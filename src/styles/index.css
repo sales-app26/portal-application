@@ -1,0 +1,270 @@
+@import 'tailwindcss';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+/* DESIGN.md tokens. Values live here only; components use the utilities. */
+@theme {
+  /* Window classes (UX-COMPONENTS.md §2) replace Tailwind's default screens. */
+  --breakpoint-*: initial;
+  --breakpoint-medium: 600px;
+  --breakpoint-expanded: 840px;
+  --breakpoint-large: 1200px;
+
+  --color-*: initial;
+  --color-primary: #0052ff;
+  --color-primary-active: #003ecc;
+  --color-primary-disabled: #a8b8cc;
+  --color-ink: #0a0b0d;
+  --color-body: #5b616e;
+  /* DESIGN.md has #7c828a here (3.9:1 on white, below WCAG AA 4.5:1 for small text); darkened to pass on white and on surface-strong. */
+  --color-muted: #656a75;
+  --color-muted-soft: #a8acb3;
+  --color-hairline: #dee1e6;
+  --color-hairline-soft: #eef0f3;
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #eef0f3;
+  --color-surface-dark: #0a0b0d;
+  --color-surface-dark-elevated: #16181c;
+  --color-on-primary: #ffffff;
+  --color-on-dark: #ffffff;
+  --color-on-dark-soft: #a8acb3;
+  --color-up: #05b169;
+  --color-down: #cf202f;
+  --color-accent-yellow: #f4b000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-sans: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 100px;
+
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-in: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emphasized-out: cubic-bezier(0.3, 0, 0.8, 0.15);
+}
+
+/* App type scale (UX-COMPONENTS.md §1, "App typography"). */
+@utility text-title-lg {
+  font-size: 32px;
+  line-height: 1.13;
+  letter-spacing: -0.4px;
+  font-weight: 400;
+}
+@utility text-title-md {
+  font-size: 18px;
+  line-height: 1.33;
+  font-weight: 600;
+}
+@utility text-title-sm {
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+@utility text-body-md {
+  font-size: 16px;
+  line-height: 1.5;
+}
+@utility text-body-sm {
+  font-size: 14px;
+  line-height: 1.5;
+}
+@utility text-caption {
+  font-size: 13px;
+  line-height: 1.5;
+}
+@utility text-caption-strong {
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+@utility text-number {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+@utility text-display-sm {
+  font-size: 36px;
+  line-height: 1.11;
+  letter-spacing: -0.5px;
+  font-weight: 400;
+}
+@utility text-button {
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 600;
+}
+@utility text-nav {
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* Safe-area helpers (UX-COMPONENTS.md §6.2). */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pressable {
+  transition: transform 100ms var(--ease-standard), background-color 100ms var(--ease-standard);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--color-canvas);
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-ink);
+    background: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+  }
+  button,
+  [role='button'],
+  nav {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* 16px minimum stops iOS Safari zooming into focused fields. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Icon: Icons8 PNG used as a mask so it takes the text colour (UX-COMPONENTS.md §8). */
+.icon {
+  display: inline-block;
+  flex: none;
+  width: var(--icon-size, 24px);
+  height: var(--icon-size, 24px);
+  background-color: currentColor;
+  -webkit-mask: var(--icon-src) center / contain no-repeat;
+  mask: var(--icon-src) center / contain no-repeat;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-strong) 0%, var(--color-hairline-soft) 50%, var(--color-surface-strong) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+  .pressable:active {
+    transform: none;
+  }
+}
+
+/* Radix dialogs and side panels (UX-COMPONENTS.md §7). */
+.overlay-scrim[data-state='open'] {
+  animation: fade-in 200ms var(--ease-standard);
+}
+.dialog-pop[data-state='open'] {
+  animation: dialog-in 200ms var(--ease-emphasized-in);
+}
+.side-panel[data-state='open'] {
+  animation: panel-in 300ms var(--ease-emphasized-in);
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+@keyframes panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+/* Map pins (UX-COMPONENTS.md §4.9): primary dot with a white ring. */
+.map-pin-wrap {
+  background: none;
+  border: 0;
+}
+.map-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-canvas);
+  color: var(--color-on-primary);
+  font: 600 11px/1 var(--font-sans);
+}
+.map-pin-selected {
+  font-size: 13px;
+  background: var(--color-ink);
+}
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+.leaflet-control-attribution {
+  font-size: 11px;
+}

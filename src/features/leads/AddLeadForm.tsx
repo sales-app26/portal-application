@@ -1,0 +1,157 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { Link, useNavigate } from 'react-router'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/Button'
+import { settleOverlays } from '@/hooks/useOverlayHistory'
+import { TextAreaField, TextField } from '@/components/ui/Field'
+import { ResponsiveOverlay } from '@/components/ui/Overlay'
+import { ApiError, apiWithMessage } from '@/lib/api'
+import { normalizePhone } from '@/lib/format'
+import { handleFormError } from '@/lib/forms'
+import { haptic } from '@/lib/haptics'
+import type { LeadDetail, MeProject } from '@/lib/types'
+import { leadSchema, type LeadValues } from './entrySchema'
+import { FollowUpFields } from './FollowUpFields'
+import { LocationField } from './LocationField'
+import { invalidateLeadData } from './queries'
+import { createStatuses, nextDateRule } from './rules'
+import { entryBody, VisitProofField, type VisitProof } from './VisitProof'
+
+const EMPTY: LeadValues = { name: '', businessName: '', phone: '', notes: '', status: 'new', note: '', nextFollowUpDate: '', location: '' }
+
+/** Add lead = client details + first follow-up in one save (PRD §5.5, flow 7.1). */
+export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; onOpenChange: (o: boolean) => void; project: MeProject }) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const doorToDoor = project.type === 'door_to_door'
+  // One id per submission, kept across retries so a double tap saves once (PRD §5.6).
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [proof, setProof] = useState<VisitProof | null>(null)
+  const [proofError, setProofError] = useState<string>()
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null)
+
+  const form = useForm<LeadValues>({ resolver: zodResolver(leadSchema), mode: 'onBlur', defaultValues: EMPTY })
+  const { register, control, handleSubmit, formState, reset, setError } = form
+
+  useEffect(() => {
+    if (!open) return
+    reset(EMPTY)
+    setRequestId(crypto.randomUUID())
+    setProof(null)
+    setProofError(undefined)
+    setDuplicateOf(null)
+  }, [open, reset])
+
+  const onSubmit = handleSubmit(async (v) => {
+    if (doorToDoor && !proof) {
+      setProofError('Take a photo of the visit to save it.')
+      haptic.error()
+      return
+    }
+    setDuplicateOf(null)
+    try {
+      const fields = {
+        clientRequestId: requestId,
+        name: v.name.trim(),
+        businessName: v.businessName.trim() || undefined,
+        phone: normalizePhone(v.phone) ?? v.phone,
+        notes: v.notes.trim() || undefined,
+        status: v.status ?? undefined,
+        note: v.note.trim(),
+        nextFollowUpDate: nextDateRule(v.status) === 'hidden' ? undefined : v.nextFollowUpDate || undefined,
+        location: v.location.trim().replace(/\s+/g, ' '),
+      }
+      const { data, message } = await apiWithMessage<LeadDetail>(`/projects/${project.id}/leads`, { method: 'POST', body: entryBody(fields, doorToDoor ? proof : null) })
+      haptic.success()
+      toast.success(message)
+      invalidateLeadData(qc)
+      qc.setQueryData(['leads', 'detail', data.id], data)
+      onOpenChange(false)
+      await settleOverlays()
+      navigate(`/leads/${data.id}`)
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'DUPLICATE_LEAD_OWN') {
+        setError('phone', { message: err.message })
+        setDuplicateOf(String(err.details?.leadId ?? ''))
+        haptic.error()
+        return
+      }
+      if (err instanceof ApiError && err.code === 'DUPLICATE_LEAD_OTHER') {
+        setError('phone', { message: err.message })
+        haptic.error()
+        return
+      }
+      if (err instanceof ApiError && (err.code === 'CAPTURE_EXPIRED' || err.code === 'VISIT_PROOF_REQUIRED')) {
+        setProof(null)
+        setProofError(err.message)
+        haptic.error()
+        return
+      }
+      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'status', 'note', 'nextFollowUpDate', 'location'])
+    }
+  })
+
+  return (
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add lead"
+      description={project.name}
+      variant="form"
+      dirty={(formState.isDirty || !!proof) && !formState.isSubmitting}
+      footer={
+        <Button type="submit" form="add-lead" size="lg" block loading={formState.isSubmitting}>
+          Save lead
+        </Button>
+      }
+    >
+      <form id="add-lead" onSubmit={onSubmit} noValidate className="flex flex-col gap-8 pt-2">
+        <fieldset className="flex flex-col gap-5">
+          <legend className="mb-4 text-caption-strong text-muted uppercase">Client</legend>
+          <TextField label="Name" autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
+          <TextField label="Business name" optional autoComplete="organization" autoCapitalize="words" enterKeyHint="next" error={formState.errors.businessName?.message} {...register('businessName')} />
+          <div className="flex flex-col gap-1.5">
+            <TextField label="Phone" type="tel" inputMode="tel" autoComplete="off" prefix="+91" enterKeyHint="next" error={formState.errors.phone?.message} {...register('phone')} />
+            {duplicateOf && (
+              <Link
+                to={`/leads/${duplicateOf}`}
+                className="text-body-sm font-semibold text-primary"
+                onClick={async (e) => {
+                  // Close the sheet and let its history entry go before navigating, or the two collide.
+                  e.preventDefault()
+                  onOpenChange(false)
+                  await settleOverlays()
+                  navigate(`/leads/${duplicateOf}`, { viewTransition: true })
+                }}
+              >
+                Open that lead
+              </Link>
+            )}
+          </div>
+          <Controller
+            control={control}
+            name="location"
+            render={({ field }) => <LocationField projectId={project.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />}
+          />
+          <TextAreaField label="About the client" optional placeholder="Anything worth remembering" error={formState.errors.notes?.message} {...register('notes')} rows={2} />
+        </fieldset>
+
+        {doorToDoor && (
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-4 text-caption-strong text-muted uppercase">Visit proof</legend>
+            <VisitProofField value={proof} onChange={(p) => (setProof(p), setProofError(undefined))} error={proofError} />
+            {proofError && <p className="text-caption text-down">{proofError}</p>}
+          </fieldset>
+        )}
+
+        <fieldset className="flex flex-col gap-5">
+          <legend className="mb-4 text-caption-strong text-muted uppercase">First follow-up</legend>
+          <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} />
+        </fieldset>
+      </form>
+    </ResponsiveOverlay>
+  )
+}
