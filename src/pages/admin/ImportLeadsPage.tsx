@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Page } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
 import { Avatar, EmptyState, ErrorState, Skeleton, Tag } from '@/components/ui/Display'
 import { TextField } from '@/components/ui/Field'
 import { ListGroup } from '@/components/ui/ListRow'
+import { Picker } from '@/components/ui/Picker'
 import { invalidateProjects, useProjectDetail, useProjectMembers } from '@/features/admin/queries'
 import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
@@ -20,6 +21,8 @@ const MAX_BYTES = 1024 * 1024
 const COLUMNS = ['name', 'phone', 'business_name', 'location', 'notes', 'owner_email']
 
 type Step = 'form' | 'preview' | 'done'
+/** review: check the file, then pick a person per lead on screen. single: the whole file goes to one person. */
+type Mode = 'review' | 'single'
 
 const downloadTemplate = () =>
   saveCsv('leads-template.csv', COLUMNS, [
@@ -28,8 +31,10 @@ const downloadTemplate = () =>
   ])
 
 /**
- * Bulk import from a CSV (admins). Check the file first, read the report, then import:
- * nothing is saved until the second step, and a file can be run twice safely.
+ * Bulk import from a CSV (admins). Two ways to hand leads out:
+ * - review: check the file, see every lead, assign them on screen (one by one or in bulk), then import;
+ * - single: the whole file goes to one person.
+ * Nothing is saved until the last step, and a file can be run twice safely.
  */
 export function ImportLeadsPage() {
   const { id = '' } = useParams()
@@ -40,10 +45,16 @@ export function ImportLeadsPage() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>('form')
+  // From a member's menu: the whole file goes to them.
+  const [params] = useSearchParams()
+  const preset = params.get('owner')
+  const [mode, setMode] = useState<Mode>(preset ? 'single' : 'review')
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string>()
   const [defaultLocation, setDefaultLocation] = useState('')
-  const [owners, setOwners] = useState<string[]>([])
+  const [single, setSingle] = useState<string | null>(preset)
+  /** File row number → member id, for the review. */
+  const [assignments, setAssignments] = useState<Record<number, string>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
 
@@ -66,12 +77,19 @@ export function ImportLeadsPage() {
       const fd = new FormData()
       fd.append('file', file)
       if (defaultLocation.trim()) fd.append('defaultLocation', defaultLocation.trim())
-      if (owners.length) fd.append('ownerIds', owners.join(','))
+      if (mode === 'single' && single) fd.append('ownerId', single)
+      if (mode === 'review') {
+        if (dryRun) fd.append('review', 'true')
+        else fd.append('assignments', JSON.stringify(assignments))
+      }
       fd.append('dryRun', String(dryRun))
       const { data } = await apiWithMessage<ImportResult>(`/projects/${id}/leads/import`, { method: 'POST', body: fd })
       setResult(data)
-      if (dryRun) setStep('preview')
-      else {
+      if (dryRun) {
+        // Start from the file's own owner_email column, where it names someone.
+        if (mode === 'review') setAssignments(Object.fromEntries(data.rows.filter((r) => r.owner).map((r) => [r.row, r.owner!.id])))
+        setStep('preview')
+      } else {
         haptic.success()
         toast.success(`${plural(data.imported, 'lead')} imported.`)
         setStep('done')
@@ -84,7 +102,7 @@ export function ImportLeadsPage() {
       haptic.error()
       const message = err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
       // A file problem belongs next to the file; anything else is a toast.
-      if (err instanceof ApiError && err.status === 400) setFileError(message)
+      if (err instanceof ApiError && err.status === 400 && step === 'form') setFileError(message)
       else toast.error(message)
     } finally {
       setBusy(false)
@@ -94,15 +112,31 @@ export function ImportLeadsPage() {
   const restart = () => {
     setStep('form')
     setResult(null)
+    setAssignments({})
     setFile(null)
     if (fileInput.current) fileInput.current.value = ''
   }
 
+  const importable = result?.importable ?? 0
+  const unassigned = mode === 'review' && result ? result.rows.filter((r) => !assignments[r.row]).length : 0
+
   const cta =
     step === 'form'
-      ? { label: 'Check file', icon: 'checkmark' as const, onClick: () => void run(true), disabled: !file || closed, loading: busy }
+      ? {
+          label: 'Check file',
+          icon: 'checkmark' as const,
+          onClick: () => void run(true),
+          disabled: !file || closed || (mode === 'single' && !single),
+          loading: busy,
+        }
       : step === 'preview'
-        ? { label: result?.importable ? `Import ${plural(result.importable, 'lead')}` : 'Nothing to import', icon: 'download' as const, onClick: () => void run(false), disabled: !result?.importable, loading: busy }
+        ? {
+            label: !importable ? 'Nothing to import' : unassigned ? `Assign ${unassigned} more` : `Import ${plural(importable, 'lead')}`,
+            icon: 'download' as const,
+            onClick: () => void run(false),
+            disabled: !importable || unassigned > 0,
+            loading: busy,
+          }
         : { label: 'View leads', icon: 'contacts' as const, onClick: () => navigate(back) }
 
   return (
@@ -117,11 +151,29 @@ export function ImportLeadsPage() {
         ) : step === 'form' ? (
           <div className="flex flex-col gap-8">
             <p className="text-body-md text-body">
-              Upload a CSV and the leads are assigned to your sales persons. They start as <b>New</b> in <b>{project.data?.name}</b> and each person finds theirs in My leads.
+              Upload a CSV of leads. They start as <b>New</b> in <b>{project.data?.name}</b> and each person finds theirs in My leads.
             </p>
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-title-md">1. The file</h2>
+              <h2 className="text-title-md">1. Who gets the leads</h2>
+              <ListGroup>
+                <ModeRow selected={mode === 'review'} onSelect={() => setMode('review')} title="I'll assign them after upload" body="See every lead in the file, then pick a person for each one, or for many at once." />
+                <ModeRow selected={mode === 'single'} onSelect={() => setMode('single')} title="All to one person" body="Every lead in the file goes to the person you pick." />
+              </ListGroup>
+              {mode === 'single' &&
+                (people.length === 0 ? (
+                  <p className="text-body-sm text-body">There are no active members in this project yet. Add some first.</p>
+                ) : (
+                  <ListGroup>
+                    {people.map((m) => (
+                      <OwnerRow key={m.userId} member={m} selected={single === m.userId} onToggle={() => setSingle(m.userId)} />
+                    ))}
+                  </ListGroup>
+                ))}
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <h2 className="text-title-md">2. The file</h2>
               <input ref={fileInput} id="import-file" type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
               <label
                 htmlFor="import-file"
@@ -145,33 +197,17 @@ export function ImportLeadsPage() {
                 </p>
               )}
               <p className="text-body-sm text-body">
-                First row = column names. <b>name</b> and <b>phone</b> are required. Optional: <b>business_name</b>, <b>location</b>, <b>notes</b> and <b>owner_email</b> (the email of the sales person who gets that lead).
+                First row = column names. <b>name</b> and <b>phone</b> are required. Optional: <b>business_name</b>, <b>location</b>, <b>notes</b>
+                {mode === 'review' && (
+                  <>
+                    {' '}and <b>owner_email</b> (pre-fills who gets that lead; you can still change it)
+                  </>
+                )}
+                .
               </p>
               <Button variant="secondary" size="sm" icon="download" className="self-start" onClick={downloadTemplate}>
                 Download a template
               </Button>
-            </section>
-
-            <section className="flex flex-col gap-3">
-              <h2 className="text-title-md">2. Who gets the leads</h2>
-              <p className="text-body-sm text-body">Rows with an owner_email go to that person. All other rows are shared evenly, in file order, between the people you pick.</p>
-              {people.length === 0 ? (
-                <p className="text-body-sm text-body">There are no active members in this project yet. Add some first.</p>
-              ) : (
-                <>
-                  <Button variant="tertiary" size="sm" className="self-start px-0" onClick={() => setOwners(owners.length === people.length ? [] : people.map((m) => m.userId))}>
-                    {owners.length === people.length ? 'Clear selection' : 'Select everyone'}
-                  </Button>
-                  <ListGroup>
-                    {people.map((m) => (
-                      <OwnerRow key={m.userId} member={m} selected={owners.includes(m.userId)} onToggle={() => setOwners((o) => (o.includes(m.userId) ? o.filter((x) => x !== m.userId) : [...o, m.userId]))} />
-                    ))}
-                  </ListGroup>
-                  <p className="text-caption text-muted" aria-live="polite">
-                    {owners.length ? `${plural(owners.length, 'person', 'people')} picked` : 'No one picked: every row then needs an owner_email.'}
-                  </p>
-                </>
-              )}
             </section>
 
             <section className="flex flex-col gap-3">
@@ -188,12 +224,166 @@ export function ImportLeadsPage() {
             </section>
           </div>
         ) : step === 'preview' && result ? (
-          <Preview result={result} onBack={restart} />
+          mode === 'review' ? (
+            <AssignStep result={result} people={people} assignments={assignments} onChange={setAssignments} onBack={restart} />
+          ) : (
+            <Preview result={result} onBack={restart} />
+          )
         ) : result ? (
           <Done result={result} projectId={id} onAgain={restart} />
         ) : null}
       </div>
     </Page>
+  )
+}
+
+function ModeRow({ selected, onSelect, title, body }: { selected: boolean; onSelect: () => void; title: string; body: string }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn('flex min-h-14 w-full items-start gap-3 border-b border-hairline-soft px-4 py-3 text-left last:border-b-0', selected ? 'bg-surface-strong' : 'active:bg-surface-soft')}
+    >
+      <span className={cn('mt-0.5 flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>
+        {selected && <Icon name="checkmark" size={16} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-title-sm">{title}</span>
+        <span className="block text-body-sm text-body">{body}</span>
+      </span>
+    </button>
+  )
+}
+
+const EVERYONE = '__everyone__'
+
+/** The review: every importable lead with its person, assigned one by one or in bulk. */
+function AssignStep({
+  result,
+  people,
+  assignments,
+  onChange,
+  onBack,
+}: {
+  result: ImportResult
+  people: Member[]
+  assignments: Record<number, string>
+  onChange: (next: Record<number, string>) => void
+  onBack: () => void
+}) {
+  const [picked, setPicked] = useState<number[]>([])
+  const rows = result.rows
+  const names = new Map(people.map((m) => [m.userId, m.name]))
+  const unassigned = rows.filter((r) => !assignments[r.row])
+  const allPicked = rows.length > 0 && picked.length === rows.length
+
+  const options = people.map((m) => ({ value: m.userId, label: m.name, description: m.email ?? ROLE_LABEL[m.role], leading: <Avatar name={m.name} size={32} /> }))
+  const bulkOptions = people.length > 1 ? [{ value: EVERYONE, label: 'Share evenly between everyone', description: `${people.length} people, in file order` }, ...options] : options
+
+  const assign = (target: number[], userId: string) => {
+    const next = { ...assignments }
+    target.forEach((row, i) => (next[row] = userId === EVERYONE ? people[i % people.length].userId : userId))
+    onChange(next)
+    setPicked([])
+  }
+  const toggle = (row: number) => setPicked((p) => (p.includes(row) ? p.filter((x) => x !== row) : [...p, row]))
+
+  const counts = new Map<string, number>()
+  for (const r of rows) if (assignments[r.row]) counts.set(assignments[r.row], (counts.get(assignments[r.row]) ?? 0) + 1)
+  const byOwner = [...counts.entries()].map(([id, count]) => ({ user: { id, name: names.get(id) ?? 'Unknown' }, count })).sort((a, b) => b.count - a.count)
+
+  if (rows.length === 0) return <Preview result={result} onBack={onBack} />
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 rounded-xl border border-hairline p-5">
+        <p className="text-title-md" role="status">
+          {plural(rows.length, 'lead')} ready · {unassigned.length ? `${unassigned.length} not assigned yet` : 'all assigned'}
+        </p>
+        <p className="text-body-sm text-body">
+          {result.total} {result.total === 1 ? 'row' : 'rows'} in the file. Pick leads, then choose who gets them. Nothing is saved until you import.
+        </p>
+        <Counts result={result} />
+        {byOwner.length > 0 && <ByOwner result={{ ...result, byOwner }} />}
+      </div>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="tertiary" size="sm" className="px-0" onClick={() => setPicked(allPicked ? [] : rows.map((r) => r.row))}>
+            {allPicked ? 'Clear selection' : 'Select all'}
+          </Button>
+          {unassigned.length > 0 && unassigned.length < rows.length && (
+            <Button variant="tertiary" size="sm" onClick={() => setPicked(unassigned.map((r) => r.row))}>
+              Select unassigned ({unassigned.length})
+            </Button>
+          )}
+          <span className="flex-1" />
+          <Picker
+            label={`Assign ${plural(picked.length, 'lead')} to`}
+            value={null}
+            options={bulkOptions}
+            onChange={(v) => assign(picked, v)}
+            trigger={({ open }) => (
+              <Button size="sm" icon="contacts" disabled={picked.length === 0} onClick={open}>
+                {picked.length ? `Assign ${picked.length}` : 'Assign'}
+              </Button>
+            )}
+          />
+        </div>
+
+        <ul className="overflow-hidden rounded-xl border border-hairline">
+          {rows.map((r) => {
+            const selected = picked.includes(r.row)
+            const owner = assignments[r.row]
+            return (
+              <li key={r.row} className={cn('flex items-center gap-3 border-b border-hairline-soft px-4 py-2 last:border-b-0', selected && 'bg-surface-strong')}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={selected}
+                  aria-label={`Select ${r.name}`}
+                  onClick={() => toggle(r.row)}
+                  className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}
+                >
+                  {selected && <Icon name="checkmark" size={16} />}
+                </button>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-title-sm">{r.name}</span>
+                  <span className="block truncate text-caption text-body">
+                    <span className="font-mono">{formatPhone(r.phone)}</span> · {r.location}
+                    {r.businessName && ` · ${r.businessName}`}
+                  </span>
+                </span>
+                <Picker
+                  label={`Who gets ${r.name}`}
+                  value={owner ?? null}
+                  options={options}
+                  onChange={(v) => onChange({ ...assignments, [r.row]: v })}
+                  trigger={({ open }) => (
+                    <button
+                      type="button"
+                      onClick={open}
+                      className={cn('flex h-9 max-w-40 flex-none items-center gap-1 rounded-pill border px-3 text-caption-strong', owner ? 'border-hairline' : 'border-dashed border-down text-down')}
+                    >
+                      <span className="truncate">{owner ? (names.get(owner) ?? 'Unknown') : 'Assign'}</span>
+                      <Icon name="expand-arrow" size={16} className="flex-none" />
+                    </button>
+                  )}
+                />
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <Problems result={result} />
+
+      <Button variant="secondary" className="self-start" onClick={onBack}>
+        Choose another file
+      </Button>
+    </div>
   )
 }
 
@@ -306,7 +496,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
                     <span className="font-mono">{formatPhone(s.phone)}</span> · {s.location}
                   </span>
                 </span>
-                <span className="flex-none text-caption text-muted">{s.owner.name}</span>
+                <span className="flex-none text-caption text-muted">{s.owner?.name}</span>
               </li>
             ))}
           </ul>

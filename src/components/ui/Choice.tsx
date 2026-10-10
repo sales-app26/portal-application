@@ -87,7 +87,7 @@ export function Segmented<T extends string>({
         <ToggleGroup.Item
           key={o.value}
           value={o.value}
-          className="flex-1 rounded-pill px-4 text-nav text-body transition-colors data-[state=on]:bg-canvas data-[state=on]:font-semibold data-[state=on]:text-ink data-[state=on]:shadow-soft"
+          className="flex-1 rounded-pill px-4 whitespace-nowrap text-nav text-body transition-colors data-[state=on]:bg-canvas data-[state=on]:font-semibold data-[state=on]:text-ink data-[state=on]:shadow-soft"
         >
           {o.label}
         </ToggleGroup.Item>

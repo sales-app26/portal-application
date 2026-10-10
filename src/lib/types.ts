@@ -317,5 +317,17 @@ export interface ImportResult {
   byOwner: { user: PersonRef; count: number }[]
   problems: ImportProblem[]
   problemsTruncated: boolean
-  sample: { row: number; name: string; phone: string; businessName: string | null; location: string; owner: PersonRef }[]
+  sample: ImportRow[]
+  /** Every importable row, in file order. */
+  rows: ImportRow[]
+}
+
+export interface ImportRow {
+  row: number
+  name: string
+  phone: string
+  businessName: string | null
+  location: string
+  /** Null in a review until someone is picked. */
+  owner: PersonRef | null
 }

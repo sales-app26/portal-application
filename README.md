@@ -95,6 +95,6 @@ Sign in as that Super Admin to create moderators, sales persons and projects (Ph
 | 4 | Timelines and maps: My day, Person timeline (`/people/:id/day`, linked from People in phase 5), `/entries/:id`, photo viewer, Leaflet + OpenStreetMap pins, same-day entry edit | **Done** |
 | | Not built: the per-entry mini map and the place-name label (needs `gps_place_label` in the API, see UX-COMPONENTS.md §4.9) | |
 | 5 | Admin: Dashboard (filters, targets, logged-nothing, status counts, conversions, people, CSV export), People (team and moderators, add, edit, deactivate), Projects (create, edit, close, reopen, join), Project detail (members, targets, leads with bulk reassign), Transfers (approve, reject) | **Done** |
-| 7 | Admin requests after v1: person summary by week or month (`/people/:id`), bulk lead import from CSV with assignment (`/projects/:id/import`). Needed two new API endpoints: `GET /timeline/summary` and `POST /projects/:id/leads/import` | **Done** |
+| 7 | Admin requests after v1: person summary by week or month (`/people/:id`), bulk lead import from CSV (`/projects/:id/import`): review every lead and assign on screen, or send the whole file to one person (`?owner=<userId>` preselects them, from a member's menu). Needed two new API endpoints: `GET /timeline/summary` and `POST /projects/:id/leads/import` | **Done** |
 | 6 | Polish: offline app shell (service worker), pull-to-refresh, automated accessibility checks (axe, WCAG 2.1 AA), bundle budget | **Done** |
 # portal-application

@@ -115,9 +115,17 @@ function MembersTab({ project }: { project: Project }) {
   return (
     <section className="flex flex-col gap-4 expanded:max-w-[800px]">
       {!closed && (
-        <Button icon="add-user-male" variant="secondary" className="self-start" onClick={() => setAdding(true)}>
-          Add member
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button icon="add-user-male" variant="secondary" onClick={() => setAdding(true)}>
+            Add member
+          </Button>
+          <Button asChild variant="secondary">
+            <Link to={`/projects/${project.id}/import`}>
+              <Icon name="csv" size={20} />
+              Import from CSV
+            </Link>
+          </Button>
+        </div>
       )}
       {q.isLoading ? (
         <ListSkeleton rows={3} />
@@ -146,6 +154,7 @@ function MembersTab({ project }: { project: Project }) {
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${m.userId}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${m.userId}/day`) },
                       { label: 'Set target', icon: 'goal', onSelect: () => setTarget(m) },
+                      { label: 'Upload leads for them', icon: 'csv', onSelect: () => navigate(`/projects/${project.id}/import?owner=${m.userId}`), hidden: !m.isActive || !m.userIsActive || m.role === 'super_admin' },
                       { label: 'Remove from project', icon: 'trash', onSelect: () => setRemoving(m), hidden: !canRemove(m) },
                     ]}
                   />
@@ -187,31 +196,45 @@ function LeadsTab({ project }: { project: Project }) {
   const leads = list.data?.pages.flatMap((pg) => pg.items) ?? []
   const toggle = (id: string) => setPicked((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)))
   const exit = () => (setSelecting(false), setPicked(new Set()))
+  const filtered = !!search.trim() || status !== 'all' || owner !== 'all'
+  const empty = !filtered && !list.isLoading && !list.isError && leads.length === 0
+  // Only filter by owner when there is more than one to choose between.
+  const ownerOptions = (members.data ?? []).filter((m) => m.isActive).map((m) => ({ value: m.userId, label: m.name }))
+  const importButton = (
+    <Button asChild>
+      <Link to={`/projects/${project.id}/import`}>
+        <Icon name="csv" size={20} />
+        Import from CSV
+      </Link>
+    </Button>
+  )
 
   return (
     <section className="flex flex-col gap-4 expanded:max-w-[900px]">
-      <label className="flex h-11 items-center gap-2 rounded-pill bg-surface-strong px-4 medium:max-w-md">
-        <Icon name="search" size={20} className="text-muted" />
-        <span className="sr-only">Search leads</span>
-        <input type="search" enterKeyHint="search" placeholder="Name, business or phone" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={120} className="h-full min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
-      </label>
-      <FilterChips label="Owner" value={owner} onChange={setOwner} options={[{ value: 'all', label: 'Everyone' }, { value: 'unavailable', label: 'Owner inactive or removed' }, ...(members.data ?? []).filter((m) => m.isActive).map((m) => ({ value: m.userId, label: m.name }))]} />
-      <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All statuses' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]} />
-      {!closed && (
-        <div className="flex flex-wrap gap-2">
-          {leads.length > 0 && (
-            <Button variant="secondary" size="sm" icon={selecting ? 'multiply' : 'checkmark'} onClick={() => (selecting ? exit() : setSelecting(true))}>
-              {selecting ? 'Cancel selection' : 'Select to reassign'}
-            </Button>
+      {/* Search and actions share one row; with no leads at all there's nothing to search or filter. */}
+      {!empty && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex h-11 min-w-0 flex-1 basis-64 items-center gap-2 rounded-pill bg-surface-strong px-4 medium:max-w-md">
+            <Icon name="search" size={20} className="text-muted" />
+            <span className="sr-only">Search leads</span>
+            <input type="search" enterKeyHint="search" placeholder="Name, business or phone" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={120} className="h-full min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
+          </label>
+          {!closed && (
+            <div className="flex gap-2">
+              {leads.length > 0 && (
+                <Button variant="secondary" icon={selecting ? 'multiply' : 'checkmark'} onClick={() => (selecting ? exit() : setSelecting(true))}>
+                  {selecting ? 'Cancel' : 'Reassign'}
+                </Button>
+              )}
+              {!selecting && importButton}
+            </div>
           )}
-          {!selecting && (
-            <Button asChild variant="secondary" size="sm">
-              <Link to={`/projects/${project.id}/import`}>
-                <Icon name="csv" size={20} />
-                Import from CSV
-              </Link>
-            </Button>
-          )}
+        </div>
+      )}
+      {!empty && (
+        <div className="flex flex-col gap-2">
+          {ownerOptions.length > 1 && <FilterChips label="Owner" value={owner} onChange={setOwner} options={[{ value: 'all', label: 'Everyone' }, ...ownerOptions, { value: 'unavailable', label: 'Owner inactive or removed' }]} />}
+          <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All statuses' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]} />
         </div>
       )}
 
@@ -219,8 +242,24 @@ function LeadsTab({ project }: { project: Project }) {
         <ListSkeleton />
       ) : list.isError ? (
         <ErrorState message={list.error.message} onRetry={() => void list.refetch()} />
+      ) : empty ? (
+        <EmptyState
+          icon="contacts"
+          title="No leads yet"
+          body={closed ? 'This project is closed.' : 'Import a CSV to hand leads out to your team, or wait for sales persons to add them in the field.'}
+          action={!closed && importButton}
+        />
       ) : leads.length === 0 ? (
-        <EmptyState icon="contacts" title="No leads match" body="Change the owner or status filter." />
+        <EmptyState
+          icon="search"
+          title="No leads match"
+          body="Try another name or phone, or clear the filters."
+          action={
+            <Button variant="secondary" onClick={() => (setSearch(''), setStatus('all'), setOwner('all'))}>
+              Clear filters
+            </Button>
+          }
+        />
       ) : (
         <div className={selecting ? '-mx-4 border-t border-hairline pb-24 medium:mx-0 medium:rounded-xl medium:border' : '-mx-4 border-t border-hairline medium:mx-0 medium:overflow-hidden medium:rounded-xl medium:border'}>
           {leads.map((l) => (

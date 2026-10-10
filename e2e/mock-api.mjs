@@ -172,6 +172,10 @@ export function createMockApi({ role = 'sales_person' } = {}) {
         problemsTruncated: false,
         sample: [{ row: 2, name: 'Imran Shaikh', phone: '9123456780', businessName: null, location: field('defaultLocation') ?? 'Kondhwa', owner: { id: ids.priya, name: picked[0] } }],
       }
+      // A review lists every row, unassigned, for picking on screen.
+      result.rows = field('review') === 'true'
+        ? [2, 3, 4, 7].map((row, i) => ({ row, name: `Lead ${i + 1}`, phone: `912345678${i}`, businessName: null, location: 'Kondhwa', owner: null }))
+        : result.sample
       return ok(result, 'Leads imported.')
     }
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/reassign$/))) return ok({ reassigned: json().leadIds.length, skipped: 0 }, 'Leads reassigned.')
