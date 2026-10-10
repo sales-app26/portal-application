@@ -331,3 +331,52 @@ export interface ImportRow {
   /** Null in a review until someone is picked. */
   owner: PersonRef | null
 }
+
+// ---------------------------------------------------------------- release notes
+
+/** A release as the Super Admin manages it, drafts included. */
+export interface AppVersion {
+  id: string
+  /** Dotted release number, e.g. "1.2.0". */
+  version: string
+  title: string | null
+  tags: string[]
+  /** The release note, markdown. */
+  notes: string
+  releasedAt: string
+  isPublished: boolean
+  /** Whether reaching this version raises the What's new dialog. */
+  notify: boolean
+  /** How many people have read the note. */
+  seenCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** The newest published release, and whether this user has been shown it. */
+export interface LatestVersion {
+  id: string
+  version: string
+  title: string | null
+  tags: string[]
+  notes: string
+  releasedAt: string
+  seen: boolean
+  notify: boolean
+}
+
+export interface VersionHistoryItem {
+  id: string
+  version: string
+  title: string | null
+  tags: string[]
+  notes: string
+  releasedAt: string
+  seen: boolean
+}
+
+export interface VersionViews {
+  seen: { userId: string; name: string; email: string; role: UserRole; seenAt: string }[]
+  /** Active people who haven't been shown it yet. */
+  pending: number
+}

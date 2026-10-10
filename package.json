@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:e2e": "node --test --test-concurrency=1 \"e2e/{app,admin,a11y,offline,summary-import}.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"e2e/{app,admin,a11y,offline,summary-import,versions}.test.mjs\"",
     "check:bundle": "node scripts/check-bundle.mjs",
     "build:check": "npm run build && npm run check:bundle",
     "test:e2e:real": "node --test --test-concurrency=1 --test-timeout=240000 e2e/real-api.test.mjs"
@@ -32,7 +32,9 @@
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.89.0",
     "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
     "react-router": "^8.4.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
     "vaul": "^1.1.2",

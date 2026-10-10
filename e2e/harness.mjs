@@ -32,8 +32,8 @@ export async function startApp() {
   })
   await browser.defaultBrowserContext().overridePermissions(base, ['geolocation', 'camera'])
 
-  async function open(viewport = PHONE, { signedIn = true, projectId, role = 'sales_person', gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {}) {
-    const api = createMockApi({ role })
+  async function open(viewport = PHONE, { signedIn = true, projectId, role = 'sales_person', unreadRelease = false, gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {}) {
+    const api = createMockApi({ role, unreadRelease })
     const page = await browser.newPage()
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))

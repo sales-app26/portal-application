@@ -15,6 +15,8 @@ import { apiWithMessage } from '@/lib/api'
 import { formatPhone, normalizePhone, ROLE_LABEL } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
+import { Tag } from '@/components/ui/Display'
+import { useLatestVersion } from '@/features/versions/queries'
 import type { Me } from '@/lib/types'
 
 export function ProfilePage() {
@@ -23,6 +25,7 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const { data: latest } = useLatestVersion()
 
   return (
     <Page title="Profile">
@@ -55,6 +58,14 @@ export function ProfilePage() {
         )}
 
         <ListGroup title="About">
+          <ListRow
+            icon="timeline"
+            title="What’s new"
+            subtitle={latest ? `Version ${latest.version}` : 'Release notes'}
+            trailing={latest && latest.notify && !latest.seen ? <Tag>New</Tag> : undefined}
+            to="/whats-new"
+            chevron
+          />
           <ListRow
             icon="info"
             title="Credits"

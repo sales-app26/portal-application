@@ -41,6 +41,7 @@ function RoleHome() {
 
 const FIELD: UserRole[] = ['sales_person', 'moderator']
 const ADMIN: UserRole[] = ['super_admin', 'moderator']
+const OWNER: UserRole[] = ['super_admin']
 
 export const router = createBrowserRouter([
   // HydrateFallback: shown instead of a blank page while a lazy route's code loads on first visit.
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
           { index: true, element: <RoleHome /> },
           { path: 'profile', lazy: async () => ({ Component: (await import('@/pages/profile/ProfilePage')).ProfilePage }) },
           { path: 'more', lazy: async () => ({ Component: (await import('@/pages/misc/MorePage')).MorePage }) },
+          { path: 'whats-new', lazy: async () => ({ Component: (await import('@/pages/misc/WhatsNewPage')).WhatsNewPage }) },
 
           { path: 'day', lazy: async () => ({ Component: (await import('@/pages/timeline/MyDayPage')).MyDayPage }) },
           { path: 'entries/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/EntryPage')).EntryPage }) },
@@ -84,6 +86,10 @@ export const router = createBrowserRouter([
               { path: 'projects/:id/import', lazy: async () => ({ Component: (await import('@/pages/admin/ImportLeadsPage')).ImportLeadsPage }) },
               { path: 'projects/:id', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectDetailPage')).ProjectDetailPage }) },
             ],
+          },
+          {
+            element: <RequireRole roles={OWNER} />,
+            children: [{ path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) }],
           },
           { path: '*', element: <NotFound /> },
         ],

@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth, useMe } from '@/auth/AuthProvider'
+import { WhatsNewDialog } from '@/features/versions/WhatsNewDialog'
 import { LoginSheet } from '@/pages/auth/LoginSheet'
 import { Banner } from '@/components/ui/Display'
 import { Avatar } from '@/components/ui/Display'
@@ -37,7 +38,9 @@ export function AppShell() {
         </main>
       </div>
       <BottomBar items={NAV[me.role].bar} />
-      {expired && <LoginSheet />}
+      {/* The newest release note, once per person. Held back while the session-expired
+          sign-in is up, so the two never stack. */}
+      {expired ? <LoginSheet /> : <WhatsNewDialog />}
     </div>
   )
 }

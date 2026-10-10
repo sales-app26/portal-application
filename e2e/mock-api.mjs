@@ -18,7 +18,8 @@ export const ids = {
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
 /** role: 'sales_person' | 'moderator' | 'super_admin' */
-export function createMockApi({ role = 'sales_person' } = {}) {
+/** `unreadRelease` leaves the live release note unread, so the What's new dialog shows. Off by default: it would sit over every other screen's tests. */
+export function createMockApi({ role = 'sales_person', unreadRelease = false } = {}) {
   const projects = [
     { id: ids.online, name: 'Pune Retail Drive', type: 'online', status: 'active', targetCount: 20, targetPeriod: 'weekly' },
     { id: ids.d2d, name: 'Kondhwa Door-to-door', type: 'door_to_door', status: 'active', targetCount: null, targetPeriod: null },
@@ -89,6 +90,13 @@ export function createMockApi({ role = 'sales_person' } = {}) {
   const page = (items) => ({ items, meta: { page: 1, limit: 20, total: items.length, totalPages: 1, hasNextPage: false, hasPreviousPage: false } })
   const ok = (data, message = 'Fetched successfully.', status = 200) => ({ status, body: { success: true, statusCode: status, message, data } })
   const fail = (status, errorCode, message, details) => ({ status, body: { success: false, statusCode: status, errorCode, message, ...(details ? { details } : {}) } })
+
+  /** Release notes: a live 1.1.0 (read, unless `unreadRelease`), over the quiet 1.0.0 everyone starts on. */
+  const seenVersions = new Set(unreadRelease ? [] : ['aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'])
+  const versions = [
+    { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', version: '1.1.0', title: 'Faster lead import', tags: ['Leads', 'Transfers'], notes: '## Added\n\n- Import a CSV of leads in one go', releasedAt: iso(), isPublished: true, notify: true, seenCount: 0, createdAt: iso(), updatedAt: iso() },
+    { id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', version: '1.0.0', title: 'First release', tags: [], notes: 'The first release of Sales Tracker.', releasedAt: iso(), isPublished: true, notify: false, seenCount: 0, createdAt: iso(), updatedAt: iso() },
+  ]
 
   /** Every request, and the non-GET ones separately, for assertions. */
   const writes = []
@@ -209,6 +217,22 @@ export function createMockApi({ role = 'sales_person' } = {}) {
     if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
     if ((m = p.match(/^\/leads\/([^/]+)\/follow-ups$/))) return ok({ entry: entry(8), lead: lead(0) }, 'Follow-up saved.', 201)
     if ((m = p.match(/^\/leads\/([^/]+)$/))) return ok(detail({ ...lead(Number(m[1][7])), id: m[1] }))
+    // ---- release notes
+    if (p === '/versions/latest') {
+      const live = versions.find((v) => v.isPublished)
+      return ok(live ? { ...live, seen: seenVersions.has(live.id) } : null)
+    }
+    if (p === '/versions/admin') return ok(versions.map((v) => ({ ...v, seenCount: seenVersions.has(v.id) ? 1 : 0 })))
+    if (p === '/versions' && method === 'GET') return ok(versions.filter((v) => v.isPublished).map((v) => ({ ...v, seen: seenVersions.has(v.id) })))
+    if (p === '/versions' && method === 'POST') return ok({ ...versions[0], id: 'new', version: '9.9.9' }, 'Created successfully.', 201)
+    if ((m = p.match(/^\/versions\/([^/]+)\/seen$/))) {
+      seenVersions.add(m[1])
+      return { status: 204, raw: '' }
+    }
+    if ((m = p.match(/^\/versions\/([^/]+)\/views$/))) return ok({ seen: [{ userId: me.id, name: me.name, email: me.email, role: 'sales_person', seenAt: iso() }], pending: 3 })
+    if ((m = p.match(/^\/versions\/([^/]+)$/)) && method === 'PATCH') return ok(versions.find((v) => v.id === m[1]) ?? versions[0], 'Updated successfully.')
+    if ((m = p.match(/^\/versions\/([^/]+)$/)) && method === 'DELETE') return { status: 204, raw: '' }
+
     return fail(404, 'NOT_FOUND', `mock: no route for ${method} ${p}`)
   }
 
