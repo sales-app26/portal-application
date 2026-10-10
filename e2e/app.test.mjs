@@ -34,7 +34,7 @@ describe('sign out', () => {
     await go('/profile')
     await click(page, 'Log out')
     await click(page, 'Log out', '[role=dialog] button')
-    await waitForText(page, 'Sales Tracker for Pronttera teams.')
+    await waitForText(page, 'Lead tracking for Pronttera teams.')
     await sleep(300)
     assert.equal(await page.evaluate(() => location.pathname + location.search), '/login')
     assert.deepEqual(errors, [])

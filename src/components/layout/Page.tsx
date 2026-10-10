@@ -42,7 +42,7 @@ export function Page({ title, back, actions, leading, cta, header, wide, childre
   const { pull, refreshing } = usePullToRefresh()
 
   useEffect(() => {
-    document.title = `${title} · Sales Tracker`
+    document.title = `${title} · Pronttera Sales`
   }, [title])
 
   useEffect(() => {

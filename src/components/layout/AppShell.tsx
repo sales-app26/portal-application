@@ -150,7 +150,7 @@ function SideDrawer() {
     <nav aria-label="Main" className="fixed inset-y-0 left-0 z-20 hidden w-[280px] flex-col border-r border-hairline bg-canvas px-3 py-4 large:flex">
       <div className="mb-6 flex items-center gap-3 px-3">
         <BrandMark />
-        <span className="text-title-md">Sales Tracker</span>
+        <span className="text-title-md">Pronttera Sales</span>
       </div>
       <ul className="flex flex-1 flex-col gap-1">
         {flatNav(me.role).map((item) => (

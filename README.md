@@ -1,6 +1,6 @@
-# Sales Tracker: portal application
+# Pronttera Sales: portal application
 
-The mobile-first web app for the Sales Tracker. It runs in the browser and installs to the home screen. It talks to the NestJS API in `../service-application`.
+The mobile-first web app for the Pronttera Sales. It runs in the browser and installs to the home screen. It talks to the NestJS API in `../service-application`.
 
 | Topic | Source |
 | --- | --- |

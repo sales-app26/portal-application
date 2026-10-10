@@ -18,7 +18,7 @@ export function LoginPage() {
       <div className="flex flex-1 flex-col px-4 pt-12 pb-[max(16px,env(safe-area-inset-bottom))] medium:px-6 expanded:w-[400px] expanded:flex-none expanded:rounded-xl expanded:border expanded:border-hairline expanded:bg-canvas expanded:p-8">
         <BrandMark size={48} />
         <h1 className="mt-6 text-title-lg">Sign in</h1>
-        <p className="mt-1 mb-8 text-body-md text-body">Sales Tracker for Pronttera teams.</p>
+        <p className="mt-1 mb-8 text-body-md text-body">Lead tracking for Pronttera teams.</p>
         {notice && (
           <p role="alert" className="mb-5 rounded-md bg-surface-strong px-4 py-3 text-body-sm text-ink">
             {notice}
