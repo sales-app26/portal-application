@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
@@ -35,7 +35,12 @@ export function HomePage() {
   const me = useMe()
   const navigate = useNavigate()
   const { project } = useProject()
-  const [adding, setAdding] = useState(false)
+  // The app icon's "Add lead" shortcut opens Home with ?add=1.
+  const [params, setParams] = useSearchParams()
+  const [adding, setAdding] = useState(() => params.get('add') === '1')
+  useEffect(() => {
+    if (params.get('add') === '1') setParams((p) => (p.delete('add'), p), { replace: true })
+  }, [params, setParams])
   const home = useHome(project?.id)
   const due = useDueToday(project?.id)
   const agenda = useAgenda(project?.id)

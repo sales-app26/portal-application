@@ -59,6 +59,9 @@ export const ICONS = {
   visible: ['eye'],
   invisible: ['eye-slash'],
   'logout-rounded': ['arrow-right-from-square'],
+  share: ['arrow-up-from-square'],
+  'add-square': ['square-plus'],
+  smartphone: ['smartphone'],
 }
 
 const symbol = (id, file) => {

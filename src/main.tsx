@@ -5,7 +5,7 @@ import { RouterProvider } from 'react-router'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api'
-import { registerServiceWorker } from '@/pwa'
+import { captureInstallPrompt, registerServiceWorker } from '@/pwa'
 import { router } from '@/router'
 import { applyTheme, watchSystemTheme } from '@/lib/theme'
 import '@/styles/index.css'
@@ -27,6 +27,7 @@ const queryClient = new QueryClient({
 })
 
 registerServiceWorker()
+captureInstallPrompt()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

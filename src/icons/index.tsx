@@ -12,6 +12,7 @@ export type IconName =
   | 'collapse-arrow' | 'multiply' | 'checkmark' | 'edit' | 'synchronize' | 'refresh' | 'goal'
   | 'ok' | 'approval' | 'cancel' | 'csv' | 'download' | 'image' | 'high-priority' | 'error'
   | 'wi-fi-disconnected' | 'lock' | 'trash' | 'info' | 'visible' | 'invisible' | 'logout-rounded'
+  | 'share' | 'add-square' | 'smartphone'
 
 interface IconProps {
   name: IconName

@@ -1,16 +1,32 @@
 {
+  "id": "/",
   "name": "Pronttera Sales",
-  "short_name": "Pronttera",
-  "description": "Leads, follow-ups and visits for the Pronttera sales team.",
+  "short_name": "Pronttera Sales",
+  "description": "Leads, follow-ups, visits and targets for the Pronttera sales team: call or WhatsApp in one tap, log the follow-up, see your day and your numbers.",
+  "lang": "en-IN",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f1115",
-  "theme_color": "#ffffff",
+  "theme_color": "#0a78b0",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Add lead", "short_name": "Add lead", "description": "Add a new lead", "url": "/home?add=1", "icons": [{ "src": "/shortcuts/add-lead.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "My leads", "short_name": "Leads", "url": "/leads", "icons": [{ "src": "/shortcuts/leads.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "My day", "short_name": "My day", "url": "/day", "icons": [{ "src": "/shortcuts/day.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Performance", "short_name": "Performance", "url": "/performance", "icons": [{ "src": "/shortcuts/performance.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/home.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Today: your target, what's due and one-tap Call and WhatsApp" },
+    { "src": "/screenshots/lead.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "A lead: deal value, history and quick actions" },
+    { "src": "/screenshots/performance.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Your performance by week or month" },
+    { "src": "/screenshots/dashboard.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "The team dashboard: revenue, funnel and leaderboard" }
   ]
 }

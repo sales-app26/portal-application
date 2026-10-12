@@ -6,7 +6,7 @@ export type ThemeChoice = 'system' | 'light' | 'dark'
 
 const KEY = 'st.theme'
 /** The status bar / browser chrome colour per theme, matching --color-canvas. */
-const CHROME = { light: '#ffffff', dark: '#0f1115' } as const
+const CHROME = { light: '#f3f4f6', dark: '#0b0d11' } as const
 
 const media = () => window.matchMedia('(prefers-color-scheme: dark)')
 

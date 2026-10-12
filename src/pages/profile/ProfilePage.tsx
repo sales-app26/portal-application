@@ -21,6 +21,8 @@ import type { Me } from '@/lib/types'
 import { ProntteraMark } from '@/components/brand/Logo'
 import { Segmented } from '@/components/ui/Choice'
 import { getThemeChoice, setThemeChoice, type ThemeChoice } from '@/lib/theme'
+import { useInstall } from '@/hooks/useInstall'
+import { Icon } from '@/icons'
 
 export function ProfilePage() {
   const me = useMe()
@@ -29,6 +31,8 @@ export function ProfilePage() {
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [theme, setTheme] = useState<ThemeChoice>(getThemeChoice)
+  const install = useInstall()
+  const [iosHelp, setIosHelp] = useState(false)
   const { data: latest } = useLatestVersion()
 
   return (
@@ -42,6 +46,21 @@ export function ProfilePage() {
             <span className="chip chip--soft chip--accent chip--sm mt-1.5 h-6 px-2.5 text-caption-strong">{ROLE_LABEL[me.role]}</span>
           </div>
         </div>
+
+        {install.mode && (
+          <ListGroup title="App">
+            <ListRow
+              icon="smartphone"
+              title="Install Pronttera Sales"
+              subtitle="Open it from your home screen, full screen, like any app"
+              chevron
+              onClick={async () => {
+                if (install.mode === 'ios') return setIosHelp(true)
+                if (await install.install()) toast.success('Pronttera Sales is on your home screen.')
+              }}
+            />
+          </ListGroup>
+        )}
 
         <ListGroup title="Account">
           <ListRow icon="user-male-circle" title="Name and phone" subtitle={me.phone ? `${me.name} · ${formatPhone(me.phone)}` : me.name} chevron onClick={() => setEditOpen(true)} />
@@ -109,6 +128,22 @@ export function ProfilePage() {
 
       <EditProfile open={editOpen} onOpenChange={setEditOpen} me={me} />
       <ChangePassword open={passwordOpen} onOpenChange={setPasswordOpen} />
+      <ResponsiveOverlay open={iosHelp} onOpenChange={setIosHelp} title="Install Pronttera Sales" description="Two taps in Safari." variant="short">
+        <ol className="flex flex-col gap-4 pb-2">
+          {[
+            { icon: 'share' as const, text: <>Tap <strong>Share</strong> in Safari's toolbar.</> },
+            { icon: 'add-square' as const, text: <>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</> },
+          ].map((step, i) => (
+            <li key={i} className="flex items-center gap-3">
+              <span className="flex size-10 flex-none items-center justify-center rounded-full bg-accent-soft text-primary">
+                <Icon name={step.icon} size={20} />
+              </span>
+              <span className="text-body-md">{step.text}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-4 text-body-sm text-muted">Pronttera Sales then opens from its own icon, full screen, and keeps you signed in.</p>
+      </ResponsiveOverlay>
       <Confirm open={logoutOpen} onOpenChange={setLogoutOpen} title="Log out?" body="You'll need your email and password to sign in again." confirmLabel="Log out" onConfirm={logout} />
     </Page>
   )
