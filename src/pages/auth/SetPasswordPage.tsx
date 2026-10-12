@@ -18,24 +18,21 @@ const schema = z
   .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'The passwords do not match.' })
 
 /**
- * Invite and reset links land here. Our own emails (Brevo) carry a one-time `token_hash`
+ * Invite and reset links land here. The emails (Brevo) carry a one-time `token_hash`
  * in the query, spent only when the password is saved, so mail scanners opening the
- * link don't use it up. Supabase's own emails put a session token in the fragment.
+ * link don't use it up.
  */
 export function SetPasswordPage() {
   const link = useMemo(() => {
     const q = new URLSearchParams(window.location.search)
-    const f = new URLSearchParams(window.location.hash.slice(1))
-    const tokenHash = q.get('token_hash')
-    const type = q.get('type') ?? f.get('type')
-    return { tokenHash, type, token: tokenHash ?? f.get('access_token'), error: f.get('error_description') }
+    return { tokenHash: q.get('token_hash'), type: q.get('type') === 'invite' ? 'invite' : 'recovery' }
   }, [])
   const [done, setDone] = useState(false)
   const { register, handleSubmit, formState } = useForm({ resolver: zodResolver(schema), mode: 'onBlur', defaultValues: { password: '', confirm: '' } })
 
   const onSubmit = handleSubmit(async ({ password }) => {
     try {
-      await api('/auth/set-password', { method: 'POST', body: link.tokenHash ? { tokenHash: link.tokenHash, type: link.type === 'invite' ? 'invite' : 'recovery', password } : { accessToken: link.token, password }, anonymous: true })
+      await api('/auth/set-password', { method: 'POST', body: { tokenHash: link.tokenHash, type: link.type, password }, anonymous: true })
       // The token is single-use; don't leave it in the address bar.
       window.history.replaceState(null, '', window.location.pathname)
       setDone(true)
@@ -50,11 +47,11 @@ export function SetPasswordPage() {
     <div className="flex min-h-dvh flex-col bg-canvas pt-safe pb-safe expanded:items-center expanded:justify-center expanded:bg-surface-soft">
       <div className="flex flex-1 flex-col px-4 pt-12 medium:px-6 expanded:w-[400px] expanded:flex-none expanded:rounded-xl expanded:border expanded:border-hairline expanded:bg-canvas expanded:p-8">
         <BrandMark size={48} />
-        {!link.token ? (
+        {!link.tokenHash ? (
           <EmptyState
             icon="error"
             title="This link has expired or was already used"
-            body={link.error ?? 'Ask your admin for a new invite, or use "Forgot password?" on the sign-in screen.'}
+            body='Ask your admin for a new invite, or use "Forgot password?" on the sign-in screen.'
             action={
               <Button asChild>
                 <Link to="/login">Go to sign in</Link>

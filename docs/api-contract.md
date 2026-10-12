@@ -365,7 +365,7 @@ All paths below are relative to `/api/v1`.
 | POST | `/auth/login` | Public | `email` (email, lowercased and trimmed, required); `password` (string, non-empty, max 72) | `SessionDto` | "Signed in.", 200 |
 | POST | `/auth/refresh` | Public | `refreshToken` (string, non-empty) | `SessionDto` | "Session refreshed.", 200 |
 | POST | `/auth/forgot-password` | Public | `email` (email) | `{ message: "If an account exists for this email, a reset link has been sent." }` | envelope message is "Created successfully.", 200 |
-| POST | `/auth/set-password` | Public | `accessToken` (string, non-empty; the Supabase token from the invite or reset link's URL fragment); `password` (string, 8–72) | `null` | "Password saved. You can sign in now.", 200. A bad link gives 401 UNAUTHORIZED, "This link has expired or was already used. Ask for a new one." |
+| POST | `/auth/set-password` | Public | `tokenHash` (string, non-empty; `token_hash` from the invite or reset link's query); `type` (`invite` or `recovery`; `type` from the link); `password` (string, 8–72) | `null` | "Password saved. You can sign in now.", 200. A bad link gives 401 UNAUTHORIZED, "This link has expired or was already used. Ask for a new one." |
 | POST | `/auth/logout` | any | none | `null` | "Signed out.", 200 |
 | GET | `/auth/me` | any | none | `MeDto` | |
 | PATCH | `/auth/me` | any | `name?` (trimmed, non-empty, max 120); `phone?` (string or null, max 20; empty or null clears; otherwise must normalize to an Indian mobile, else 400 VALIDATION_FAILED "Enter a 10-digit Indian mobile number.") | `MeDto` | "Updated successfully." |

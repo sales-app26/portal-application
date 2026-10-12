@@ -17,7 +17,7 @@ npm run dev        # http://localhost:5173; /api is proxied to the API on :4100
 npm run build      # type-check + production build into dist/
 ```
 
-Set `VITE_API_URL` only when the API is not same-origin. It defaults to `/api/v1`. The API's `AUTH_REDIRECT_URL` must point at `<app>/set-password`.
+Set `VITE_API_URL` only when the API is not same-origin. It defaults to `/api/v1`. The API's `APP_URL` must be this app's public address: invite and reset emails link to `<app>/set-password`.
 
 ## Stack
 
