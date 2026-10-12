@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
@@ -34,6 +34,7 @@ export function PeoplePage() {
   const [editing, setEditing] = useState<User | null>(null)
   const [toggling, setToggling] = useState<User | null>(null)
   const [deleting, setDeleting] = useState<User | null>(null)
+  const [sharing, setSharing] = useState<User | null>(null)
   const [busy, setBusy] = useState(false)
   const q = useDebounced(search.trim(), 300)
 
@@ -123,7 +124,7 @@ export function PeoplePage() {
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
                       { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
-                      { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => void shareResetLink(u), hidden: !u.isActive || u.id === me.id },
+                      { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id },
                       { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(u), hidden: !isSuper || u.id === me.id || u.role === 'super_admin' },
                       { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: !u.isActive && u.id === me.id },
                     ]}
@@ -151,32 +152,82 @@ export function PeoplePage() {
         onConfirm={toggleActive}
         loading={busy}
       />
+      {sharing && <ResetLinkSheet user={sharing} onClose={() => setSharing(null)} />}
       {deleting && <DeleteUserSheet user={deleting} onClose={() => setDeleting(null)} />}
     </Page>
   )
 }
 
 /**
- * A one-time password-reset link the admin sends by hand. Phones get the share sheet
- * (WhatsApp, SMS…); elsewhere it's copied.
+ * A one-time password-reset link the admin sends by hand (WhatsApp, SMS…). The link is
+ * shown first and copied only on the admin's own tap: browsers may refuse a clipboard
+ * write that happens after a network wait, which would leave the old clipboard in place.
  */
-async function shareResetLink(user: User) {
-  try {
-    const { data, message } = await apiWithMessage<{ link: string }>(`/users/${user.id}/reset-link`, { method: 'POST' })
-    const text = `Hi ${user.name}, use this link to set your Pronttera Sales password. It works once.`
-    if (typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches) {
-      try {
-        await navigator.share({ title: 'Reset your password', text, url: data.link })
-        return
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return
-      }
+function ResetLinkSheet({ user, onClose }: { user: User; onClose: () => void }) {
+  const [link, setLink] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const text = `Hi ${user.name}, use this link to set your Pronttera Sales password. It works once.`
+
+  useEffect(() => {
+    let live = true
+    apiWithMessage<{ link: string }>(`/users/${user.id}/reset-link`, { method: 'POST' })
+      .then(({ data }) => live && setLink(data.link))
+      .catch((err: unknown) => live && setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.'))
+    return () => {
+      live = false
     }
-    await navigator.clipboard.writeText(`${text}\n${data.link}`)
-    toast.success(`Link copied, not emailed. ${message}`)
-  } catch (err) {
-    handleFormError(err)
+  }, [user.id])
+
+  const copy = async () => {
+    if (!link) return
+    try {
+      await navigator.clipboard.writeText(`${text}\n${link}`)
+      setCopied(true)
+      toast.success('Link copied. Paste it to the person; it is not emailed.')
+    } catch {
+      toast.error('Could not copy. Select the link and copy it by hand.')
+    }
   }
+  const canShare = typeof navigator.share === 'function'
+  const share = async () => {
+    if (!link) return
+    try {
+      await navigator.share({ title: 'Reset your password', text, url: link })
+    } catch {
+      /* cancelled */
+    }
+  }
+
+  return (
+    <ResponsiveOverlay open onOpenChange={(o) => !o && onClose()} title={`Reset link for ${user.name}`} description="Works once. Share it only with this person." variant="confirm">
+      {error ? (
+        <ErrorState message={error} />
+      ) : !link ? (
+        <ListSkeleton rows={1} />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <input
+            readOnly
+            value={link}
+            aria-label="Reset link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="h-12 w-full rounded-md border border-hairline bg-surface-soft px-3 font-mono text-caption"
+          />
+          <div className="flex flex-col gap-3 medium:flex-row-reverse">
+            <Button icon={copied ? 'checkmark' : undefined} onClick={() => void copy()}>
+              {copied ? 'Copied' : 'Copy link'}
+            </Button>
+            {canShare && (
+              <Button variant="secondary" onClick={() => void share()}>
+                Share…
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </ResponsiveOverlay>
+  )
 }
 
 /**
