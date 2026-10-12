@@ -119,6 +119,7 @@ export function PeoplePage() {
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${u.id}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
+                      { label: 'Share reset link', icon: 'lock', onSelect: () => void shareResetLink(u), hidden: !u.isActive || u.id === me.id },
                       { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: !u.isActive && u.id === me.id },
                     ]}
                   />
@@ -147,4 +148,27 @@ export function PeoplePage() {
       />
     </Page>
   )
+}
+
+/**
+ * A one-time password-reset link the admin sends by hand. Phones get the share sheet
+ * (WhatsApp, SMS…); elsewhere it's copied.
+ */
+async function shareResetLink(user: User) {
+  try {
+    const { data, message } = await apiWithMessage<{ link: string }>(`/users/${user.id}/reset-link`, { method: 'POST' })
+    const text = `Hi ${user.name}, use this link to set your Pronttera Sales password. It works once.`
+    if (typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches) {
+      try {
+        await navigator.share({ title: 'Reset your password', text, url: data.link })
+        return
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return
+      }
+    }
+    await navigator.clipboard.writeText(`${text}\n${data.link}`)
+    toast.success(`Link copied. ${message}`)
+  } catch (err) {
+    handleFormError(err)
+  }
 }
