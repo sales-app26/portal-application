@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { StatusChip } from '@/components/ui/Choice'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
@@ -5,7 +6,7 @@ import { Icon } from '@/icons'
 import { formatDateTime, formatTime, relativeDay } from '@/lib/format'
 import type { Entry } from '@/lib/types'
 
-/** One row in a lead's history (PRD §5.11). Photo viewer and map pin arrive in phase 4. */
+/** One row in a lead's history (PRD §5.11). A visit's photo opens the entry: full photo and map pin. */
 export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boolean; onDelete?: () => void }) {
   const isVisit = entry.hasPhoto
   return (
@@ -39,7 +40,7 @@ export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boole
               {entry.location.name}
             </span>
           )}
-          {isVisit && entry.gpsAccuracyM !== null && <span className="font-mono">± {Math.round(entry.gpsAccuracyM)} m</span>}
+          {isVisit && entry.gpsAccuracyM !== null && <span className="tabular-nums">± {Math.round(entry.gpsAccuracyM)} m</span>}
           {!mine && <span>by {entry.user.name}</span>}
           {entry.edited && <span>Edited {formatTime(entry.updatedAt)}</span>}
         </p>
@@ -49,7 +50,12 @@ export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boole
           </Button>
         )}
         {isVisit && entry.photoUrl && (
-          <img src={entry.photoUrl} alt={`Visit photo, ${formatDateTime(entry.createdAt)}`} loading="lazy" className="mt-3 size-16 rounded-md bg-surface-strong object-cover" />
+          <Link to={`/entries/${entry.id}`} className="pressable mt-3 inline-flex items-center gap-3 rounded-md active:opacity-80" aria-label="Open the visit photo and map">
+            <img src={entry.photoUrl} alt={`Visit photo, ${formatDateTime(entry.createdAt)}`} loading="lazy" className="size-16 rounded-md bg-surface-strong object-cover" />
+            <span className="inline-flex items-center gap-1 text-body-sm font-semibold text-primary">
+              <Icon name="map" size={18} /> Photo and map
+            </span>
+          </Link>
         )}
       </div>
     </li>

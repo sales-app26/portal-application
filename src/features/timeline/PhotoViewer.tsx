@@ -84,7 +84,7 @@ export function PhotoViewer({ entry, title, onClose }: Props) {
         </p>
         {hasGps && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="font-mono text-caption text-on-dark-soft">
+            <span className="tabular-nums text-caption text-on-dark-soft">
               {entry.latitude!.toFixed(5)}, {entry.longitude!.toFixed(5)} · ± {Math.round(entry.gpsAccuracyM ?? 0)} m
             </span>
             {entry.lowAccuracy && <Tag>Low accuracy</Tag>}

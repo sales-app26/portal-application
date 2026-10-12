@@ -35,7 +35,7 @@ export function DateStrip({ value, onChange }: { value: string; onChange: (ymd: 
               className={cn('pressable flex h-16 w-12 flex-none flex-col items-center justify-center rounded-lg', on ? 'bg-ink text-on-dark' : 'bg-surface-strong text-ink')}
             >
               <span className={cn('text-caption-strong uppercase', on ? 'text-on-dark-soft' : 'text-muted')}>{new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' }).format(date)}</span>
-              <span className="font-mono text-number">{date.getUTCDate()}</span>
+              <span className="tabular-nums text-number">{date.getUTCDate()}</span>
             </button>
           )
         })}

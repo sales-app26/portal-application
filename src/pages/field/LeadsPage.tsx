@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Navigate, Outlet, useParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
-import { FilterChips } from '@/components/ui/Choice'
+import { ChoiceList, FilterChips } from '@/components/ui/Choice'
+import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Display'
 import { LoadMore } from '@/components/ui/LoadMore'
 import { Button } from '@/components/ui/Button'
@@ -14,11 +15,43 @@ import { ProjectSwitcher } from '@/features/projects/ProjectSwitcher'
 import { useDebounced } from '@/hooks/useDebounced'
 import { useWindowClass } from '@/hooks/useWindowClass'
 import { Icon } from '@/icons'
-import { STATUSES, STATUS_LABEL } from '@/lib/format'
-import type { LeadStatus } from '@/lib/types'
+import { STATUSES, STATUS_DOT, STATUS_LABEL } from '@/lib/format'
+import type { LeadSort, LeadStatus } from '@/lib/types'
 import { LeadDetailPage } from './LeadDetailPage'
 
 type StatusFilter = LeadStatus | 'all'
+
+const SORTS: { value: LeadSort; label: string; short: string }[] = [
+  { value: 'next_follow_up', label: 'Next follow-up first', short: 'Next follow-up' },
+  { value: 'updated', label: 'Recently active', short: 'Recently active' },
+  { value: 'created', label: 'Newest first', short: 'Newest' },
+  { value: 'name', label: 'Name, A to Z', short: 'Name' },
+]
+const SORT_KEY = 'st.leadSort'
+
+/** The rep's last sort choice survives reloads; storage can be blocked, so every access is guarded. */
+function useLeadSort(): [LeadSort, (s: LeadSort) => void] {
+  const [sort, setSort] = useState<LeadSort>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_KEY)
+      if (SORTS.some((s) => s.value === saved)) return saved as LeadSort
+    } catch {
+      /* storage blocked */
+    }
+    return 'next_follow_up'
+  })
+  return [
+    sort,
+    (s) => {
+      setSort(s)
+      try {
+        localStorage.setItem(SORT_KEY, s)
+      } catch {
+        /* storage blocked */
+      }
+    },
+  ]
+}
 
 /**
  * My leads. Phones: the list, with detail pushed as its own page.
@@ -59,9 +92,11 @@ function LeadList() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [adding, setAdding] = useState(false)
+  const [sort, setSort] = useLeadSort()
+  const [sorting, setSorting] = useState(false)
   const q = useDebounced(search.trim(), 300)
   // Moderators also see everyone's leads as admins; "My leads" is their own work.
-  const list = useLeadList(project?.id, { search: q || undefined, status: status === 'all' ? null : status, mine: me.role === 'moderator' })
+  const list = useLeadList(project?.id, { search: q || undefined, status: status === 'all' ? null : status, mine: me.role === 'moderator', sort })
   const leads = list.data?.pages.flatMap((p) => p.items) ?? []
   const total = list.data?.pages[0]?.meta.total
 
@@ -106,11 +141,30 @@ function LeadList() {
               </button>
             )}
           </label>
-          <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]} />
+          <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]} />
         </div>
       }
     >
-      {total !== undefined && <p className="mb-2 text-caption text-muted" aria-live="polite">{total === 1 ? '1 lead' : `${total} leads`}</p>}
+      <div className="mb-1 flex min-h-9 items-center justify-between gap-2">
+        <p className="text-caption text-muted" aria-live="polite">
+          {total === undefined ? '' : total === 1 ? '1 lead' : `${total} leads`}
+        </p>
+        <button type="button" onClick={() => setSorting(true)} className="pressable -mr-2 flex h-9 items-center gap-1.5 rounded-pill px-3 text-body-sm font-semibold text-ink active:bg-surface-strong">
+          <Icon name="sort" size={18} />
+          {SORTS.find((s) => s.value === sort)?.short}
+        </button>
+      </div>
+      <ResponsiveOverlay open={sorting} onOpenChange={setSorting} title="Sort leads" variant="choice">
+        <ChoiceList
+          label="Sort leads"
+          value={sort}
+          options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
+          onSelect={(v) => {
+            setSort(v)
+            setSorting(false)
+          }}
+        />
+      </ResponsiveOverlay>
       {list.isLoading ? (
         <ListSkeleton />
       ) : list.isError ? (
@@ -129,7 +183,7 @@ function LeadList() {
       ) : (
         <div className="-mx-4 border-t border-hairline medium:-mx-6 expanded:-mx-8">
           {leads.map((l) => (
-            <LeadRow key={l.id} lead={l} />
+            <LeadRow key={l.id} lead={l} contact />
           ))}
           <LoadMore hasNext={!!list.hasNextPage} loading={list.isFetchingNextPage} onLoad={() => void list.fetchNextPage()} />
         </div>

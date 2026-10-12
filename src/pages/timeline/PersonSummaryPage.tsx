@@ -123,7 +123,7 @@ function WeekRows({ userId, days, today }: { userId: string; days: DaySummary[];
               </span>
               <span className="truncate text-caption text-body">{describeDay(d)}</span>
             </span>
-            <span className="w-8 flex-none text-right font-mono text-number">{d.followUps}</span>
+            <span className="w-8 flex-none text-right tabular-nums text-number">{d.followUps}</span>
           </Link>
         </li>
       ))}
@@ -166,7 +166,7 @@ function MonthGrid({ userId, days, today }: { userId: string; days: DaySummary[]
               <span aria-hidden className={cn('text-caption', d.date === today && 'font-semibold underline underline-offset-2')}>
                 {dayNumber(d.date)}
               </span>
-              <span aria-hidden className="font-mono text-caption-strong">
+              <span aria-hidden className="tabular-nums text-caption-strong">
                 {d.followUps === 0 ? '' : d.followUps}
               </span>
             </Link>

@@ -12,6 +12,8 @@ export interface PageCta {
   onClick: () => void
   disabled?: boolean
   loading?: boolean
+  /** A step in a flow (Check file, Import): a full-width bar on phones instead of the floating button. */
+  bar?: boolean
 }
 
 interface PageProps {
@@ -28,6 +30,10 @@ interface PageProps {
   header?: ReactNode
   /** Use the full content width instead of the 1200px cap (tables). */
   wide?: boolean
+  /** A line under the large title, e.g. today's date. */
+  subtitle?: ReactNode
+  /** The page draws its own big heading (lead detail): keep the bar title hidden until scrolled. */
+  heroTitle?: boolean
   children: ReactNode
 }
 
@@ -35,11 +41,26 @@ interface PageProps {
  * Page frame (UX-COMPONENTS.md §4.1). Compact: 56px bar + large title that collapses
  * into the bar on scroll. Medium and up: plain bar, title in the page header.
  */
-export function Page({ title, back, actions, leading, cta, header, wide, children }: PageProps) {
+export function Page({ title, back, actions, leading, cta, header, wide, subtitle, heroTitle, children }: PageProps) {
   const navigate = useNavigate()
   const sentinel = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const { pull, refreshing } = usePullToRefresh()
+  // The floating button shrinks to a round + while scrolling down, so it doesn't sit on row buttons.
+  const [fabSmall, setFabSmall] = useState(false)
+  const hasFab = !!cta && !cta.bar
+  useEffect(() => {
+    if (!hasFab) return
+    let last = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      if (Math.abs(y - last) < 8) return
+      setFabSmall(y > last && y > 80)
+      last = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasFab])
 
   useEffect(() => {
     document.title = `${title} · Pronttera Sales`
@@ -86,7 +107,7 @@ export function Page({ title, back, actions, leading, cta, header, wide, childre
             className={cn(
               'min-w-0 flex-1 truncate text-title-md transition-opacity duration-150 medium:hidden',
               back ? '' : 'pl-2',
-              scrolled || back ? 'opacity-100' : 'opacity-0',
+              scrolled || (back && !heroTitle) ? 'opacity-100' : 'opacity-0',
             )}
           >
             {title}
@@ -107,16 +128,33 @@ export function Page({ title, back, actions, leading, cta, header, wide, childre
         {/* Large title: compact only when there is no back button; always on larger screens. */}
         <div className={cn('pt-1 pb-4 medium:pt-2 medium:pb-6', back && 'hidden medium:block')}>
           <h1 className={cn('text-title-lg', back && 'max-medium:sr-only')}>{title}</h1>
+          {subtitle && <p className={cn('mt-1 text-body-md text-body', back && 'max-medium:hidden')}>{subtitle}</p>}
         </div>
         <div ref={sentinel} aria-hidden className="h-px" />
         {header && <div className="mb-4">{header}</div>}
         <div className={cn(cta && 'pb-24 medium:pb-8', !cta && 'pb-8')}>{children}</div>
       </div>
 
-      {cta && (
+      {/* Phones: a floating action button above the tab bar, so the list keeps the screen. */}
+      {cta?.bar && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 border-t border-hairline bg-canvas px-4 py-3 medium:hidden">
           <Button size="lg" block icon={cta.icon} onClick={cta.onClick} disabled={cta.disabled} loading={cta.loading}>
             {cta.label}
+          </Button>
+        </div>
+      )}
+      {cta && !cta.bar && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] z-10 flex justify-end px-4 medium:hidden">
+          <Button
+            size="lg"
+            icon={cta.icon}
+            onClick={cta.onClick}
+            disabled={cta.disabled}
+            loading={cta.loading}
+            aria-label={cta.label}
+            className={cn('pointer-events-auto shadow-[0_6px_20px_rgba(0,82,255,0.35)] transition-[padding,width] duration-200', fabSmall ? 'w-14 px-0' : 'px-6')}
+          >
+            {!fabSmall && cta.label}
           </Button>
         </div>
       )}

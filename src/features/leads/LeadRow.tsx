@@ -5,24 +5,28 @@ import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
 import { plural, relativeDay } from '@/lib/format'
 import type { LeadSummary } from '@/lib/types'
+import { ContactButtons } from './ContactActions'
 
-/** 72px lead row (UX-COMPONENTS.md §4.6). Active state highlights it in the split view. */
-export function LeadRow({ lead, showOwner, selected, onToggle }: { lead: LeadSummary; showOwner?: boolean; selected?: boolean; onToggle?: () => void }) {
-  const secondary = [lead.businessName, lead.location.name, showOwner ? lead.owner.name : null].filter(Boolean).join(' · ')
-  const right = (
-    <span className="flex flex-none flex-col items-end gap-1">
-      <StatusChip status={lead.status} />
-      {lead.ownerTag ? (
-        <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner inactive' : 'Owner removed'}</Tag>
-      ) : lead.overdueDays ? (
-        <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag>
-      ) : lead.nextFollowUpDate ? (
-        <span className="text-caption text-muted">{relativeDay(lead.nextFollowUpDate)}</span>
-      ) : lead.hasPendingTransfer ? (
-        <span className="text-caption text-muted">Transfer pending</span>
-      ) : null}
-    </span>
-  )
+/** "Overdue 2 days", "Next: Tomorrow", "Owner inactive"… the one thing to know about when. */
+export function LeadWhen({ lead }: { lead: LeadSummary }) {
+  if (lead.ownerTag) return <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner inactive' : 'Owner removed'}</Tag>
+  if (lead.overdueDays) return <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag>
+  if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDay(lead.nextFollowUpDate)}</span>
+  if (lead.hasPendingTransfer) return <span className="text-caption whitespace-nowrap text-muted">Transfer pending</span>
+  return null
+}
+
+const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [lead.businessName, lead.location.name, showOwner ? lead.owner.name : null].filter(Boolean).join(' · ')
+
+/**
+ * Lead row (UX-COMPONENTS.md §4.6).
+ *  - `contact`: the rep's own lists. Call and WhatsApp sit on the row, so the commonest
+ *    job (reach the client) is one tap from Home or My leads.
+ *  - otherwise: admin lists, with an avatar and the owner.
+ */
+export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead: LeadSummary; showOwner?: boolean; selected?: boolean; onToggle?: () => void; contact?: boolean }) {
+  const secondary = secondaryLine(lead, showOwner)
+
   // Selection mode (bulk reassign): the whole row toggles instead of navigating.
   if (onToggle)
     return (
@@ -40,9 +44,28 @@ export function LeadRow({ lead, showOwner, selected, onToggle }: { lead: LeadSum
           <span className="truncate text-title-sm">{lead.name}</span>
           <span className="truncate text-body-sm text-body">{secondary}</span>
         </span>
-        {right}
+        <span className="flex flex-none flex-col items-end gap-1">
+          <StatusChip status={lead.status} />
+          <LeadWhen lead={lead} />
+        </span>
       </button>
     )
+
+  if (contact)
+    return (
+      <div className="flex items-center border-b border-hairline-soft has-[a[aria-current=page]]:expanded:bg-surface-strong">
+        <NavLink to={`/leads/${lead.id}`} className="flex min-h-[84px] min-w-0 flex-1 flex-col justify-center gap-1 py-3 pr-2 pl-4 active:bg-surface-soft">
+          <span className="truncate text-title-sm">{lead.name}</span>
+          {secondary && <span className="truncate text-body-sm text-body">{secondary}</span>}
+          <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <StatusChip status={lead.status} size="sm" />
+            <LeadWhen lead={lead} />
+          </span>
+        </NavLink>
+        <ContactButtons phone={lead.phone} name={lead.name} className="pr-4" />
+      </div>
+    )
+
   return (
     <NavLink
       to={`/leads/${lead.id}`}
@@ -58,7 +81,10 @@ export function LeadRow({ lead, showOwner, selected, onToggle }: { lead: LeadSum
         <span className="truncate text-title-sm">{lead.name}</span>
         <span className="truncate text-body-sm text-body">{secondary}</span>
       </span>
-      {right}
+      <span className="flex flex-none flex-col items-end gap-1">
+        <StatusChip status={lead.status} />
+        <LeadWhen lead={lead} />
+      </span>
     </NavLink>
   )
 }

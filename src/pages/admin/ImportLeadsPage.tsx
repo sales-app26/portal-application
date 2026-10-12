@@ -140,7 +140,7 @@ export function ImportLeadsPage() {
         : { label: 'View leads', icon: 'contacts' as const, onClick: () => navigate(back) }
 
   return (
-    <Page title="Import leads" back={back} cta={project.data && !closed ? cta : undefined}>
+    <Page title="Import leads" back={back} cta={project.data && !closed && cta ? { ...cta, bar: true } : undefined}>
       <div className="expanded:max-w-[720px]">
         {project.isLoading || members.isLoading ? (
           <Skeleton className="h-64 rounded-xl" />
@@ -352,7 +352,7 @@ function AssignStep({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title-sm">{r.name}</span>
                   <span className="block truncate text-caption text-body">
-                    <span className="font-mono">{formatPhone(r.phone)}</span> · {r.location}
+                    <span className="tabular-nums">{formatPhone(r.phone)}</span> · {r.location}
                     {r.businessName && ` · ${r.businessName}`}
                   </span>
                 </span>
@@ -430,7 +430,7 @@ function ByOwner({ result }: { result: ImportResult }) {
           <span className="h-2 flex-1 overflow-hidden rounded-pill bg-surface-strong">
             <span className="block h-full rounded-pill bg-ink" style={{ width: `${(o.count / max) * 100}%` }} />
           </span>
-          <span className="w-10 flex-none text-right font-mono text-caption">{o.count}</span>
+          <span className="w-10 flex-none text-right tabular-nums text-caption">{o.count}</span>
         </li>
       ))}
     </ul>
@@ -451,9 +451,9 @@ function Problems({ result }: { result: ImportResult }) {
         {result.problems.map((p) => (
           <li key={p.row} className="border-b border-hairline-soft px-4 py-3 last:border-b-0">
             <p className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-caption text-muted">Row {p.row}</span>
+              <span className="tabular-nums text-caption text-muted">Row {p.row}</span>
               <span className="text-title-sm">{p.name}</span>
-              {p.phone && <span className="font-mono text-caption text-body">{p.phone}</span>}
+              {p.phone && <span className="tabular-nums text-caption text-body">{p.phone}</span>}
             </p>
             <p className={cn('text-body-sm', p.kind === 'invalid' ? 'text-down' : 'text-body')}>{p.reason}</p>
           </li>
@@ -493,7 +493,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title-sm">{s.name}</span>
                   <span className="block truncate text-caption text-body">
-                    <span className="font-mono">{formatPhone(s.phone)}</span> · {s.location}
+                    <span className="tabular-nums">{formatPhone(s.phone)}</span> · {s.location}
                   </span>
                 </span>
                 <span className="flex-none text-caption text-muted">{s.owner?.name}</span>

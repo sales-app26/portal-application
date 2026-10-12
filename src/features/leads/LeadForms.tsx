@@ -64,8 +64,9 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
   const helpers = useSaveHelpers(lead, onOpenChange)
   const statuses = followUpStatuses(lead.status)
 
+  // Preselect where the lead stands (New becomes Contacted: logging a follow-up means contact).
   const defaults = (): FollowUpValues => ({
-    status: lead.status === 'converted' ? 'converted' : null,
+    status: lead.status === 'new' ? 'contacted' : lead.status,
     note: '',
     nextFollowUpDate: '',
     location: lead.location.name,

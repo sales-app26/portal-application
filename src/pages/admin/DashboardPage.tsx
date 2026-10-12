@@ -5,6 +5,7 @@ import { Page } from '@/components/layout/Page'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button, IconButton } from '@/components/ui/Button'
 import { Avatar, Card, EmptyState, ErrorState, ProgressBar, SectionTitle, Skeleton, StatTile } from '@/components/ui/Display'
+import { Segmented } from '@/components/ui/Choice'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { DashboardFilters, presetRange } from '@/features/admin/DashboardFilters'
 import { useDashboard, useProjectOptions, useUserOptions, type DashboardFilter } from '@/features/admin/queries'
@@ -127,7 +128,7 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
       <div className="grid grid-cols-2 gap-3 expanded:grid-cols-4">
         <StatTile label="New leads" value={d.newLeads} />
         <StatTile label={filter.from === filter.to ? 'Follow-ups' : 'Follow-ups in range'} value={d.followUps} />
-        <StatTile label="Follow-ups today" value={d.followUpsToday} />
+        <StatTile label="Converted" value={d.people.reduce((n, p) => n + p.conversions, 0)} tone="up" />
         <StatTile label="Pending transfers" value={d.pendingTransfers} onClick={() => navigate('/transfers')} />
       </div>
 
@@ -144,7 +145,7 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
                     <Link to={`/people/${t.user.id}`} className="min-w-0 truncate text-title-sm active:underline">
                       {t.user.name}
                     </Link>
-                    <span className="flex-none font-mono text-caption">
+                    <span className="flex-none tabular-nums text-caption">
                       {t.achieved}
                       {t.targetCount ? ` / ${t.targetCount}` : ''}
                     </span>
@@ -191,9 +192,9 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
                 <span aria-hidden className={cn('size-2.5 flex-none rounded-full', STATUS_DOT[s.status])} />
                 <span className="w-36 flex-none truncate text-body-sm">{STATUS_LABEL[s.status]}</span>
                 <span className="h-2 flex-1 overflow-hidden rounded-pill bg-surface-strong">
-                  <span className="block h-full rounded-pill bg-ink" style={{ width: `${(s.count / maxStatus) * 100}%` }} />
+                  <span className={cn('block h-full rounded-pill', STATUS_DOT[s.status])} style={{ width: `${(s.count / maxStatus) * 100}%` }} />
                 </span>
-                <span className="w-10 flex-none text-right font-mono text-caption">{s.count}</span>
+                <span className="w-10 flex-none text-right tabular-nums text-caption">{s.count}</span>
               </li>
             ))}
           </ul>
@@ -215,7 +216,7 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
                       </span>
                       <span className="block truncate text-caption text-body">
                         {c.convertedBy.name} · {formatDateTime(c.convertedAt)}
-                        {c.via === 'status_change' && ' · set by hand'} · <span className="font-mono">{formatPhone(c.phone)}</span>
+                        {c.via === 'status_change' && ' · set by hand'} · <span className="tabular-nums">{formatPhone(c.phone)}</span>
                       </span>
                     </span>
                     <Icon name="chevron-right" size={20} className="text-muted-soft" />
@@ -228,42 +229,63 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
         </Card>
       </div>
 
-      <section>
-        <SectionTitle>People · {plural(d.people.length, 'person', 'people')}</SectionTitle>
-        {d.people.length === 0 ? (
-          <p className="text-body-sm text-body">No activity in these dates.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-hairline">
-            <table className="w-full min-w-[480px] text-left">
-              <thead className="border-b border-hairline text-caption-strong text-muted">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Person</th>
-                  <th className="px-3 py-3 text-right font-semibold">New</th>
-                  <th className="px-3 py-3 text-right font-semibold">Follow-ups</th>
-                  <th className="px-3 py-3 text-right font-semibold">Converted</th>
-                  <th className="px-4 py-3 text-right font-semibold">Today</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.people.map((p) => (
-                  <tr key={p.user.id} className="border-b border-hairline-soft last:border-b-0 active:bg-surface-soft expanded:hover:bg-surface-soft">
-                    <td className="px-4 py-3">
-                      <Link to={`/people/${p.user.id}?date=${filter.to}`} className="text-title-sm active:underline">
-                        {p.user.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-right font-mono text-body-sm">{p.newLeads}</td>
-                    <td className="px-3 py-3 text-right font-mono text-body-sm">{p.followUps}</td>
-                    <td className="px-3 py-3 text-right font-mono text-body-sm">{p.conversions}</td>
-                    <td className="px-4 py-3 text-right font-mono text-body-sm">{p.followUpsToday}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <Leaderboard people={d.people} date={filter.to} />
     </>
+  )
+}
+
+type RankBy = 'conversions' | 'followUps' | 'newLeads'
+const RANK_LABEL: Record<RankBy, string> = { conversions: 'Converted', followUps: 'Follow-ups', newLeads: 'New leads' }
+
+/**
+ * Who is doing what in these dates, ranked. A list rather than a table so it reads on a
+ * phone without sideways scrolling; the metric to rank by is one tap away.
+ */
+function Leaderboard({ people, date }: { people: Dashboard['people']; date: string }) {
+  const [by, setBy] = useState<RankBy>('conversions')
+  const ranked = [...people].sort((a, b) => b[by] - a[by] || b.followUps - a.followUps || a.user.name.localeCompare(b.user.name))
+  const top = Math.max(1, ...ranked.map((p) => p[by]))
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-title-md">People · {plural(people.length, 'person', 'people')}</h2>
+        {people.length > 1 && (
+          <Segmented label="Rank by" value={by} onChange={setBy} options={(Object.keys(RANK_LABEL) as RankBy[]).map((k) => ({ value: k, label: RANK_LABEL[k] }))} />
+        )}
+      </div>
+      {people.length === 0 ? (
+        <p className="text-body-sm text-body">No activity in these dates.</p>
+      ) : (
+        <ol className="overflow-hidden rounded-xl border border-hairline">
+          {ranked.map((p, i) => (
+            <li key={p.user.id} className="border-b border-hairline-soft last:border-b-0">
+              <Link to={`/people/${p.user.id}?date=${date}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-soft expanded:hover:bg-surface-soft">
+                <span className={cn('w-6 flex-none text-center text-title-sm tabular-nums', i === 0 && p[by] > 0 ? 'text-primary' : 'text-muted')}>{i + 1}</span>
+                <Avatar name={p.user.name} size={36} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-title-sm">{p.user.name}</span>
+                  <span className="block truncate text-caption text-body tabular-nums">
+                    {(Object.keys(RANK_LABEL) as RankBy[])
+                      .filter((k) => k !== by)
+                      .map((k) => `${p[k]} ${RANK_LABEL[k].toLowerCase()}`)
+                      .join(' · ')}
+                    {` · ${p.followUpsToday} today`}
+                  </span>
+                  <span className="mt-1.5 block h-1.5 overflow-hidden rounded-pill bg-surface-strong">
+                    <span className="block h-full rounded-pill bg-primary" style={{ width: `${(p[by] / top) * 100}%` }} />
+                  </span>
+                </span>
+                <span className="flex w-16 flex-none flex-col items-end">
+                  <span className="text-title-md tabular-nums">{p[by]}</span>
+                  <span className="text-caption text-muted">{RANK_LABEL[by].toLowerCase()}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   )
 }
 

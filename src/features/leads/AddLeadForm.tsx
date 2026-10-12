@@ -9,10 +9,11 @@ import { settleOverlays } from '@/hooks/useOverlayHistory'
 import { TextAreaField, TextField } from '@/components/ui/Field'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { ApiError, apiWithMessage } from '@/lib/api'
-import { normalizePhone } from '@/lib/format'
+import { api } from '@/lib/api'
+import { formatPhone, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import type { LeadDetail, MeProject } from '@/lib/types'
+import type { LeadDetail, LeadSummary, MeProject, Paginated } from '@/lib/types'
 import { leadSchema, type LeadValues } from './entrySchema'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
@@ -34,7 +35,40 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null)
 
   const form = useForm<LeadValues>({ resolver: zodResolver(leadSchema), mode: 'onBlur', defaultValues: EMPTY })
-  const { register, control, handleSubmit, formState, reset, setError } = form
+  const { register, control, handleSubmit, formState, reset, setError, setValue } = form
+  // Found while typing: the rep's own lead with this number, so they can open it instead of retyping.
+  const [existing, setExisting] = useState<LeadSummary | null>(null)
+  const phoneField = register('phone')
+
+  const checkPhone = async (raw: string) => {
+    const digits = normalizePhone(raw)
+    setExisting(null)
+    if (!digits) return
+    try {
+      const page = await api<Paginated<LeadSummary>>(`/projects/${project.id}/leads`, { query: { search: digits, limit: 1, mine: 'true' } })
+      const hit = page.items.find((l) => l.phone === digits)
+      if (hit) setExisting(hit)
+    } catch {
+      // Only a hint; the save still checks duplicates on the server.
+    }
+  }
+
+  const pickContact = async () => {
+    try {
+      const [c] = await (navigator as unknown as { contacts: { select: (p: string[], o: { multiple: boolean }) => Promise<{ name?: string[]; tel?: string[] }[]> } }).contacts.select(['name', 'tel'], { multiple: false })
+      if (!c) return
+      if (c.name?.[0]) setValue('name', c.name[0], { shouldDirty: true, shouldValidate: true })
+      const tel = c.tel?.find((t) => normalizePhone(t)) ?? c.tel?.[0]
+      if (tel) {
+        const digits = normalizePhone(tel)
+        setValue('phone', digits ? formatPhone(digits) : tel, { shouldDirty: true, shouldValidate: true })
+        void checkPhone(tel)
+      }
+    } catch {
+      // Cancelled or not allowed: nothing to do.
+    }
+  }
+  const canPickContact = typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window
 
   useEffect(() => {
     if (!open) return
@@ -43,6 +77,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
     setProof(null)
     setProofError(undefined)
     setDuplicateOf(null)
+    setExisting(null)
   }, [open, reset])
 
   const onSubmit = handleSubmit(async (v) => {
@@ -110,11 +145,47 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
     >
       <form id="add-lead" onSubmit={onSubmit} noValidate className="flex flex-col gap-8 pt-2">
         <fieldset className="flex flex-col gap-5">
-          <legend className="mb-4 text-caption-strong text-muted uppercase">Client</legend>
-          <TextField label="Name" autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
-          <TextField label="Business name" optional autoComplete="organization" autoCapitalize="words" enterKeyHint="next" error={formState.errors.businessName?.message} {...register('businessName')} />
+          <legend className="mb-4 flex w-full items-center justify-between gap-3 text-caption-strong text-muted uppercase">
+            Client
+            {canPickContact && (
+              <Button type="button" variant="secondary" size="sm" icon="contacts" onClick={pickContact} className="normal-case">
+                Pick from contacts
+              </Button>
+            )}
+          </legend>
+          <TextField label="Shop or business name" optional autoComplete="organization" autoCapitalize="words" enterKeyHint="next" error={formState.errors.businessName?.message} {...register('businessName')} />
+          <TextField label="Contact person" autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
           <div className="flex flex-col gap-1.5">
-            <TextField label="Phone" type="tel" inputMode="tel" autoComplete="off" prefix="+91" enterKeyHint="next" error={formState.errors.phone?.message} {...register('phone')} />
+            <TextField
+              label="Phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              prefix="+91"
+              enterKeyHint="next"
+              error={formState.errors.phone?.message}
+              {...phoneField}
+              onBlur={(e) => {
+                void phoneField.onBlur(e)
+                void checkPhone(e.target.value)
+              }}
+            />
+            {existing && !duplicateOf && (
+              <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-accent-yellow/15 px-3 py-2 text-body-sm text-ink">
+                You already have this number: <strong>{existing.name}</strong>
+                <button
+                  type="button"
+                  className="font-semibold text-primary"
+                  onClick={async () => {
+                    onOpenChange(false)
+                    await settleOverlays()
+                    navigate(`/leads/${existing.id}`)
+                  }}
+                >
+                  Open lead
+                </button>
+              </p>
+            )}
             {duplicateOf && (
               <Link
                 to={`/leads/${duplicateOf}`}

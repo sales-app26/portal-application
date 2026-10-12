@@ -212,7 +212,7 @@ function ResetLinkSheet({ user, onClose }: { user: User; onClose: () => void }) 
             value={link}
             aria-label="Reset link"
             onFocus={(e) => e.currentTarget.select()}
-            className="h-12 w-full rounded-md border border-hairline bg-surface-soft px-3 font-mono text-caption"
+            className="h-12 w-full rounded-md border border-hairline bg-surface-soft px-3 tabular-nums text-caption"
           />
           <div className="flex flex-col gap-3 medium:flex-row-reverse">
             <Button icon={copied ? 'checkmark' : undefined} onClick={() => void copy()}>

@@ -211,7 +211,7 @@ describe('projects', () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
     await go(`/projects/${ids.online}?tab=leads`)
     await waitForText(page, 'Asha Patil')
-    await click(page, 'Select to reassign')
+    await click(page, 'Reassign') // enters selection mode
     const rows = await page.$$('[role=checkbox]')
     assert.equal(rows.length, 4)
     await rows[0].evaluate((r) => r.click())

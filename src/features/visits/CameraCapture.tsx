@@ -219,7 +219,7 @@ function GpsPill({ state, fix }: { state: string; fix: GpsFix | null }) {
   const low = fix.accuracy > LOW_ACCURACY_M
   return (
     <span
-      className={cn('flex h-9 items-center gap-1.5 rounded-pill bg-surface-dark-elevated px-3 font-mono text-caption-strong', low ? 'text-accent-yellow' : 'text-on-dark')}
+      className={cn('flex h-9 items-center gap-1.5 rounded-pill bg-surface-dark-elevated px-3 tabular-nums text-caption-strong', low ? 'text-accent-yellow' : 'text-on-dark')}
       aria-live="polite"
       aria-label={`Location found, accuracy ${Math.round(fix.accuracy)} metres${low ? ', low accuracy' : ''}`}
     >

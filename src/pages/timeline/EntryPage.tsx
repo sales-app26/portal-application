@@ -63,7 +63,7 @@ export function EntryPage() {
             <section className="flex flex-col gap-3">
               <LazyMap points={[{ id: e.id, latitude: e.latitude!, longitude: e.longitude!, accuracy: e.gpsAccuracyM }]} interactive={false} className="h-48 rounded-xl border border-hairline" />
               <div className="flex flex-wrap items-center gap-3">
-                <span className="font-mono text-caption text-body">
+                <span className="tabular-nums text-caption text-body">
                   {e.latitude!.toFixed(5)}, {e.longitude!.toFixed(5)} · ± {Math.round(e.gpsAccuracyM ?? 0)} m
                 </span>
                 {e.lowAccuracy && <Tag>Low accuracy</Tag>}
@@ -77,7 +77,7 @@ export function EntryPage() {
           )}
 
           <ListGroup>
-            {e.location && <ListRow icon="marker" title={e.location.name} subtitle="Typed location" />}
+            {e.location && <ListRow icon="marker" title={e.location.name} subtitle="Area" />}
             <ListRow icon="contacts" title="Open the lead" to={`/leads/${e.leadId}`} chevron />
           </ListGroup>
 

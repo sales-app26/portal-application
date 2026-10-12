@@ -92,7 +92,7 @@ export function VisitProofField({ value, onChange, error }: { value: VisitProof 
           <p className="flex items-center gap-1 text-title-sm">
             <Icon name="checkmark" size={20} className="text-up" /> Photo taken
           </p>
-          <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-caption text-body">
+          <p className="mt-1 flex flex-wrap items-center gap-2 tabular-nums text-caption text-body">
             ± {Math.round(value.gpsAccuracyM)} m{low && <Tag className="font-sans">Low accuracy</Tag>}
           </p>
           <p className={cn('mt-1 text-caption', (remaining ?? 0) < 120_000 ? 'text-down' : 'text-muted')} aria-live="off">

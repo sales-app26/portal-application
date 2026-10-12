@@ -12,15 +12,26 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
 
 export const STATUSES = Object.keys(STATUS_LABEL) as LeadStatus[]
 
-/** Status shows as a dot colour only; the label carries the meaning (UX-COMPONENTS.md §4.5). */
+/** One hue per status (dot, bar, pin); the label still carries the meaning for colour-blind users. */
 export const STATUS_DOT: Record<LeadStatus, string> = {
-  new: 'bg-muted-soft',
-  contacted: 'bg-body',
-  interested: 'bg-ink',
-  follow_up_scheduled: 'bg-primary',
-  not_interested: 'bg-muted',
-  converted: 'bg-up',
-  lost: 'bg-down',
+  new: 'bg-status-new',
+  contacted: 'bg-status-contacted',
+  interested: 'bg-status-interested',
+  follow_up_scheduled: 'bg-status-scheduled',
+  not_interested: 'bg-status-not-interested',
+  converted: 'bg-status-converted',
+  lost: 'bg-status-lost',
+}
+
+/** The same hue as a light tint, for chip backgrounds. */
+export const STATUS_TINT: Record<LeadStatus, string> = {
+  new: 'bg-status-new/12',
+  contacted: 'bg-status-contacted/10',
+  interested: 'bg-status-interested/12',
+  follow_up_scheduled: 'bg-status-scheduled/10',
+  not_interested: 'bg-status-not-interested/10',
+  converted: 'bg-status-converted/12',
+  lost: 'bg-status-lost/10',
 }
 
 export const ROLE_LABEL: Record<UserRole, string> = {
@@ -70,6 +81,16 @@ export function formatTime(iso: string): string {
   return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
     .format(new Date(iso))
     .toLowerCase()
+}
+
+/** "today", "yesterday", "3 days ago", then a short date, in India time. */
+export function ago(iso: string): string {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso))
+  const days = Math.round((Date.parse(`${todayIST()}T00:00:00Z`) - Date.parse(`${ymd}T00:00:00Z`)) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days} days ago`
+  return formatDate(ymd)
 }
 
 export function formatDateTime(iso: string): string {

@@ -107,7 +107,7 @@ function BarLink({ item, forceActive }: { item: NavItem; forceActive?: boolean }
 function Badge({ count }: { count: number }) {
   if (!count) return null
   return (
-    <span className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-pill bg-down px-1 font-mono text-[10px] leading-none font-semibold text-on-primary">
+    <span className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-pill bg-down px-1 tabular-nums text-[10px] leading-none font-semibold text-on-primary">
       <span className="sr-only">, </span>
       {count > 99 ? '99+' : count}
       <span className="sr-only"> pending</span>
@@ -183,7 +183,7 @@ function DrawerLink({ item }: { item: NavItem }) {
         <>
           <Icon name={item.icon} filled={isActive} />
           <span className="flex-1">{item.label}</span>
-          {badge > 0 && <span className="rounded-pill bg-down px-2 font-mono text-caption-strong text-on-primary">{badge}</span>}
+          {badge > 0 && <span className="rounded-pill bg-down px-2 tabular-nums text-caption-strong text-on-primary">{badge}</span>}
         </>
       )}
     </NavLink>

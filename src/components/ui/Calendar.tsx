@@ -30,7 +30,7 @@ export function Calendar({ className, classNames, showOutsideDays = true, ...pro
         week: 'mt-1 flex w-full',
         day: 'flex flex-1 items-center justify-center p-0 text-center',
         day_button: cn(
-          'pressable flex size-11 items-center justify-center rounded-full font-mono text-number text-ink expanded:size-10',
+          'pressable flex size-11 items-center justify-center rounded-full tabular-nums text-number text-ink expanded:size-10',
           'hover:bg-surface-strong focus-visible:outline-2 focus-visible:outline-primary',
         ),
         today: '[&>button]:shadow-[inset_0_0_0_1px_var(--color-ink)]',

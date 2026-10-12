@@ -23,7 +23,10 @@ import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import { formatDateTime, formatPhone, plural, relativeDay } from '@/lib/format'
+import { ago, formatDateTime, formatPhone, plural, relativeDay, STATUS_LABEL } from '@/lib/format'
+import { cn } from '@/lib/cn'
+import { ChatIcon } from '@/features/leads/ContactActions'
+import { telHref, whatsappHref } from '@/lib/contact'
 import type { LeadDetail } from '@/lib/types'
 
 type FormName = 'follow-up' | 'status' | 'edit' | 'transfer' | 'reassign' | 'delete' | null
@@ -62,7 +65,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   ) : lead.isError ? (
     <ErrorState message={lead.error.message} onRetry={() => void lead.refetch()} />
   ) : d ? (
-    <LeadBody lead={d} />
+    <LeadBody lead={d} onOpenForm={setForm} />
   ) : null
 
   const forms = d && (
@@ -119,14 +122,14 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <Page title={d?.name ?? 'Lead'} back="/leads" actions={actions} cta={cta}>
+    <Page title={d?.name ?? 'Lead'} back="/leads" actions={actions} cta={cta} heroTitle>
       {body}
       {forms}
     </Page>
   )
 }
 
-function LeadBody({ lead }: { lead: LeadDetail }) {
+function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: FormName) => void }) {
   const me = useMe()
   const qc = useQueryClient()
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
@@ -138,6 +141,9 @@ function LeadBody({ lead }: { lead: LeadDetail }) {
   const shownIds = new Set(lead.recentEntries.map((e) => e.id))
   const olderEntries = (older.data?.pages.flatMap((pg) => pg.items) ?? []).filter((e) => !shownIds.has(e.id))
   const hasMore = lead.entryCount > lead.recentEntries.length
+  const lastEntry = lead.recentEntries[0]
+  // Where the rep last stood with this client: the newest visit with a GPS fix.
+  const lastGps = lead.recentEntries.find((e) => e.latitude !== null && e.longitude !== null)
 
   return (
     <div className="flex flex-col gap-6 expanded:max-w-[720px]">
@@ -147,20 +153,38 @@ function LeadBody({ lead }: { lead: LeadDetail }) {
           <h2 className="text-title-md break-words">{lead.name}</h2>
           {lead.businessName && <p className="text-body-md text-body">{lead.businessName}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusChip status={lead.status} />
+            {lead.permissions.canChangeStatus ? (
+              <button type="button" onClick={() => onOpenForm('status')} aria-label={`Status: ${STATUS_LABEL[lead.status]}. Change status`} className="pressable inline-flex items-center rounded-pill">
+                <StatusChip status={lead.status} className="h-8 pr-2.5" trailing={<Icon name="expand-arrow" size={14} className="text-body" />} />
+              </button>
+            ) : (
+              <StatusChip status={lead.status} />
+            )}
             {lead.overdueDays ? <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag> : null}
             {lead.ownerTag && <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner inactive' : 'Owner removed'}</Tag>}
             {lead.project.status === 'closed' && <Tag>Closed project</Tag>}
           </div>
+          {lastEntry && (
+            <p className="mt-2 text-caption text-muted">
+              Last activity {ago(lastEntry.createdAt)} · {plural(lead.entryCount, 'entry', 'entries')}
+            </p>
+          )}
         </div>
       </header>
 
-      <Button asChild variant="secondary" block className="medium:w-auto medium:self-start">
-        <a href={`tel:+91${lead.phone}`}>
-          <Icon name="phone" size={20} />
-          Call {formatPhone(lead.phone)}
-        </a>
-      </Button>
+      <div className="flex gap-3">
+        <QuickAction href={telHref(lead.phone)} icon={<Icon name="phone" />} label="Call" sub={formatPhone(lead.phone)} tone="primary" />
+        <QuickAction href={whatsappHref(lead.phone)} external icon={<ChatIcon size={24} />} label="WhatsApp" tone="whatsapp" />
+        {lastGps && (
+          <QuickAction
+            href={`https://www.google.com/maps/dir/?api=1&destination=${lastGps.latitude},${lastGps.longitude}`}
+            external
+            icon={<Icon name="near-me" />}
+            label="Directions"
+            sub="Last visit"
+          />
+        )}
+      </div>
 
       {lead.pendingTransfer && (
         <Notice icon="swap" title={`Transfer to ${lead.pendingTransfer.toUser.name} is waiting for approval`}>
@@ -175,9 +199,16 @@ function LeadBody({ lead }: { lead: LeadDetail }) {
       )}
 
       <ListGroup>
-        <ListRow icon="phone" title={<span className="font-mono">{formatPhone(lead.phone)}</span>} subtitle="Phone" />
         <ListRow icon="marker" title={lead.location.name} subtitle="Location" />
-        {lead.nextFollowUpDate && <ListRow icon="calendar" title={relativeDay(lead.nextFollowUpDate)} subtitle="Next follow-up" />}
+        {lead.nextFollowUpDate && (
+          <ListRow
+            icon="calendar"
+            title={relativeDay(lead.nextFollowUpDate)}
+            subtitle="Next follow-up"
+            onClick={lead.permissions.canLogFollowUp ? () => onOpenForm('follow-up') : undefined}
+            chevron={lead.permissions.canLogFollowUp}
+          />
+        )}
         {!mine && <ListRow icon="user-male-circle" title={lead.owner.name} subtitle="Owner" />}
         {lead.convertedAt && <ListRow icon="ok" title={formatDateTime(lead.convertedAt)} subtitle={lead.convertedBy ? `Converted by ${lead.convertedBy.name}` : 'Converted'} />}
         <ListRow icon="briefcase" title={lead.project.name} subtitle={lead.project.type === 'door_to_door' ? 'Door-to-door project' : 'Online project'} />
@@ -232,6 +263,28 @@ function LeadBody({ lead }: { lead: LeadDetail }) {
         }}
       />
     </div>
+  )
+}
+
+/** A big round action with a label under it, like a phone's contact card. */
+function QuickAction({ href, icon, label, sub, tone, external }: { href: string; icon: React.ReactNode; label: string; sub?: string; tone?: 'primary' | 'whatsapp'; external?: boolean }) {
+  return (
+    <a
+      href={href}
+      {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
+      className="pressable flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-xl border border-hairline px-2 py-3 text-center active:bg-surface-soft expanded:max-w-40 expanded:hover:bg-surface-soft"
+    >
+      <span
+        className={cn(
+          'flex size-11 items-center justify-center rounded-full',
+          tone === 'primary' ? 'bg-primary text-on-primary' : tone === 'whatsapp' ? 'bg-[#25d366] text-white' : 'bg-surface-strong text-ink',
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-body-sm font-semibold text-ink">{label}</span>
+      {sub && <span className="-mt-1.5 w-full truncate text-caption text-muted tabular-nums">{sub}</span>}
+    </a>
   )
 }
 

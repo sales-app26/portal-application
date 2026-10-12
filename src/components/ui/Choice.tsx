@@ -2,15 +2,77 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { Icon } from '@/icons'
-import { STATUS_DOT, STATUS_LABEL } from '@/lib/format'
+import { STATUS_DOT, STATUS_LABEL, STATUS_TINT } from '@/lib/format'
 import type { LeadStatus } from '@/lib/types'
 
-export function StatusChip({ status, className }: { status: LeadStatus; className?: string }) {
+export function StatusChip({ status, size = 'md', className, trailing }: { status: LeadStatus; size?: 'sm' | 'md'; className?: string; trailing?: ReactNode }) {
   return (
-    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-pill bg-surface-strong px-3 text-caption-strong whitespace-nowrap text-ink', className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-pill text-caption-strong whitespace-nowrap text-ink',
+        size === 'sm' ? 'h-6 px-2.5' : 'h-7 px-3',
+        STATUS_TINT[status],
+        className,
+      )}
+    >
       <span aria-hidden className={cn('size-2 rounded-full', STATUS_DOT[status])} />
       {STATUS_LABEL[status]}
+      {trailing}
     </span>
+  )
+}
+
+/**
+ * One-tap status choice for forms: every allowed status visible at once, coloured like the
+ * chips in lists. Replaces a dropdown, which cost two taps and a scroll for the commonest action.
+ */
+export function StatusChoice({
+  statuses,
+  value,
+  onChange,
+  label = 'Status',
+  error,
+}: {
+  statuses: LeadStatus[]
+  value: LeadStatus | null
+  onChange: (s: LeadStatus) => void
+  label?: string
+  error?: string
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span id="status-choice-label" className="text-title-sm text-ink">
+        {label}
+      </span>
+      <div role="radiogroup" aria-labelledby="status-choice-label" aria-invalid={!!error} className="flex flex-wrap gap-2">
+        {statuses.map((s) => {
+          const on = s === value
+          return (
+            <button
+              key={s}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(s)}
+              className={cn(
+                'pressable inline-flex h-10 items-center gap-2 rounded-pill border px-3.5 text-nav whitespace-nowrap transition-colors',
+                on ? cn('border-ink font-semibold text-ink', STATUS_TINT[s]) : 'border-hairline bg-canvas text-ink',
+              )}
+            >
+              <span aria-hidden className={cn('size-2.5 rounded-full', STATUS_DOT[s])} />
+              {STATUS_LABEL[s]}
+              {on && <Icon name="checkmark" size={16} />}
+            </button>
+          )
+        })}
+      </div>
+      {error && (
+        <p role="alert" className="flex items-center gap-1 text-caption text-down">
+          <Icon name="error" size={16} />
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -105,7 +167,7 @@ export function FilterChips<T extends string>({
 }: {
   value: T
   onChange: (v: T) => void
-  options: { value: T; label: string }[]
+  options: { value: T; label: string; dot?: string }[]
   label: string
 }) {
   return (
@@ -120,10 +182,11 @@ export function FilterChips<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              'pressable h-9 flex-none rounded-pill px-4 text-nav whitespace-nowrap',
+              'pressable inline-flex h-9 flex-none items-center gap-2 rounded-pill px-4 text-nav whitespace-nowrap',
               on ? 'bg-ink text-on-dark' : 'bg-surface-strong text-ink',
             )}
           >
+            {o.dot && <span aria-hidden className={cn('size-2 rounded-full', o.dot)} />}
             {o.label}
           </button>
         )

@@ -31,11 +31,11 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
     >
       <span aria-hidden className="absolute top-12 bottom-0 left-[16px] w-px bg-hairline group-last:hidden" />
       <span className="relative z-[1] flex size-8 flex-none items-center justify-center rounded-full bg-surface-strong">
-        {number ? <span className="font-mono text-caption-strong">{number}</span> : <Icon name={entry.entryType === 'status_change' ? 'synchronize' : 'checkmark'} size={16} />}
+        {number ? <span className="tabular-nums text-caption-strong">{number}</span> : <Icon name={entry.entryType === 'status_change' ? 'synchronize' : 'checkmark'} size={16} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <time dateTime={entry.createdAt} className="font-mono text-caption-strong">
+          <time dateTime={entry.createdAt} className="tabular-nums text-caption-strong">
             {formatTime(entry.createdAt)}
           </time>
           {showProject && <span className="truncate text-caption text-muted">{entry.project.name}</span>}
@@ -61,7 +61,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
 
         {entry.location && (
           <p className="mt-1 flex items-center gap-1 text-caption text-muted">
-            <Icon name="marker" size={16} /> Typed: {entry.location.name}
+            <Icon name="marker" size={16} /> {entry.location.name}
           </p>
         )}
 
@@ -77,7 +77,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
             </button>
             <div className="flex min-w-0 flex-col items-start gap-1.5">
               {entry.gpsAccuracyM !== null && (
-                <span className="flex items-center gap-2 font-mono text-caption text-body">
+                <span className="flex items-center gap-2 tabular-nums text-caption text-body">
                   ± {Math.round(entry.gpsAccuracyM)} m{entry.lowAccuracy && <Tag className="font-sans">Low accuracy</Tag>}
                 </span>
               )}

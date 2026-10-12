@@ -113,15 +113,34 @@ export function ProgressBar({ value, max, label = 'Progress towards target' }: {
   )
 }
 
-export function StatTile({ label, value, onClick }: { label: string; value: ReactNode; onClick?: () => void }) {
+export function StatTile({
+  label,
+  value,
+  onClick,
+  tone = 'ink',
+  className,
+}: {
+  label: string
+  value: ReactNode
+  onClick?: () => void
+  /** `down` paints the number red (overdue), `up` green (done). */
+  tone?: 'ink' | 'down' | 'up'
+  className?: string
+}) {
   const Comp = onClick ? 'button' : 'div'
   return (
     <Comp
+      type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={cn('flex flex-col items-start gap-1 rounded-xl border border-hairline bg-canvas p-4 text-left', onClick && 'pressable active:bg-surface-soft')}
+      className={cn(
+        'flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-hairline bg-canvas p-4 text-left',
+        onClick && 'pressable active:bg-surface-soft expanded:hover:bg-surface-soft',
+        tone === 'down' && 'border-down/25 bg-down/5',
+        className,
+      )}
     >
-      <span className="font-mono text-display-sm">{value}</span>
-      <span className="text-body-sm text-body">{label}</span>
+      <span className={cn('text-display-sm font-semibold tabular-nums', tone === 'down' ? 'text-down' : tone === 'up' ? 'text-up' : 'text-ink')}>{value}</span>
+      <span className="w-full text-body-sm leading-tight text-body">{label}</span>
     </Comp>
   )
 }

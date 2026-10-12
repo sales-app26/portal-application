@@ -1,4 +1,6 @@
-import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router'
+import { createBrowserRouter, Navigate, Outlet, useLocation, useRouteError } from 'react-router'
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/icons'
 import { useAuth, useMe } from '@/auth/AuthProvider'
 import { ProjectProvider } from '@/features/projects/ProjectContext'
 import { AppShell, BrandMark } from '@/components/layout/AppShell'
@@ -13,6 +15,29 @@ function Splash() {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-canvas">
       <BrandMark size={56} />
       <Spinner size={24} className="text-muted" />
+    </div>
+  )
+}
+
+/**
+ * A screen that crashed, or whose code failed to download (bad signal, or a new version
+ * replaced the old files). The tab bar stays, so the rest of the app is still reachable.
+ */
+function RouteError() {
+  const error = useRouteError()
+  const chunk = error instanceof Error && /dynamically imported module|Importing a module script failed|Failed to fetch/i.test(error.message)
+  return (
+    <div role="alert" className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 px-6 text-center">
+      <Icon name={chunk ? 'wi-fi-disconnected' : 'error'} size={48} className="text-muted" />
+      <h1 className="text-title-md">{chunk ? "This screen didn't load" : 'Something went wrong'}</h1>
+      <p className="max-w-sm text-body-sm text-body">
+        {chunk
+          ? 'The signal may be weak, or the app was just updated. Reloading usually fixes it.'
+          : 'Reload to try again. If it keeps happening, tell your admin what you were doing.'}
+      </p>
+      <Button icon="refresh" onClick={() => window.location.reload()}>
+        Reload
+      </Button>
     </div>
   )
 }
@@ -50,6 +75,7 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     HydrateFallback: Splash,
+    errorElement: <RouteError />,
     children: [
       {
         element: (
@@ -58,40 +84,46 @@ export const router = createBrowserRouter([
           </ProjectProvider>
         ),
         children: [
-          { index: true, element: <RoleHome /> },
-          { path: 'profile', lazy: async () => ({ Component: (await import('@/pages/profile/ProfilePage')).ProfilePage }) },
-          { path: 'more', lazy: async () => ({ Component: (await import('@/pages/misc/MorePage')).MorePage }) },
-          { path: 'whats-new', lazy: async () => ({ Component: (await import('@/pages/misc/WhatsNewPage')).WhatsNewPage }) },
-
-          { path: 'day', lazy: async () => ({ Component: (await import('@/pages/timeline/MyDayPage')).MyDayPage }) },
-          { path: 'entries/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/EntryPage')).EntryPage }) },
           {
-            path: 'leads',
-            lazy: async () => ({ Component: (await import('@/pages/field/LeadsPage')).LeadsPage }),
-            children: [{ path: ':id', lazy: async () => ({ Component: (await import('@/pages/field/LeadsPage')).LeadDetailRoute }) }],
-          },
-          {
-            element: <RequireRole roles={FIELD} />,
-            children: [{ path: 'home', lazy: async () => ({ Component: (await import('@/pages/field/HomePage')).HomePage }) }],
-          },
-          {
-            element: <RequireRole roles={ADMIN} />,
+            // Errors render inside the shell, so the navigation survives a broken screen.
+            errorElement: <RouteError />,
             children: [
-              { path: 'dashboard', lazy: async () => ({ Component: (await import('@/pages/admin/DashboardPage')).DashboardPage }) },
-              { path: 'transfers', lazy: async () => ({ Component: (await import('@/pages/admin/TransfersPage')).TransfersPage }) },
-              { path: 'people', lazy: async () => ({ Component: (await import('@/pages/admin/PeoplePage')).PeoplePage }) },
-              { path: 'people/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonSummaryPage')).PersonSummaryPage }) },
-              { path: 'people/:id/day', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonTimelinePage')).PersonTimelinePage }) },
-              { path: 'projects', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectsPage')).ProjectsPage }) },
-              { path: 'projects/:id/import', lazy: async () => ({ Component: (await import('@/pages/admin/ImportLeadsPage')).ImportLeadsPage }) },
-              { path: 'projects/:id', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectDetailPage')).ProjectDetailPage }) },
+              { index: true, element: <RoleHome /> },
+              { path: 'profile', lazy: async () => ({ Component: (await import('@/pages/profile/ProfilePage')).ProfilePage }) },
+              { path: 'more', lazy: async () => ({ Component: (await import('@/pages/misc/MorePage')).MorePage }) },
+              { path: 'whats-new', lazy: async () => ({ Component: (await import('@/pages/misc/WhatsNewPage')).WhatsNewPage }) },
+
+              { path: 'day', lazy: async () => ({ Component: (await import('@/pages/timeline/MyDayPage')).MyDayPage }) },
+              { path: 'entries/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/EntryPage')).EntryPage }) },
+              {
+                path: 'leads',
+                lazy: async () => ({ Component: (await import('@/pages/field/LeadsPage')).LeadsPage }),
+                children: [{ path: ':id', lazy: async () => ({ Component: (await import('@/pages/field/LeadsPage')).LeadDetailRoute }) }],
+              },
+              {
+                element: <RequireRole roles={FIELD} />,
+                children: [{ path: 'home', lazy: async () => ({ Component: (await import('@/pages/field/HomePage')).HomePage }) }],
+              },
+              {
+                element: <RequireRole roles={ADMIN} />,
+                children: [
+                  { path: 'dashboard', lazy: async () => ({ Component: (await import('@/pages/admin/DashboardPage')).DashboardPage }) },
+                  { path: 'transfers', lazy: async () => ({ Component: (await import('@/pages/admin/TransfersPage')).TransfersPage }) },
+                  { path: 'people', lazy: async () => ({ Component: (await import('@/pages/admin/PeoplePage')).PeoplePage }) },
+                  { path: 'people/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonSummaryPage')).PersonSummaryPage }) },
+                  { path: 'people/:id/day', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonTimelinePage')).PersonTimelinePage }) },
+                  { path: 'projects', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectsPage')).ProjectsPage }) },
+                  { path: 'projects/:id/import', lazy: async () => ({ Component: (await import('@/pages/admin/ImportLeadsPage')).ImportLeadsPage }) },
+                  { path: 'projects/:id', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectDetailPage')).ProjectDetailPage }) },
+                ],
+              },
+              {
+                element: <RequireRole roles={OWNER} />,
+                children: [{ path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) }],
+              },
+              { path: '*', element: <NotFound /> },
             ],
           },
-          {
-            element: <RequireRole roles={OWNER} />,
-            children: [{ path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) }],
-          },
-          { path: '*', element: <NotFound /> },
         ],
       },
     ],

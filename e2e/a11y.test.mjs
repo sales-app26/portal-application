@@ -49,12 +49,12 @@ describe('axe: open overlays', () => {
     await page.close()
   })
 
-  test('status picker inside the form', async () => {
+  test('status chips, quick notes and quick dates inside the form', async () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
-    await click(page, 'Choose a status')
-    await waitForText(page, 'Follow-up scheduled')
+    await click(page, 'Follow-up scheduled', '[role=radio]')
+    await waitForText(page, 'Tomorrow')
     await sleep(500)
     assert.deepEqual(await axeViolations(page), [])
     await page.close()
