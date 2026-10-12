@@ -17,18 +17,25 @@ const schema = z
   })
   .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'The passwords do not match.' })
 
-/** Invite and reset links land here with the Supabase token in the URL fragment. */
+/**
+ * Invite and reset links land here. Our own emails (Brevo) carry a one-time `token_hash`
+ * in the query, spent only when the password is saved, so mail scanners opening the
+ * link don't use it up. Supabase's own emails put a session token in the fragment.
+ */
 export function SetPasswordPage() {
   const link = useMemo(() => {
-    const p = new URLSearchParams(window.location.hash.slice(1))
-    return { token: p.get('access_token'), type: p.get('type'), error: p.get('error_description') }
+    const q = new URLSearchParams(window.location.search)
+    const f = new URLSearchParams(window.location.hash.slice(1))
+    const tokenHash = q.get('token_hash')
+    const type = q.get('type') ?? f.get('type')
+    return { tokenHash, type, token: tokenHash ?? f.get('access_token'), error: f.get('error_description') }
   }, [])
   const [done, setDone] = useState(false)
   const { register, handleSubmit, formState } = useForm({ resolver: zodResolver(schema), mode: 'onBlur', defaultValues: { password: '', confirm: '' } })
 
   const onSubmit = handleSubmit(async ({ password }) => {
     try {
-      await api('/auth/set-password', { method: 'POST', body: { accessToken: link.token, password }, anonymous: true })
+      await api('/auth/set-password', { method: 'POST', body: link.tokenHash ? { tokenHash: link.tokenHash, type: link.type === 'invite' ? 'invite' : 'recovery', password } : { accessToken: link.token, password }, anonymous: true })
       // The token is single-use; don't leave it in the address bar.
       window.history.replaceState(null, '', window.location.pathname)
       setDone(true)
