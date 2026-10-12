@@ -21,7 +21,7 @@ interface LoginFormProps {
   defaultEmail?: string
   /** Full page: the Sign in button sits at the bottom of the screen, in thumb reach. */
   pinnedAction?: boolean
-  /** Rendered under the pinned button (the Icons8 credit). */
+  /** Rendered under the Sign in button. */
   footer?: React.ReactNode
 }
 

@@ -143,16 +143,12 @@ describe('people', () => {
 })
 
 describe('projects', () => {
-  test('moderator joins a project without approval; no create button', async () => {
-    const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
+  test('moderator sees the projects he was added to; no create or join button', async () => {
+    const { page, go } = await app.open(PHONE, { role: 'moderator' })
     await go('/projects')
     await waitForText(page, 'Pune Retail Drive')
     assert.equal(await visibleButtons(page, 'New project'), 0)
-    await click(page, 'Join a project')
-    await waitForText(page, 'Baner Expansion')
-    await click(page, 'Join')
-    await waitForText(page, 'Project assigned to you.')
-    assert.ok(api.writes.some((w) => w.path.endsWith('/join')))
+    assert.equal(await visibleButtons(page, 'Join a project'), 0)
     await page.close()
   })
 

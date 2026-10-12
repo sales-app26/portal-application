@@ -6,7 +6,6 @@ import { FilterChips } from '@/components/ui/Choice'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Display'
 import { LoadMore } from '@/components/ui/LoadMore'
 import { Button } from '@/components/ui/Button'
-import { JoinProject } from '@/pages/admin/ProjectsPage'
 import { AddLeadForm } from '@/features/leads/AddLeadForm'
 import { LeadRow } from '@/features/leads/LeadRow'
 import { useLeadList } from '@/features/leads/queries'
@@ -60,25 +59,21 @@ function LeadList() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [adding, setAdding] = useState(false)
-  const [joining, setJoining] = useState(false)
   const q = useDebounced(search.trim(), 300)
   // Moderators also see everyone's leads as admins; "My leads" is their own work.
   const list = useLeadList(project?.id, { search: q || undefined, status: status === 'all' ? null : status, mine: me.role === 'moderator' })
   const leads = list.data?.pages.flatMap((p) => p.items) ?? []
   const total = list.data?.pages[0]?.meta.total
 
-  // Every lead belongs to a project, so adding one starts with being in one.
+  // Every lead belongs to a project; only the Super Admin adds people to one.
   if (!project) {
-    const moderator = me.role === 'moderator'
     return (
       <Page title="My leads">
         <EmptyState
           icon="briefcase"
-          title="Join a project to add leads"
-          body={moderator ? 'Every lead belongs to a project. Join one, then add your leads here.' : 'Every lead belongs to a project. Ask your admin to add you to one, then add your leads here.'}
-          action={moderator && <Button onClick={() => setJoining(true)}>Join a project</Button>}
+          title="You're not in a project yet"
+          body="Every lead belongs to a project. Once your admin adds you to one, you can add your leads here."
         />
-        {moderator && <JoinProject open={joining} onOpenChange={setJoining} />}
       </Page>
     )
   }

@@ -154,7 +154,6 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     // ---- projects
     if (p === '/projects' && method === 'GET') return ok(page(projects.map((x) => projectDto(x))))
     if (p === '/projects' && method === 'POST') return ok(projectDto({ id: ids.other, name: 'New Drive', type: 'online', status: 'active' }, { typeLocked: false, memberCount: 0, leadCount: 0 }), 'Created successfully.', 201)
-    if (p === '/projects/joinable') return ok([projectDto({ id: ids.other, name: 'Baner Expansion', type: 'online', status: 'active' }, { memberCount: 3, leadCount: 8 })])
     if ((m = p.match(/^\/projects\/([^/]+)\/join$/))) return ok(members[0], 'Project assigned to you.', 201)
     if ((m = p.match(/^\/projects\/([^/]+)\/(close|reopen)$/))) return ok(projectDto(projects[0], { status: m[2] === 'close' ? 'closed' : 'active' }), m[2] === 'close' ? 'Project closed. It is now read-only.' : 'Project reopened.')
     if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)\/target$/))) return ok(members.find((x) => x.userId === m[2]) ?? members[0], 'Target updated.')

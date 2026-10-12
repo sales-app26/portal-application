@@ -403,7 +403,6 @@ Create errors:
 | Method | Path | Roles | Params / Body | data |
 |---|---|---|---|---|
 | GET | `/projects` | any | Query: pagination plus `status?` (ProjectStatus), `type?` (ProjectType). `search` matches the name. Super admin sees all projects; others see projects they are active members of. Sorted by status, then `createdAt` descending. | Paginated `ProjectDto` |
-| GET | `/projects/joinable` | **MOD** | | `ProjectDto[]` (not paged): active projects the moderator is not in, sorted by name |
 | GET | `/projects/:id` | any (must be a member, else 404) | | `ProjectDto` |
 | POST | `/projects` | **SA** | JSON **or** `multipart/form-data`. Fields: `name` (trimmed, non-empty, max 120); `description?` (string or null, max 2000; empty becomes null); `type` (ProjectType); `startDate` (YYYY-MM-DD); `endDate?` (YYYY-MM-DD; empty is ignored; must be on or after `startDate`, else 400). Optional file field **`image`**: JPG or PNG, at most 2 MB (service check), with a multer ceiling of 8 MB. | `ProjectDto` (may include `warnings`). 201 |
 | PATCH | `/projects/:id` | **SA** | `name?`, `description?` (null or "" clears), `type?` (409 CONFLICT "The project type cannot change once the project has a lead." if `typeLocked`), `startDate?`, `endDate?` (null or "" clears) | `ProjectDto` |
@@ -413,7 +412,6 @@ Create errors:
 | POST | `/projects/:id/reopen` | **SA** | | `ProjectDto`. 200, "Project reopened." |
 | GET | `/projects/:id/members` | any member | Query: `includeRemoved?` ("true"/"false"; admins only). **No pagination params; sending them gives 400.** | `MemberDto[]`: active first, then by name. Non-admins see only active members, without email, phone or targets. |
 | POST | `/projects/:id/members` | SA, MOD | `userId` (uuid v4); `targetCount?` (int, 1–100000); `targetPeriod?` (TargetPeriod). Send both or neither, else 400 "Set the target number and the period together, or clear both." | `MemberDto`. 201, "Member added to the project." |
-| POST | `/projects/:id/join` | **MOD** | none | `MemberDto`. 201, "Project assigned to you." Closed project: 409 PROJECT_CLOSED. Already a member: 409 CONFLICT. |
 | DELETE | `/projects/:id/members/:userId` | SA, MOD | both params are uuid v4 | `MemberDto` (with `isActive: false` and `removedAt` set). "Member removed from the project." |
 | PATCH | `/projects/:id/members/:userId/target` | SA, MOD | `targetCount` (int 1–100000, or null; **required key**); `targetPeriod` (TargetPeriod or null; **required key**). Both null clears the target. | `MemberDto`. "Target updated." |
 

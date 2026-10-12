@@ -54,7 +54,6 @@ export function useProjectOptions() {
   })
 }
 
-export const useJoinable = (enabled: boolean) => useQuery({ queryKey: ['projects', 'joinable'], enabled, queryFn: () => api<Project[]>('/projects/joinable') })
 export const useProjectDetail = (id: string | undefined) => useQuery({ queryKey: ['projects', 'detail', id], enabled: !!id, queryFn: () => api<Project>(`/projects/${id}`) })
 
 export const projectMembersKey = (projectId: string) => ['projects', projectId, 'members', 'admin'] as const
