@@ -8,9 +8,11 @@ import { ActionMenu } from '@/components/ui/ActionMenu'
 import { FilterChips, Segmented } from '@/components/ui/Choice'
 import { Avatar, EmptyState, ErrorState, ListSkeleton, Tag } from '@/components/ui/Display'
 import { LoadMore } from '@/components/ui/LoadMore'
-import { Confirm } from '@/components/ui/Overlay'
+import { Confirm, ResponsiveOverlay } from '@/components/ui/Overlay'
+import { Picker } from '@/components/ui/Picker'
+import { Button } from '@/components/ui/Button'
 import { AddUserForm, EditUserForm } from '@/features/admin/UserForms'
-import { invalidateUsers, useUserList } from '@/features/admin/queries'
+import { invalidateProjects, invalidateUsers, useUserList, useUserOptions } from '@/features/admin/queries'
 import { useDebounced } from '@/hooks/useDebounced'
 import { Icon } from '@/icons'
 import { apiWithMessage } from '@/lib/api'
@@ -31,6 +33,7 @@ export function PeoplePage() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [toggling, setToggling] = useState<User | null>(null)
+  const [deleting, setDeleting] = useState<User | null>(null)
   const [busy, setBusy] = useState(false)
   const q = useDebounced(search.trim(), 300)
 
@@ -119,7 +122,9 @@ export function PeoplePage() {
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${u.id}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
-                      { label: 'Share reset link', icon: 'lock', onSelect: () => void shareResetLink(u), hidden: !u.isActive || u.id === me.id },
+                      { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
+                      { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => void shareResetLink(u), hidden: !u.isActive || u.id === me.id },
+                      { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(u), hidden: !isSuper || u.id === me.id || u.role === 'super_admin' },
                       { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: !u.isActive && u.id === me.id },
                     ]}
                   />
@@ -146,6 +151,7 @@ export function PeoplePage() {
         onConfirm={toggleActive}
         loading={busy}
       />
+      {deleting && <DeleteUserSheet user={deleting} onClose={() => setDeleting(null)} />}
     </Page>
   )
 }
@@ -167,7 +173,74 @@ async function shareResetLink(user: User) {
       }
     }
     await navigator.clipboard.writeText(`${text}\n${data.link}`)
-    toast.success(`Link copied. ${message}`)
+    toast.success(`Link copied, not emailed. ${message}`)
+  } catch (err) {
+    handleFormError(err)
+  }
+}
+
+/**
+ * Super Admin: delete someone for good. Their leads go to the person picked; the
+ * visits and follow-ups they logged stay, shown as "Deleted user".
+ */
+function DeleteUserSheet({ user, onClose }: { user: User; onClose: () => void }) {
+  const qc = useQueryClient()
+  const options = useUserOptions({ isActive: true })
+  const [to, setTo] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const people = (options.data ?? []).filter((p) => p.id !== user.id && p.role !== 'super_admin')
+
+  const remove = async () => {
+    setBusy(true)
+    try {
+      const { data, message } = await apiWithMessage<{ leadsMoved: number }>(`/users/${user.id}/delete`, { method: 'POST', body: to ? { transferToId: to } : {} })
+      const who = people.find((p) => p.id === to)?.name
+      toast.success(data.leadsMoved && who ? `${message} ${data.leadsMoved} ${data.leadsMoved === 1 ? 'lead' : 'leads'} moved to ${who}.` : message)
+      invalidateUsers(qc)
+      invalidateProjects(qc)
+      void qc.invalidateQueries({ queryKey: ['leads'] })
+      void qc.invalidateQueries({ queryKey: ['transfers'] })
+      void qc.invalidateQueries({ queryKey: ['dashboard'] })
+      onClose()
+    } catch (err) {
+      handleFormError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ResponsiveOverlay open onOpenChange={(o) => !o && onClose()} title={`Delete ${user.name}?`} variant="confirm">
+      <div className="flex flex-col gap-4 text-body-md text-body">
+        <p>
+          This can’t be undone. Their login, name, email and phone are erased, and the email can be used for a new account. The visits and follow-ups they logged stay, shown as <b>Deleted user</b>.
+        </p>
+        <Picker
+          label="Who takes over their leads"
+          value={to}
+          options={people.map((p) => ({ value: p.id, label: p.name, description: p.email, leading: <Avatar name={p.name} size={32} /> }))}
+          onChange={setTo}
+          placeholder="Choose a person"
+          hint="Needed if they own any leads. That person joins those projects if they aren’t in them already."
+        />
+        <div className="mt-2 flex flex-col gap-3 medium:flex-row-reverse">
+          <Button loading={busy} onClick={() => void remove()}>
+            Delete {user.name}
+          </Button>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </ResponsiveOverlay>
+  )
+}
+
+/** Emails the person a reset link to their account email (Brevo). */
+async function emailResetLink(user: User) {
+  try {
+    const { data } = await apiWithMessage<{ email: string }>(`/users/${user.id}/reset-email`, { method: 'POST' })
+    toast.success(`Reset email sent to ${data.email}.`)
   } catch (err) {
     handleFormError(err)
   }

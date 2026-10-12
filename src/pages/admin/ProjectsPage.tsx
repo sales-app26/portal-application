@@ -77,7 +77,7 @@ export function ProjectsPage() {
 }
 
 /** Moderator assigns an active project to himself, no approval needed (PRD §5.4). */
-function JoinProject({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function JoinProject({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient()
   const q = useJoinable(open)
   const [busyId, setBusyId] = useState<string | null>(null)

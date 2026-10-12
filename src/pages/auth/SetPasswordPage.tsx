@@ -24,7 +24,8 @@ const schema = z
  */
 export function SetPasswordPage() {
   const link = useMemo(() => {
-    const q = new URLSearchParams(window.location.search)
+    // Some mail apps leave the link's "&" as "&amp;", turning "type" into "amp;type".
+    const q = new URLSearchParams(window.location.search.replace(/&amp;/g, '&'))
     return { tokenHash: q.get('token_hash'), type: q.get('type') === 'invite' ? 'invite' : 'recovery' }
   }, [])
   const [done, setDone] = useState(false)
