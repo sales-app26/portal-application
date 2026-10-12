@@ -12,6 +12,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
     <title>Pronttera Sales</title>
+    <!-- Link previews (WhatsApp, SMS, Slack…). Crawlers don't run JS, so these live here, and
+         the image must be an absolute URL: __APP_URL__ is filled in at build time (vite.config.ts). -->
+    <meta name="description" content="Lead tracking for Pronttera sales teams." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Pronttera Sales" />
+    <meta property="og:title" content="Pronttera Sales" />
+    <meta property="og:description" content="Lead tracking for Pronttera sales teams. Open the link to continue." />
+    <meta property="og:image" content="__APP_URL__/og-banner.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A smiling Pronttera salesperson on a call, with the text Pronttera Sales" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="__APP_URL__/og-banner.jpg" />
   </head>
   <body>
     <div id="root"></div>

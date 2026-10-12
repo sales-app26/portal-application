@@ -4,8 +4,18 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { precacheServiceWorker } from './scripts/sw-plugin.ts'
 
+// Open Graph images must be absolute URLs. VITE_APP_URL wins; on Vercel the production domain is used.
+const appUrl = (
+  process.env.VITE_APP_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+).replace(/\/+$/, '')
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), precacheServiceWorker()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    precacheServiceWorker(),
+    { name: 'og-absolute-urls', transformIndexHtml: (html) => html.replaceAll('__APP_URL__', appUrl) },
+  ],
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
