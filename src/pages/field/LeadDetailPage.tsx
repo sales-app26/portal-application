@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
@@ -8,7 +9,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { settleOverlays } from '@/hooks/useOverlayHistory'
 import { StatusChip } from '@/components/ui/Choice'
-import { Avatar, EmptyState, ErrorState, SectionTitle, Skeleton, Tag } from '@/components/ui/Display'
+import { Avatar, Card, EmptyState, ErrorState, SectionTitle, Skeleton, Tag } from '@/components/ui/Display'
 import { ListGroup, ListRow } from '@/components/ui/ListRow'
 import { Confirm } from '@/components/ui/Overlay'
 import { ReassignForm } from '@/features/admin/MemberForms'
@@ -23,10 +24,12 @@ import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import { ago, formatDateTime, formatPhone, plural, relativeDay, STATUS_LABEL } from '@/lib/format'
+import { ago, formatDateTime, formatPhone, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { ChatIcon } from '@/features/leads/ContactActions'
-import { telHref, whatsappHref } from '@/lib/contact'
+import { telHref } from '@/lib/contact'
+import { rememberContact } from '@/lib/contactPrompt'
+import { WhatsAppSheet } from '@/features/leads/WhatsAppSheet'
 import type { LeadDetail } from '@/lib/types'
 
 type FormName = 'follow-up' | 'status' | 'edit' | 'transfer' | 'reassign' | 'delete' | null
@@ -40,6 +43,16 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   const lead = useLead(id)
   const [form, setForm] = useState<FormName>(null)
   const sheet = useIsSheetLayout()
+  const [params, setParams] = useSearchParams()
+
+  // "Log it" from the after-call prompt lands here with ?log=1: open the form once the lead is in.
+  const wantsLog = params.get('log') === '1'
+  const canLog = !!lead.data?.permissions.canLogFollowUp
+  useEffect(() => {
+    if (!wantsLog || !lead.data) return
+    setParams((p) => (p.delete('log'), p), { replace: true })
+    if (canLog) setForm('follow-up')
+  }, [wantsLog, lead.data, canLog, setParams])
 
   const notFound = lead.error instanceof ApiError && lead.error.code === 'NOT_FOUND'
   const d = lead.data
@@ -136,6 +149,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
   const [deletingEntry, setDeletingEntry] = useState(false)
   const mine = lead.owner.id === me.id
   const [showOlder, setShowOlder] = useState(false)
+  const [chat, setChat] = useState(false)
   const older = useLeadEntries(lead.id, showOlder)
   // The embedded 20 are the newest; paged history starts again from the top, so skip what we already show.
   const shownIds = new Set(lead.recentEntries.map((e) => e.id))
@@ -173,8 +187,16 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       </header>
 
       <div className="flex gap-3">
-        <QuickAction href={telHref(lead.phone)} icon={<Icon name="phone" />} label="Call" sub={formatPhone(lead.phone)} tone="primary" />
-        <QuickAction href={whatsappHref(lead.phone)} external icon={<ChatIcon size={24} />} label="WhatsApp" tone="whatsapp" />
+        <QuickAction
+          href={telHref(lead.phone)}
+          onClick={() => lead.permissions.canLogFollowUp && rememberContact({ leadId: lead.id, name: lead.name, kind: 'call' })}
+          icon={<Icon name="phone" />}
+          label="Call"
+          sub={formatPhone(lead.phone)}
+          tone="primary"
+        />
+        <QuickAction onClick={() => setChat(true)} icon={<ChatIcon size={24} />} label="WhatsApp" sub="Ready messages" tone="whatsapp" />
+        <WhatsAppSheet open={chat} onOpenChange={setChat} lead={lead} prompt={lead.permissions.canLogFollowUp} />
         {lastGps && (
           <QuickAction
             href={`https://www.google.com/maps/dir/?api=1&destination=${lastGps.latitude},${lastGps.longitude}`}
@@ -199,6 +221,13 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       )}
 
       <ListGroup>
+        {(lead.dealValue || lead.plan) && (
+          <ListRow
+            icon="goal"
+            title={[lead.dealValue ? `${rupees(lead.dealValue)} a month` : null, lead.plan].filter(Boolean).join(' · ')}
+            subtitle={lead.status === 'converted' ? 'Deal won' : 'Expected deal'}
+          />
+        )}
         <ListRow icon="marker" title={lead.location.name} subtitle="Location" />
         {lead.nextFollowUpDate && (
           <ListRow
@@ -211,17 +240,21 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
         )}
         {!mine && <ListRow icon="user-male-circle" title={lead.owner.name} subtitle="Owner" />}
         {lead.convertedAt && <ListRow icon="ok" title={formatDateTime(lead.convertedAt)} subtitle={lead.convertedBy ? `Converted by ${lead.convertedBy.name}` : 'Converted'} />}
-        <ListRow icon="briefcase" title={lead.project.name} subtitle={lead.project.type === 'door_to_door' ? 'Door-to-door project' : 'Online project'} />
+        <ListRow
+          icon="briefcase"
+          title={lead.project.name}
+          subtitle={[lead.project.type === 'door_to_door' ? 'Door-to-door project' : 'Online project', lead.source ? `Source: ${SOURCE_LABEL[lead.source]}` : null].filter(Boolean).join(' · ')}
+        />
       </ListGroup>
 
       {lead.notes && (
-        <section>
+        <Card>
           <SectionTitle>About the client</SectionTitle>
           <p className="text-body-md whitespace-pre-line text-body">{lead.notes}</p>
-        </section>
+        </Card>
       )}
 
-      <section aria-labelledby="history-title">
+      <section aria-labelledby="history-title" className="card card--default gap-0 rounded-2xl p-5 expanded:p-6">
         <SectionTitle>
           <span id="history-title">History · {lead.entryCount}</span>
         </SectionTitle>
@@ -267,12 +300,30 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
 }
 
 /** A big round action with a label under it, like a phone's contact card. */
-function QuickAction({ href, icon, label, sub, tone, external }: { href: string; icon: React.ReactNode; label: string; sub?: string; tone?: 'primary' | 'whatsapp'; external?: boolean }) {
+function QuickAction({
+  href,
+  onClick,
+  icon,
+  label,
+  sub,
+  tone,
+  external,
+}: {
+  href?: string
+  onClick?: () => void
+  icon: React.ReactNode
+  label: string
+  sub?: string
+  tone?: 'primary' | 'whatsapp'
+  external?: boolean
+}) {
+  const Comp = href ? 'a' : 'button'
   return (
-    <a
-      href={href}
+    <Comp
+      {...(href ? { href } : { type: 'button' as const })}
+      onClick={onClick}
       {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
-      className="pressable flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-xl border border-hairline px-2 py-3 text-center active:bg-surface-soft expanded:max-w-40 expanded:hover:bg-surface-soft"
+      className="card card--default pressable min-w-0 flex-1 items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-shadow hover:shadow-lift active:bg-surface-secondary expanded:max-w-44"
     >
       <span
         className={cn(
@@ -284,7 +335,7 @@ function QuickAction({ href, icon, label, sub, tone, external }: { href: string;
       </span>
       <span className="text-body-sm font-semibold text-ink">{label}</span>
       {sub && <span className="-mt-1.5 w-full truncate text-caption text-muted tabular-nums">{sub}</span>}
-    </a>
+    </Comp>
   )
 }
 

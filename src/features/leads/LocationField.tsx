@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId, useRef, useState } from 'react'
-import { FieldShell } from '@/components/ui/Field'
+import { FieldShell, inputBox } from '@/components/ui/Field'
 import { useDebounced } from '@/hooks/useDebounced'
 import { Icon } from '@/icons'
 import { api } from '@/lib/api'
@@ -52,11 +52,8 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
     <FieldShell label={label} htmlFor={id} error={error}>
       <div className="relative">
         <div
-          className={cn(
-            'flex h-12 items-center rounded-md border border-hairline bg-canvas',
-            focused && 'border-primary shadow-[inset_0_0_0_1px_var(--color-primary)]',
-            error && 'border-down',
-          )}
+          aria-invalid={!!error}
+          className={cn(inputBox, 'flex h-12 items-center', focused && 'border-primary ring-3 ring-focus/25')}
         >
           <Icon name="marker" size={20} className="ml-4 text-muted" />
           <input
@@ -107,7 +104,7 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
           <ul
             id={listId}
             role="listbox"
-            className="mt-1 overflow-hidden rounded-md border border-hairline bg-canvas expanded:absolute expanded:inset-x-0 expanded:top-full expanded:z-30 expanded:shadow-soft"
+            className="mt-1.5 overflow-hidden rounded-2xl bg-overlay p-1 shadow-overlay expanded:absolute expanded:inset-x-0 expanded:top-full expanded:z-30"
           >
             {rows.map((r, i) => (
               <li
@@ -117,7 +114,7 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
                 aria-selected={i === active}
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => choose(r.name)}
-                className={cn('flex min-h-12 cursor-pointer items-center gap-3 border-b border-hairline-soft px-4 text-body-md last:border-b-0', i === active ? 'bg-surface-strong' : 'active:bg-surface-soft expanded:hover:bg-surface-soft')}
+                className={cn('flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-3 text-body-md', i === active ? 'bg-default' : 'active:bg-default expanded:hover:bg-default')}
               >
                 <Icon name={r.isNew ? 'plus-math' : 'marker'} size={20} className="text-muted" />
                 <span className="truncate">{r.isNew ? <>Use “{r.name}”</> : r.name}</span>

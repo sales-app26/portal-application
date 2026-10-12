@@ -108,6 +108,12 @@ export async function click(page, text, selector = 'button, a, [role=option], li
   )
 }
 
+/** Clicks the last visible element of `selector` whose text contains `text` (rows with avatars or a second line). */
+export async function clickContaining(page, text, selector) {
+  await page.waitForFunction((t, s) => [...document.querySelectorAll(s)].some((e) => e.textContent.includes(t) && e.getClientRects().length), { timeout: 5000 }, text, selector)
+  await page.evaluate((t, s) => [...document.querySelectorAll(s)].reverse().find((e) => e.textContent.includes(t) && e.getClientRects().length).click(), text, selector)
+}
+
 export const waitForText = (page, text, timeout = 5000) => page.waitForFunction((t) => document.body.innerText.includes(t), { timeout }, text)
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

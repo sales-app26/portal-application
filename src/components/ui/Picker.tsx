@@ -4,7 +4,7 @@ import { useIsSheetLayout } from '@/hooks/useWindowClass'
 import { cn } from '@/lib/cn'
 import { Icon } from '@/icons'
 import { ChoiceList, type ChoiceOption } from './Choice'
-import { FieldShell } from './Field'
+import { FieldShell, inputBox } from './Field'
 import { ResponsiveOverlay } from './Overlay'
 
 interface PickerProps<T extends string> {
@@ -45,10 +45,7 @@ export function Picker<T extends string>({ label, value, options, onChange, plac
       aria-expanded={open}
       aria-invalid={!!error}
       onClick={() => setOpen(true)}
-      className={cn(
-        'flex h-12 w-full items-center gap-2 rounded-md border border-hairline bg-canvas px-4 text-left text-body-md',
-        'aria-expanded:border-primary aria-[invalid=true]:border-down',
-      )}
+      className={cn(inputBox, 'flex h-12 items-center gap-2 px-4 text-left aria-expanded:border-primary aria-expanded:ring-3 aria-expanded:ring-focus/25')}
     >
       <span className="min-w-0 flex-1 truncate">{shown}</span>
       <Icon name="expand-arrow" size={20} className="text-muted" />
@@ -87,7 +84,7 @@ export function Picker<T extends string>({ label, value, options, onChange, plac
           <Popover.Content
             align="start"
             sideOffset={6}
-            className="z-50 max-h-[min(400px,var(--radix-popover-content-available-height))] w-[var(--radix-popover-trigger-width)] min-w-64 overflow-y-auto rounded-lg border border-hairline bg-canvas shadow-soft"
+            className="z-50 max-h-[min(400px,var(--radix-popover-content-available-height))] w-[var(--radix-popover-trigger-width)] min-w-64 overflow-y-auto rounded-2xl bg-overlay py-1 shadow-overlay"
           >
             {list}
           </Popover.Content>

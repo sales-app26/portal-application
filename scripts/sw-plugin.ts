@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { Plugin } from 'vite'
 
 // Files in /public that the build doesn't list but the app needs offline.
-const STATIC = ['/favicon.svg', '/manifest.webmanifest', '/app-icon-192.png', '/app-icon-512.png']
+const STATIC = ['/favicon.svg', '/manifest.webmanifest', '/app-icon-192.png', '/app-icon-512.png', '/app-icon-maskable-512.png', '/apple-touch-icon.png', '/brand/pronttera-mark.svg', '/brand/pronttera-mark-white.svg']
 
 /**
  * Fonts ship one file per script and per format. A phone only ever uses the Latin woff2 files,

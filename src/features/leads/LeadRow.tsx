@@ -3,7 +3,7 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Avatar, Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { plural, relativeDay } from '@/lib/format'
+import { plural, relativeDay, rupees } from '@/lib/format'
 import type { LeadSummary } from '@/lib/types'
 import { ContactButtons } from './ContactActions'
 
@@ -14,6 +14,12 @@ export function LeadWhen({ lead }: { lead: LeadSummary }) {
   if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDay(lead.nextFollowUpDate)}</span>
   if (lead.hasPendingTransfer) return <span className="text-caption whitespace-nowrap text-muted">Transfer pending</span>
   return null
+}
+
+/** "₹2,499/mo" when the lead carries a deal value. */
+function DealValue({ lead }: { lead: LeadSummary }) {
+  if (!lead.dealValue) return null
+  return <span className="text-caption-strong whitespace-nowrap text-ink tabular-nums">{rupees(lead.dealValue)}/mo</span>
 }
 
 const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [lead.businessName, lead.location.name, showOwner ? lead.owner.name : null].filter(Boolean).join(' · ')
@@ -35,7 +41,7 @@ export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead
         role="checkbox"
         aria-checked={!!selected}
         onClick={onToggle}
-        className={cn('flex min-h-[72px] w-full items-center gap-3 border-b border-hairline-soft px-4 py-3 text-left', selected ? 'bg-surface-strong' : 'active:bg-surface-soft')}
+        className={cn('flex min-h-[72px] w-full items-center gap-3 border-b border-separator px-4 py-3 text-left transition-colors', selected ? 'bg-accent-soft' : 'active:bg-surface-secondary')}
       >
         <span className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>
           {selected && <Icon name="checkmark" size={16} />}
@@ -53,16 +59,20 @@ export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead
 
   if (contact)
     return (
-      <div className="flex items-center border-b border-hairline-soft has-[a[aria-current=page]]:expanded:bg-surface-strong">
-        <NavLink to={`/leads/${lead.id}`} className="flex min-h-[84px] min-w-0 flex-1 flex-col justify-center gap-1 py-3 pr-2 pl-4 active:bg-surface-soft">
-          <span className="truncate text-title-sm">{lead.name}</span>
-          {secondary && <span className="truncate text-body-sm text-body">{secondary}</span>}
-          <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <StatusChip status={lead.status} size="sm" />
-            <LeadWhen lead={lead} />
+      <div className="flex items-center border-b border-separator transition-colors last:border-b-0 hover:bg-surface-secondary has-[a[aria-current=page]]:expanded:bg-accent-soft">
+        <NavLink to={`/leads/${lead.id}`} className="flex min-h-[84px] min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4">
+          <Avatar name={lead.name} className="hidden medium:flex" />
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="truncate text-title-sm">{lead.name}</span>
+            {secondary && <span className="truncate text-body-sm text-body">{secondary}</span>}
+            <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <StatusChip status={lead.status} size="sm" />
+              <DealValue lead={lead} />
+              <LeadWhen lead={lead} />
+            </span>
           </span>
         </NavLink>
-        <ContactButtons phone={lead.phone} name={lead.name} className="pr-4" />
+        <ContactButtons lead={lead} className="pr-4" />
       </div>
     )
 
@@ -71,8 +81,8 @@ export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead
       to={`/leads/${lead.id}`}
       className={({ isActive }) =>
         cn(
-          'flex min-h-[72px] items-center gap-3 border-b border-hairline-soft px-4 py-3 active:bg-surface-soft expanded:hover:bg-surface-soft',
-          isActive && 'expanded:bg-surface-strong expanded:hover:bg-surface-strong',
+          'flex min-h-[72px] items-center gap-3 border-b border-separator px-4 py-3 transition-colors last:border-b-0 active:bg-surface-secondary expanded:hover:bg-surface-secondary',
+          isActive && 'expanded:bg-accent-soft expanded:hover:bg-accent-soft',
         )
       }
     >

@@ -15,7 +15,12 @@ export type LeadStatus =
 export type EntryType = 'follow_up' | 'status_change'
 export type TransferStatus = 'pending' | 'approved' | 'rejected'
 export type LeadOwnerTag = 'owner_inactive' | 'owner_removed'
-export type LeadSort = 'updated' | 'created' | 'name' | 'next_follow_up'
+export type LeadSort = 'updated' | 'created' | 'name' | 'next_follow_up' | 'value' | 'activity'
+export type LeadSource = 'walk_in' | 'referral' | 'phone' | 'whatsapp' | 'social' | 'event' | 'import' | 'other'
+export type LostReason = 'price' | 'has_alternative' | 'not_ready' | 'no_need' | 'owner_unavailable' | 'shop_closed' | 'competitor' | 'other'
+export type LeadDue = 'overdue' | 'today' | 'tomorrow' | 'week' | 'none'
+export type FunnelStage = 'created' | 'contacted' | 'interested' | 'converted'
+export type AttentionKind = 'behind_target' | 'overdue_pile' | 'idle' | 'stale_transfer'
 
 export interface Paginated<T> {
   items: T[]
@@ -71,6 +76,8 @@ export interface User {
   createdBy: string | null
   createdAt: string
   canManage: boolean
+  /** Reset link, deactivate, reactivate: false when the person also works in projects the caller doesn't run. */
+  canManageAccount: boolean
 }
 
 export interface Project {
@@ -133,6 +140,8 @@ export interface Entry {
   updatedAt: string
   edited: boolean
   editable: boolean
+  /** Why it was lost: only on Not interested and Lost entries. */
+  reason: LostReason | null
 }
 
 export interface TimelineEntry extends Entry {
@@ -156,6 +165,12 @@ export interface LeadSummary {
   hasPendingTransfer: boolean
   createdAt: string
   updatedAt: string
+  /** Whole rupees per month. */
+  dealValue: number | null
+  plan: string | null
+  source: LeadSource | null
+  lastActivityAt: string
+  createdBy: PersonRef | null
 }
 
 export interface LeadTransferRef {
@@ -232,6 +247,20 @@ export interface MeHome {
   followUpsToday: number
   myLeads: number
   notice: string | null
+  conversionsThisMonth: number
+  revenueThisMonth: number
+}
+
+/** GET /me/agenda: the rep's lists for planning the day and the week. */
+export interface Agenda {
+  overdue: number
+  today: number
+  tomorrow: number
+  thisWeek: number
+  /** Open leads untouched for 14+ days. */
+  cold: number
+  /** New leads nobody has contacted yet (imports). */
+  untouched: number
 }
 
 export interface Timeline {
@@ -258,7 +287,16 @@ export interface Dashboard {
     followUps: number
     conversions: number
     followUpsToday: number
+    revenue: number
   }[]
+  conversions: number
+  revenue: number
+  funnel: { stage: FunnelStage; count: number }[]
+  trendBucket: 'day' | 'week'
+  trend: { date: string; followUps: number; newLeads: number; conversions: number; revenue: number }[]
+  lostReasons: { reason: LostReason | 'unspecified'; count: number }[]
+  sources: { source: LeadSource | 'unspecified'; count: number }[]
+  needsAttention: { kind: AttentionKind; user: PersonRef | null; projectName: string | null; detail: string; leadCount?: number }[]
   loggedNothingToday: { user: PersonRef; role: UserRole; projects: string[] }[]
   leadsByStatus: { status: LeadStatus; count: number }[]
   conversionsThisWeek: {

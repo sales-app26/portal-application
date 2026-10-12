@@ -21,7 +21,8 @@ describe('dashboard', () => {
     await go('/dashboard')
     await waitForText(page, 'Target vs achieved')
     const text = await page.evaluate(() => document.body.innerText)
-    for (const t of ['New leads', 'Pending transfers', 'Priya Desai', 'Logged nothing today', 'Karan Mehta', 'Conversions this week', 'Leads by status']) assert.ok(text.includes(t), `shows ${t}`)
+    for (const t of ['New leads', 'Pending transfers', 'Priya Desai', 'Logged nothing today', 'Karan Mehta', 'Conversions this week', 'Leads by status', 'Monthly revenue won', 'Funnel', 'Needs attention', '6 leads overdue', 'Why leads say no', 'Price too high', 'Where leads come from', 'Leaderboard'])
+      assert.ok(text.includes(t), `shows ${t}`)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), PHONE.width)
     assert.deepEqual(errors, [])
     await page.close()
@@ -35,8 +36,14 @@ describe('dashboard', () => {
     await click(page, 'All my projects', 'button[aria-haspopup=listbox]')
     await click(page, 'Pune Retail Drive', '[role=option]')
     await click(page, 'Show results')
-    await sleep(500)
-    const last = api.calls.filter((c) => c.path === '/dashboard').at(-1)
+    // Wait for the request with both filters, rather than a fixed pause the refetch can miss.
+    const deadline = Date.now() + 5000
+    let last
+    while (Date.now() < deadline) {
+      last = api.calls.filter((c) => c.path === '/dashboard').at(-1)
+      if (last?.query.projectId && last.query.from !== last.query.to) break
+      await sleep(100)
+    }
     assert.equal(last.query.projectId, '11111111-1111-4111-8111-111111111111')
     assert.notEqual(last.query.from, last.query.to, '7-day range')
     await page.close()
@@ -194,7 +201,7 @@ describe('projects', () => {
     await page.close()
   })
 
-  test('moderator sees no Settings tab and cannot remove another moderator', async () => {
+  test('moderator sees no Settings tab and cannot remove, or set the target of, another moderator', async () => {
     const { page, go } = await app.open(PHONE, { role: 'moderator' })
     await go(`/projects/${ids.online}`)
     await waitForText(page, 'Priya Desai')
@@ -202,8 +209,9 @@ describe('projects', () => {
     // Menus: Priya (sales person) offers Remove, Farah (moderator) does not.
     const menus = await page.$$('button[aria-label="More actions"]')
     await menus[1].evaluate((b) => b.click())
-    await waitForText(page, 'Set target')
+    await waitForText(page, 'View their day')
     assert.equal(await visibleButtons(page, 'Remove from project'), 0)
+    assert.equal(await visibleButtons(page, 'Set target'), 0, "another moderator's target is the Super Admin's to set")
     await page.close()
   })
 

@@ -203,10 +203,18 @@ Other database errors:
 - `EntryType`: `follow_up`, `status_change`
 - `TransferStatus`: `pending`, `approved`, `rejected`
 - `LeadOwnerTag` (derived, admins only): `owner_inactive`, `owner_removed`
+- `LeadSource` (`leads.source`): `walk_in`, `referral`, `phone`, `whatsapp`, `social`, `event`, `import`, `other`. The CSV import sets `import`; anything may be sent by hand.
+- `LostReason` (`follow_ups.reason`): `price`, `has_alternative`, `not_ready`, `no_need`, `owner_unavailable`, `shop_closed`, `competitor`, `other`
+- `LeadDue` (lead list `due` filter, derived): `overdue`, `today`, `tomorrow`, `week`, `none`
+- `FunnelStage` (dashboard `funnel`): `created`, `contacted`, `interested`, `converted`
+- `AttentionKind` (dashboard `needsAttention`): `behind_target`, `overdue_pile`, `idle`, `stale_transfer`
+- `TrendBucket` (dashboard `trendBucket`): `day`, `week`
 
 Related constants:
 - `TERMINAL_STATUSES` = `NOT_DUE_STATUSES` = [`not_interested`, `converted`, `lost`]
-- Lead list `sort` values: `updated` (default, DESC), `created` (DESC), `name` (ASC), `next_follow_up` (ASC). All use NULLS LAST.
+- `REASON_STATUSES` = [`not_interested`, `lost`]: the only statuses an entry may carry a `reason` for.
+- `UNSPECIFIED` = `"unspecified"`: what dashboard `lostReasons` and `sources` show for a null reason or source.
+- Lead list `sort` values: `updated` (default, DESC), `created` (DESC), `name` (ASC), `next_follow_up` (ASC), `value` (`dealValue` DESC: biggest deal first), `activity` (`lastActivityAt` ASC: longest untouched first). All use NULLS LAST.
 
 ---
 
@@ -262,6 +270,7 @@ All paths below are relative to `/api/v1`.
     "entryType": "follow_up|status_change",
     "status": "<LeadStatus after this entry>",
     "note": "string|null",
+    "reason": "<LostReason>|null",
     "nextFollowUpDate": "YYYY-MM-DD|null",
     "location": "{id,name}|null",
     "hasPhoto": true,
@@ -275,6 +284,7 @@ All paths below are relative to `/api/v1`.
   }
   ```
   - `location` is null for a `status_change`.
+  - `reason` is set only on `not_interested` and `lost` entries, and only when one was given. It is never editable.
   - `photoUrl` is a signed URL with a TTL of `SIGNED_URL_TTL_SECONDS` (default 600 s).
   - `lowAccuracy` is true when `gpsAccuracyM > 100`.
   - `user` is whoever logged the entry.
@@ -291,12 +301,20 @@ All paths below are relative to `/api/v1`.
     "owner": { "id": "...", "name": "...", "isActive": true },
     "ownerTag": "owner_inactive|owner_removed|null",
     "convertedAt": "ISO|null",
+    "dealValue": "number|null",
+    "plan": "string|null",
+    "source": "<LeadSource>|null",
+    "lastActivityAt": "ISO",
+    "createdBy": "{id,name}|null",
     "hasPendingTransfer": false,
     "createdAt": "ISO", "updatedAt": "ISO"
   }
   ```
   - `overdueDays` is set when `nextFollowUpDate` is before today and the status is not terminal; otherwise null.
   - `ownerTag` is always null for non-admins.
+  - `dealValue` is whole rupees per month (0–100000000). `plan` is the plan sold or offered (1–80 chars). Both are set on create, on an entry that converts the lead, or by `PATCH /leads/:id`. Leaving Converted keeps them, but revenue only counts converted leads.
+  - `lastActivityAt` is the time of the latest live entry, or `createdAt` if there is none (imported leads). Every follow-up and status change moves it; it falls back when the Super Admin deletes the latest entry. Editing the lead or an entry, and transfers, do not move it.
+  - `createdBy` is who added the lead (the person who logged its first entry) or the admin who imported it. It does not change on transfer. Null only for leads imported before it was recorded.
 - **LeadDetailDto** is `LeadSummaryDto` plus:
   ```json
   {
@@ -433,13 +451,13 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | Method | Path | Roles | Params / Body | data |
 |---|---|---|---|---|
 | POST | `/projects/:id/leads` | **SP, MOD** (must be an active member) | JSON or multipart. **CreateLeadDto**, see the field table below. | `LeadDetailDto`. **201**, "Lead saved." |
-| GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `sort?` (`updated`, `created`, `name` or `next_follow_up`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. | Paginated `LeadSummaryDto` |
+| GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `due?` (LeadDue, see below), `cold?` ("true"/"false"), `source?` (LeadSource), `sort?` (`updated`, `created`, `name`, `next_follow_up`, `value` or `activity`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. Filters combine with AND. | Paginated `LeadSummaryDto` |
 | GET | `/leads/:id` | any (admin of the project, or owner and active member; else 404) | | `LeadDetailDto` |
 | GET | `/leads/:id/entries` | same | Query: pagination | Paginated `EntryDto`, newest first |
-| PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace) | `LeadDetailDto` |
+| PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace); `dealValue?` (integer 0–100000000, or null to clear); `plan?` (string or null, trimmed, max 80, "" becomes null); `source?` (LeadSource, or null to clear) | `LeadDetailDto` |
 | DELETE | `/leads/:id` | **SA** | | `null`, "Deleted successfully." This is a soft delete. |
 | POST | `/leads/:id/follow-ups` | **SP, MOD** (owner only) | JSON or multipart. **LogFollowUpDto**, see below. | `EntrySaveResultDto`. **201**, "Follow-up saved." |
-| POST | `/leads/:id/status` | any (owner, or an admin of the project) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; the reason); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored) | `EntrySaveResultDto`. **200**, "Status changed." |
+| POST | `/leads/:id/status` | any (owner, or an admin of the project) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); `dealValue?`, `plan?` (only with `converted`; same validation as on create) | `EntrySaveResultDto`. **200**, "Status changed." |
 
 **CreateLeadDto fields.** It extends `LogFollowUpDto`, so it includes every follow-up field.
 
@@ -449,6 +467,10 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | `businessName` | string\|null | no | "" becomes null, max 160 |
 | `phone` | string | yes | non-empty, max 20. Server: Indian mobile, else 400 VALIDATION_FAILED "Enter a 10-digit Indian mobile number." |
 | `notes` | string\|null | no | max 2000. About the client, separate from the note. |
+| `dealValue` | integer | no | 0–100000000, rupees per month. Numeric strings accepted (multipart); "" is ignored. Allowed with any status on create. |
+| `plan` | string\|null | no | trimmed, max 80; "" becomes null |
+| `source` | LeadSource | no | "" is ignored. Not sent → null. |
+| `reason` | LostReason | no | only with `not_interested` or `lost`, else 400 (see below); "" is ignored |
 | `clientRequestId` | uuid v4 | yes | idempotency key |
 | `status` | LeadStatus | yes | `new` is allowed only here |
 | `note` | string | yes | trimmed, **min 5**, max 2000 (the first follow-up note) |
@@ -469,7 +491,16 @@ Other create errors:
 - Not a member: 404.
 - Closed project: 409 PROJECT_CLOSED "This project is closed."
 
-**LogFollowUpDto fields:** `clientRequestId`, `status`, `note`, `nextFollowUpDate?`, `location` (required; pre-fill it with the lead's location), plus `latitude?`, `longitude?`, `gpsAccuracyM?`, `captureToken?` and the `photo` file. Constraints are the same as in the table above.
+**LogFollowUpDto fields:** `clientRequestId`, `status`, `note`, `nextFollowUpDate?`, `location` (required; pre-fill it with the lead's location), `reason?`, `dealValue?`, `plan?`, plus `latitude?`, `longitude?`, `gpsAccuracyM?`, `captureToken?` and the `photo` file. Constraints are the same as in the table above, except that `dealValue` and `plan` are allowed only when `status` is `converted`.
+
+**List filters (`GET /projects/:id/leads`).** "Today" is the IST date.
+- `due=overdue`: `nextFollowUpDate` before today.
+- `due=today` / `due=tomorrow`: `nextFollowUpDate` equals today / today + 1.
+- `due=week`: `nextFollowUpDate` from today + 1 to today + 7, inclusive (so it includes tomorrow).
+- `due=none`: no `nextFollowUpDate` and the status is not terminal.
+- `cold=true`: status not terminal and `lastActivityAt` more than 14 × 24 hours ago. `cold=false` or absent: no filter.
+- `source=<LeadSource>`: exact match; leads with no source never match.
+- Unknown values give 400.
 
 Follow-up and status rules (`lead-rules.ts`):
 - Next follow-up date:
@@ -485,6 +516,9 @@ Follow-up and status rules (`lead-rules.ts`):
   - The same status gives 422 "The lead already has this status."
   - `new` gives 422.
   - Leaving `converted` as a non-admin gives 403 "Ask your moderator to change this."
+- Reason (create, follow-up, status change): optional. Allowed only when `status` is `not_interested` or `lost`; otherwise 400 VALIDATION_FAILED "A reason can be given only for Not interested or Lost." An unknown value is a 400 from the validator.
+- Deal value and plan on a follow-up or status change: allowed only when `status` is `converted` (a new conversion, or a follow-up on a lead that stays converted); otherwise 400 VALIDATION_FAILED "Deal value and plan can be sent only when the lead is Converted." Values sent overwrite the lead's; values not sent (or blank) leave the lead's as they are.
+- Every follow-up and status change sets the lead's `lastActivityAt` to the entry's `createdAt`.
 - A follow-up by an admin who is not the owner gives 403 "Only the lead's owner can log a follow-up."
 - If the lead was transferred away from the caller (an approved transfer from them), the error is 409 `LEAD_TRANSFERRED`, "This lead now belongs to {name}." Otherwise 404.
 - If the project closed meanwhile: 409 `PROJECT_CLOSED`.
@@ -495,7 +529,7 @@ Follow-up and status rules (`lead-rules.ts`):
 | GET | `/entries/:id` | any (author, owner who is an active member, or admin of the project; else 404) | | `EntryDto` |
 | GET | `/entries/:id/photo` | same | | `{ url: string, expiresInSeconds: number }` (default 600). No photo: 404 "This entry has no photo." Storage failure: 502 INTEGRATION_ERROR. |
 | PATCH | `/entries/:id` | any (author only) | `note?` (trimmed, 5–2000); `nextFollowUpDate?` (YYYY-MM-DD, or null/"" to clear; follow-ups only). At least one field is required, else 400 "Send a note or a next follow-up date to change." | `EntrySaveResultDto`, "Updated successfully." |
-| DELETE | `/entries/:id` | **SA** | | `null` |
+| DELETE | `/entries/:id` | **SA** | | `null`. The lead's status, next date, conversion and `lastActivityAt` are rebuilt from the remaining entries (`lastActivityAt` falls back to the lead's `createdAt` if none remain). Deal value and plan are kept. |
 
 Entry edit errors:
 - An admin who is not the author: 403 "Only the person who logged this entry can edit it."
@@ -544,13 +578,35 @@ Transfer errors:
     "overdue": 0,
     "followUpsToday": 0,
     "myLeads": 0,
+    "conversionsThisMonth": 0,
+    "revenueThisMonth": 0,
     "notice": "string|null"
   }
   ```
   - `targets` holds the caller's own progress per active project.
   - `dueToday` counts due plus overdue.
   - `followUpsToday` counts `follow_up` entries the caller logged today in IST.
+  - `conversionsThisMonth` counts leads whose `convertedBy` is the caller and whose `convertedAt` falls in the current IST calendar month, across the caller's projects (or `projectId`).
+  - `revenueThisMonth` is the sum of `dealValue` (₹/month) over those leads; a lead without a deal value adds 0. A number, not a string.
   - `notice` is "You are not assigned to any project yet." when the caller has no projects.
+
+**GET `/me/agenda`** (roles SP, MOD; a Super Admin gets 403)
+- Query: `projectId?` (uuid v4; a project the caller is not a member of gives 404).
+- `data`:
+  ```json
+  {
+    "overdue": 0,
+    "today": 0,
+    "tomorrow": 0,
+    "thisWeek": 0,
+    "cold": 0,
+    "untouched": 0
+  }
+  ```
+  - Counts only leads the caller owns, not deleted, in active projects where the caller is still an active member (the same scope as `/me/due-today`).
+  - `overdue`, `today`, `tomorrow`, `thisWeek` match the lead list's `due=overdue|today|tomorrow|week`. `thisWeek` is today + 1 to today + 7, so it includes `tomorrow`.
+  - `cold` matches `cold=true`: open leads with no activity for 14 days.
+  - `untouched`: status `new` with no live entry at all, i.e. imported and never contacted.
 
 **GET `/me/due-today`** (roles SP, MOD)
 - Query: pagination plus `projectId?`.
@@ -580,7 +636,7 @@ Transfer errors:
 
 **GET `/dashboard`** (roles SA, MOD)
 - Query (`ReportFilterDto`):
-  - `from?`, `to?`: YYYY-MM-DD, inclusive, IST. If only one is sent, it is used for both; if neither, today. `from > to` gives 400 "The start date must be on or before the end date."
+  - `from?`, `to?`: YYYY-MM-DD, inclusive, IST. If only one is sent, it is used for both; if neither, today. `from > to` gives 400 "The start date must be on or before the end date." More than **366 days** gives 400 VALIDATION_FAILED "The dashboard can cover at most 366 days."
   - `projectId?`, `userId?`: uuid v4.
 - `data`:
   ```json
@@ -590,8 +646,31 @@ Transfer errors:
     "newLeads": 0,
     "followUps": 0,
     "followUpsToday": 0,
+    "conversions": 0,
+    "revenue": 0,
+    "funnel": [
+      { "stage": "created", "count": 0 },
+      { "stage": "contacted", "count": 0 },
+      { "stage": "interested", "count": 0 },
+      { "stage": "converted", "count": 0 }
+    ],
+    "trendBucket": "day|week",
+    "trend": [
+      { "date": "YYYY-MM-DD", "followUps": 0, "newLeads": 0, "conversions": 0, "revenue": 0 }
+    ],
+    "lostReasons": [ { "reason": "<LostReason>|unspecified", "count": 0 } ],
+    "sources": [ { "source": "<LeadSource>|unspecified", "count": 0 } ],
     "people": [
-      { "user": { "id": "...", "name": "..." }, "role": "...", "newLeads": 0, "followUps": 0, "conversions": 0, "followUpsToday": 0 }
+      { "user": { "id": "...", "name": "..." }, "role": "...", "newLeads": 0, "followUps": 0, "conversions": 0, "revenue": 0, "followUpsToday": 0 }
+    ],
+    "needsAttention": [
+      {
+        "kind": "behind_target|overdue_pile|idle|stale_transfer",
+        "user": "{id,name}|null",
+        "projectName": "string|null",
+        "detail": "...",
+        "leadCount": 0
+      }
     ],
     "loggedNothingToday": [
       { "user": { "id": "...", "name": "..." }, "role": "...", "projects": ["Project name"] }
@@ -610,7 +689,19 @@ Transfer errors:
   }
   ```
   - `targets` are for the current week or month, not the date range.
+  - `newLeads` counts leads whose `createdAt` is in the range, credited to `createdBy` (the person who added the lead, or the admin who imported it), so imported leads count. With `userId`, only leads that person created. `people[].newLeads` uses the same rule, so an admin who imported leads appears in `people` with them. Leads imported before `createdBy` was recorded count in the total only. `/timeline/summary` counts `newLeads` the same way.
   - `followUps` counts entries in the range.
+  - `conversions` counts leads whose `convertedAt` is in the range; `revenue` is the sum of their `dealValue` (₹/month, a lead without one adds 0). With `userId`, conversions credited to that person (`convertedBy`). `people[].conversions` / `people[].revenue` are the same per person.
+  - `funnel` covers leads **created** in the range, by current status: `created` = all of them; `contacted` = any status but `new`; `interested` = `interested`, `follow_up_scheduled` or `converted`; `converted` = `converted`. Always four items in that order. With `userId` it follows the lead's current **owner** (whose pipeline it is), unlike `newLeads`.
+  - `trend` has one point per IST day in the range, zeros included, and `trendBucket` is `day`. When the range is longer than 92 days the points are Monday–Sunday weeks instead (`trendBucket` is `week`, at most 53 points); each point's `date` is the week's Monday, except the first, which is `from` when the range starts mid-week. `followUps` counts `follow_up` entries (filtered by who logged them), `newLeads` as above, `conversions` and `revenue` as above.
+  - `lostReasons` counts `not_interested` and `lost` entries logged in the range by `reason` (null → `"unspecified"`), filtered by who logged them; only non-zero reasons, most common first.
+  - `sources` counts leads created in the range by `source` (null → `"unspecified"`); only non-zero, most common first. With `userId` it follows the owner, like `funnel`.
+  - `needsAttention` is about **now**, not the date range (project and person filters still apply). At most 20 items, most severe first. Severity is how far past its threshold each item is (gap ÷ 20 points, overdue ÷ 5, idle days ÷ 2, hours ÷ 24), then by kind in the order listed, then name.
+    - `behind_target`: one per member target (active project) whose conversions share (`achieved / targetCount`, capped at 100%) is more than 20 percentage points behind the share of the current week or month gone. `detail`: "3 of 10 conversions with 65% of the week gone." No `leadCount`.
+    - `overdue_pile`: one per owner and project with 5 or more overdue leads (`nextFollowUpDate` before today), counting only owners who are active users and active members of an active project. `leadCount` = the overdue leads. `detail`: "7 leads overdue for a follow-up."
+    - `idle`: one per active sales person or moderator who owns at least one lead in an active project in scope and has logged no entry in scope for 2 or more IST days (today counts as day 0, so nothing today or yesterday). Someone who never logged is counted from the day they joined. `projectName` is null when it spans several projects. `leadCount` = their open (non-terminal) leads in scope. `detail`: "No entry for 3 days." or "Nothing logged since joining 5 days ago."
+    - `stale_transfer`: one per pending transfer older than 24 hours, oldest first; `user` is the person it is from. With `userId`, transfers from or to that person. `detail`: "Transfer of Asha Patil to Priya Desai waiting 30 hours." No `leadCount`.
+    - `leadCount` is omitted (not null) where it does not apply.
   - `leadsByStatus` always contains all 7 statuses, zeros included.
   - `conversionsThisWeek` covers the current Monday–Sunday IST week, newest first, at most 500.
   - `message` is "No data for these dates." when both `newLeads` and `followUps` are 0.
@@ -647,7 +738,8 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - `latitude`, `longitude`, `gpsAccuracyM`: text parts with numeric strings, converted on the server.
 - `captureToken`: text part.
 - `clientRequestId`, `status`, `note`, `nextFollowUpDate` (optional; an empty string means not sent), `location`: text parts.
-- For create only: `name`, `businessName`, `phone`, `notes`.
+- Optional text parts: `reason`, `dealValue` (a numeric string), `plan`. An empty string means not sent (for `plan`, null).
+- For create only: `name`, `businessName`, `phone`, `notes`, `source`.
 - Do not send any other parts; `forbidNonWhitelisted` rejects them with 400.
 
 **Size and format limits**
@@ -700,6 +792,7 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - `to`: YYYY-MM-DD, **required**.
 - `projectId?`, `userId?`: uuid v4.
 - The span is inclusive and **at most 92 days**, else 400 VALIDATION_FAILED "An export can cover at most 92 days." `from > to` gives 400.
+- A file holds **at most 20,000 rows**. More gives 400 VALIDATION_FAILED "An export can hold at most 20,000 rows. Choose fewer days, one project or one person." Nothing is downloaded; narrow the filters and retry.
 - A moderator's export covers only his projects. For leads, `userId` filters by owner; for follow-ups, by the person who logged the entry.
 
 **Response**
@@ -710,9 +803,9 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - The CSV is UTF-8 with a BOM, CRLF line endings, and RFC 4180 quoting. Cells starting with `= + - @ tab CR` get a leading `'` (numbers are left alone).
 - Date-times are formatted `YYYY-MM-DD HH:mm` in IST.
 
-**Leads columns:** Lead ID, Project, Name, Business name, Phone, Location, Status, Next follow-up, Owner, Owner active (yes/no), Converted at (IST), Converted by, Added at (IST), Updated at (IST), Notes. Rows are leads whose `created_at` falls in the range.
+**Leads columns:** Lead ID, Project, Name, Business name, Phone, Location, Status, Next follow-up, Owner, Owner active (yes/no), Converted at (IST), Converted by, Deal value (₹/month), Plan, Source (LeadSource value or blank), Added at (IST), Updated at (IST), Last activity (IST), Notes. Rows are leads whose `created_at` falls in the range.
 
-**Follow-ups columns:** Entry ID, Logged at (IST), Project, Lead, Business name, Phone, Logged by, Type (`follow_up`/`status_change`), Status, Note, Next follow-up, Typed location, Latitude, Longitude, GPS accuracy (m), Low accuracy (yes/no/blank), Photo (login required), Edited (yes/no).
+**Follow-ups columns:** Entry ID, Logged at (IST), Project, Lead, Business name, Phone, Logged by, Type (`follow_up`/`status_change`), Status, Reason (LostReason value or blank), Note, Next follow-up, Typed location, Latitude, Longitude, GPS accuracy (m), Low accuracy (yes/no/blank), Photo (login required), Edited (yes/no).
 - The photo cell is `${APP_URL}/entries/<entryId>`, or `entries/<entryId>` if `APP_URL` is not set.
 - **Your web app needs a route `/entries/:id`** that, after login, calls `GET /api/v1/entries/:id` and `GET /api/v1/entries/:id/photo`.
 
@@ -812,6 +905,8 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - NEXT_DATE_NOT_OWNER: "The next follow-up date can be changed only while you own the lead."
 - CLIENT_REQUEST_REUSED: "This request id was already used for a different entry."
 - NOTHING_TO_UPDATE: "Send a note or a next follow-up date to change."
+- REASON_NOT_ALLOWED: "A reason can be given only for Not interested or Lost."
+- DEAL_ONLY_WHEN_CONVERTED: "Deal value and plan can be sent only when the lead is Converted."
 
 **VISIT_ERROR**
 - PHOTO_REQUIRED: "Take a photo of the visit to save it."
@@ -838,6 +933,8 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 
 **REPORT_ERROR**
 - EXPORT_RANGE_TOO_LONG: "An export can cover at most 92 days."
+- EXPORT_TOO_MANY_ROWS: "An export can hold at most 20,000 rows. Choose fewer days, one project or one person."
+- DASHBOARD_RANGE_TOO_LONG: "The dashboard can cover at most 366 days."
 - DATE_REQUIRED: "Choose a start and end date."
 
 The messages use the typographic apostrophe `’` in "lead’s".
@@ -898,8 +995,14 @@ The messages use the typographic apostrophe `’` in "lead’s".
 - PROJECT_IMAGE_MAX_BYTES 2 MB (JPG or PNG only); PROJECT_IMAGE_MAX_EDGE_PX 1200
 - Signed URL TTL: 600 s by default
 
+**Sales insights**
+- DEAL_VALUE_MAX 100000000 (whole rupees per month, minimum 0); PLAN_MAX_LENGTH 80
+- COLD_LEAD_DAYS **14** (counted as 14 × 24 hours from `lastActivityAt`)
+- DASHBOARD_MAX_DAYS **366**; TREND_MAX_DAILY_POINTS 92 (longer ranges trend by week)
+- Needs attention: ATTENTION_BEHIND_TARGET_POINTS 20, ATTENTION_OVERDUE_PILE 5, ATTENTION_IDLE_DAYS 2, ATTENTION_STALE_TRANSFER_HOURS 24, ATTENTION_LIST_LIMIT 20
+
 **Exports, transfers, members**
-- EXPORT_MAX_DAYS **92**
+- EXPORT_MAX_DAYS **92**; EXPORT_MAX_ROWS **20,000**
 - BULK_REASSIGN_MAX_LEADS 500
 - Member target count: 1 to 100000
 

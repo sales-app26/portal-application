@@ -1,7 +1,7 @@
 // Browser tests against a fake API: node --test e2e/   (or npm run test:e2e)
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { click, fill, LAPTOP, PHONE, sleep, startApp, waitForText } from './harness.mjs'
+import { click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -34,7 +34,7 @@ describe('sign out', () => {
     await go('/profile')
     await click(page, 'Log out')
     await click(page, 'Log out', '[role=dialog] button')
-    await waitForText(page, 'Lead tracking for Pronttera teams.')
+    await waitForText(page, 'Your leads, follow-ups and visits in one place.')
     await sleep(300)
     assert.equal(await page.evaluate(() => location.pathname + location.search), '/login')
     assert.deepEqual(errors, [])
@@ -85,6 +85,58 @@ describe('field work', () => {
     await click(page, 'Save follow-up')
     await waitForText(page, 'Write at least 5 characters.')
     assert.equal(api.writes.filter((x) => x.path.endsWith('/follow-ups')).length, 0)
+    await page.close()
+  })
+})
+
+describe('deals, reasons and the agenda', () => {
+  test('converting asks for the deal and sends the monthly value as a number', async () => {
+    const { page, go, api, errors } = await app.open(PHONE)
+    await go(`/leads/${ids.lead}`)
+    await click(page, 'Log follow-up')
+    await click(page, 'Converted', '[role=radio]')
+    await waitForText(page, 'Mark as won')
+    const value = await page.$('input[inputmode=numeric]')
+    await value.evaluate((el) => (el.scrollIntoView({ block: 'center' }), el.focus(), el.select()))
+    await page.keyboard.type('3,999') // replaces the prefilled expected value
+    await fill(page, 'Note', 'Signed up today, wants onboarding.')
+    await click(page, 'Save follow-up')
+    await waitForText(page, 'Converted!')
+    const body = JSON.parse(api.writes.find((x) => x.path.endsWith('/follow-ups')).body)
+    assert.equal(body.status, 'converted')
+    assert.equal(body.dealValue, 3999)
+    assert.equal(body.plan, 'Growth', 'the expected plan carries over')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('lost asks why, and the reason is sent; other statuses send no reason or deal', async () => {
+    const { page, go, api } = await app.open(PHONE)
+    await go(`/leads/${ids.lead}`)
+    await click(page, 'Log follow-up')
+    await click(page, 'Lost', '[role=radio]')
+    await click(page, 'Price too high', '[role=radio]')
+    await fill(page, 'Note', 'Went with a cheaper option.')
+    await click(page, 'Save follow-up')
+    await waitForText(page, 'Follow-up saved.')
+    const body = JSON.parse(api.writes.find((x) => x.path.endsWith('/follow-ups')).body)
+    assert.equal(body.reason, 'price')
+    assert.equal(body.dealValue, undefined)
+    await page.close()
+  })
+
+  test('home agenda: counts from /me/agenda, and each chip loads its list', async () => {
+    const { page, go, api } = await app.open(PHONE)
+    await go('/home')
+    await waitForText(page, 'Going cold')
+    await clickContaining(page, 'Tomorrow', '[role=radio]')
+    await sleep(400)
+    assert.equal(api.calls.filter((c) => c.path.endsWith('/leads')).at(-1).query.due, 'tomorrow')
+    await clickContaining(page, 'Going cold', '[role=radio]')
+    await sleep(400)
+    const cold = api.calls.filter((c) => c.path.endsWith('/leads')).at(-1).query
+    assert.equal(cold.cold, 'true')
+    assert.equal(cold.sort, 'activity')
     await page.close()
   })
 })

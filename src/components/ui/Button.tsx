@@ -1,48 +1,53 @@
 import { Slot } from '@radix-ui/react-slot'
-import { cva, type VariantProps } from 'class-variance-authority'
 import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 import { Icon, type IconName } from '@/icons'
 import { Spinner } from './Spinner'
 
-// DESIGN.md buttons: every CTA is a pill; one action colour (UX-COMPONENTS.md §4.4).
-const button = cva(
-  'pressable inline-flex items-center justify-center gap-2 rounded-pill text-button whitespace-nowrap disabled:pointer-events-none',
-  {
-    variants: {
-      variant: {
-        primary: 'bg-primary text-on-primary active:bg-primary-active disabled:bg-primary-disabled',
-        secondary: 'bg-surface-strong text-ink active:bg-hairline disabled:text-muted-soft',
-        tertiary: 'bg-transparent text-primary active:text-primary-active disabled:text-muted-soft px-2',
-        'outline-dark': 'bg-transparent text-on-dark border border-on-dark active:bg-surface-dark-elevated',
-        'secondary-dark': 'bg-surface-dark-elevated text-on-dark',
-      },
-      size: {
-        md: 'h-11 px-5',
-        lg: 'h-14 px-8',
-        sm: 'h-9 px-4 text-body-sm font-semibold',
-      },
-      block: { true: 'w-full' },
-    },
-    defaultVariants: { variant: 'primary', size: 'md' },
-  },
-)
+/*
+ * HeroUI v3 buttons (`button button--<variant>` from @heroui/styles) on a native <button>,
+ * so forms submit and onClick works as everywhere else, with no extra JavaScript.
+ * Heights are a touch taller than HeroUI's desktop defaults: thumbs, not cursors.
+ */
+const VARIANT = {
+  primary: 'button--primary shadow-[0_1px_2px_rgb(10_120_176/0.25)]',
+  /** Neutral fill: the everyday second action. */
+  secondary: 'button--tertiary',
+  /** Accent text on a soft accent fill: a friendly secondary that still reads as Pronttera. */
+  soft: 'bg-accent-soft text-accent-soft-foreground hover:bg-accent-soft-hover',
+  /** Text-only, accent coloured: inline actions such as "Edit". */
+  tertiary: 'button--ghost text-primary! px-2',
+  outline: 'button--outline',
+  danger: 'button--danger',
+  'danger-soft': 'button--danger-soft',
+  'outline-dark': 'border border-on-dark/60 text-on-dark hover:bg-white/10',
+  'secondary-dark': 'bg-surface-dark-elevated text-on-dark hover:bg-white/10',
+} as const
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof button> {
+const SIZE = {
+  sm: 'button--sm h-9 px-3.5 text-[13px] md:h-9',
+  md: 'h-11 px-5 text-[15px] md:h-11',
+  lg: 'button--lg h-14 px-7 text-base font-semibold md:h-13',
+} as const
+
+export type ButtonVariant = keyof typeof VARIANT
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant
+  size?: keyof typeof SIZE
+  block?: boolean
   loading?: boolean
   icon?: IconName
   asChild?: boolean
 }
 
+export const buttonClass = ({ variant = 'primary', size = 'md', block, className }: { variant?: ButtonVariant; size?: keyof typeof SIZE; block?: boolean; className?: string }) =>
+  cn('button font-semibold', VARIANT[variant], SIZE[size], block && 'button--full-width', className)
+
 export function Button({ className, variant, size, block, loading, icon, children, disabled, asChild, ...rest }: ButtonProps) {
   const Comp = asChild ? Slot : 'button'
   return (
-    <Comp
-      className={cn(button({ variant, size, block }), className)}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
-      {...rest}
-    >
+    <Comp className={buttonClass({ variant, size, block: !!block, className })} disabled={disabled || loading} aria-busy={loading || undefined} data-pending={loading || undefined} {...rest}>
       {asChild ? (
         children
       ) : loading ? (
@@ -68,7 +73,7 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: 'light' | 'dark'
 }
 
-/** 48×48 hit area, 24px icon, always labelled (UX-COMPONENTS.md §4.4). */
+/** 48×48 hit area, 24px icon, always labelled (UX-COMPONENTS.md §4.4). HeroUI ghost icon button. */
 export function IconButton({ icon, label, filled, tone = 'light', className, ...rest }: IconButtonProps) {
   return (
     <button
@@ -76,8 +81,8 @@ export function IconButton({ icon, label, filled, tone = 'light', className, ...
       aria-label={label}
       title={label}
       className={cn(
-        'pressable inline-flex size-12 flex-none items-center justify-center rounded-full',
-        tone === 'light' ? 'text-ink active:bg-surface-strong' : 'text-on-dark active:bg-surface-dark-elevated',
+        'button button--icon-only size-12! rounded-full! md:size-11!',
+        tone === 'light' ? 'button--ghost text-ink' : 'text-on-dark hover:bg-white/10 active:bg-white/15',
         className,
       )}
       {...rest}

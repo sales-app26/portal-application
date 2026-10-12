@@ -3,7 +3,7 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
-import { formatDateTime, formatTime, relativeDay } from '@/lib/format'
+import { formatDateTime, formatTime, REASON_LABEL, relativeDay } from '@/lib/format'
 import type { Entry } from '@/lib/types'
 
 /** One row in a lead's history (PRD §5.11). A visit's photo opens the entry: full photo and map pin. */
@@ -29,6 +29,7 @@ export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boole
               <Icon name="calendar" size={16} /> Next: {relativeDay(entry.nextFollowUpDate)}
             </span>
           )}
+          {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
           {entry.lowAccuracy && <Tag>Low accuracy</Tag>}
           {entry.entryType === 'status_change' && <Tag>Manual change</Tag>}
         </div>

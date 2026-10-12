@@ -31,7 +31,7 @@ export function ActionMenu({ items, label = 'More actions', title, trigger }: { 
               <button
                 key={i.label}
                 type="button"
-                className="flex min-h-14 items-center gap-4 px-4 text-left text-body-md active:bg-surface-soft"
+                className="mx-2 flex min-h-13 items-center gap-4 rounded-xl px-3 text-left text-body-md active:bg-default"
                 onClick={() => {
                   setOpen(false)
                   // Let the sheet close (and its history entry unwind) before opening the next overlay.
@@ -52,9 +52,9 @@ export function ActionMenu({ items, label = 'More actions', title, trigger }: { 
     <Dropdown.Root>
       <Dropdown.Trigger asChild>{button}</Dropdown.Trigger>
       <Dropdown.Portal>
-        <Dropdown.Content align="end" sideOffset={4} className="z-50 min-w-52 rounded-lg border border-hairline bg-canvas py-1 shadow-soft">
+        <Dropdown.Content align="end" sideOffset={6} className="z-50 min-w-56 rounded-2xl bg-overlay p-1.5 shadow-overlay">
           {visible.map((i) => (
-            <Dropdown.Item key={i.label} onSelect={i.onSelect} className="flex h-10 cursor-pointer items-center gap-3 px-3 text-body-sm outline-none data-[highlighted]:bg-surface-soft">
+            <Dropdown.Item key={i.label} onSelect={i.onSelect} className="flex h-10 cursor-pointer items-center gap-3 rounded-xl px-3 text-body-sm outline-none data-[highlighted]:bg-default">
               <Icon name={i.icon} size={20} />
               {i.label}
             </Dropdown.Item>

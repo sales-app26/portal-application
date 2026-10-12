@@ -46,7 +46,7 @@ export function WhatsNewPage() {
             </Card>
           )}
 
-          <ul className="overflow-hidden rounded-xl border border-hairline bg-canvas">
+          <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {versions.map((v) => {
               const isOpen = expanded.has(v.id)
               return (

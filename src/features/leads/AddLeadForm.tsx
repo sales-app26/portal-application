@@ -13,15 +13,16 @@ import { api } from '@/lib/api'
 import { formatPhone, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import type { LeadDetail, LeadSummary, MeProject, Paginated } from '@/lib/types'
-import { leadSchema, type LeadValues } from './entrySchema'
+import type { LeadDetail, LeadSource, LeadSummary, MeProject, Paginated } from '@/lib/types'
+import { leadSchema, outcomeBody, type LeadValues } from './entrySchema'
+import { SourceChoice } from './SourceChoice'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
 import { invalidateLeadData } from './queries'
 import { createStatuses, nextDateRule } from './rules'
 import { entryBody, VisitProofField, type VisitProof } from './VisitProof'
 
-const EMPTY: LeadValues = { name: '', businessName: '', phone: '', notes: '', status: 'new', note: '', nextFollowUpDate: '', location: '' }
+const EMPTY: LeadValues = { name: '', businessName: '', phone: '', notes: '', status: 'new', note: '', nextFollowUpDate: '', location: '', source: null, reason: null, dealValue: '', plan: '' }
 
 /** Add lead = client details + first follow-up in one save (PRD §5.5, flow 7.1). */
 export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; onOpenChange: (o: boolean) => void; project: MeProject }) {
@@ -98,6 +99,8 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
         note: v.note.trim(),
         nextFollowUpDate: nextDateRule(v.status) === 'hidden' ? undefined : v.nextFollowUpDate || undefined,
         location: v.location.trim().replace(/\s+/g, ' '),
+        source: v.source ?? undefined,
+        ...outcomeBody(v, { dealAlways: true }),
       }
       const { data, message } = await apiWithMessage<LeadDetail>(`/projects/${project.id}/leads`, { method: 'POST', body: entryBody(fields, doorToDoor ? proof : null) })
       haptic.success()
@@ -125,7 +128,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'status', 'note', 'nextFollowUpDate', 'location'])
+      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'status', 'note', 'nextFollowUpDate', 'location', 'source', 'reason', 'dealValue', 'plan'])
     }
   })
 
@@ -208,6 +211,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
             render={({ field }) => <LocationField projectId={project.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />}
           />
           <TextAreaField label="About the client" optional placeholder="Anything worth remembering" error={formState.errors.notes?.message} {...register('notes')} rows={2} />
+          <Controller control={control} name="source" render={({ field }) => <SourceChoice value={(field.value as LeadSource | null) ?? null} onChange={field.onChange} />} />
         </fieldset>
 
         {doorToDoor && (
@@ -220,7 +224,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
 
         <fieldset className="flex flex-col gap-5">
           <legend className="mb-4 text-caption-strong text-muted uppercase">First follow-up</legend>
-          <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} />
+          <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} dealAlways />
         </fieldset>
       </form>
     </ResponsiveOverlay>

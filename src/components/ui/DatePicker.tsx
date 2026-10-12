@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 import { formatDate, todayIST } from '@/lib/format'
 import { Icon } from '@/icons'
 import { Calendar } from './Calendar'
-import { FieldShell } from './Field'
+import { FieldShell, inputBox } from './Field'
 import { ResponsiveOverlay } from './Overlay'
 
 /** `YYYY-MM-DD` → a Date at local midnight, which is what the calendar compares. */
@@ -84,7 +84,7 @@ export function DatePicker({ label, value, onChange, min, max, optional, placeho
             onChange('')
             setOpen(false)
           }}
-          className="pressable mt-2 flex h-12 w-full items-center justify-center rounded-md text-title-sm text-ink hover:bg-surface-strong"
+          className="pressable mt-2 flex h-12 w-full items-center justify-center rounded-xl text-title-sm text-ink hover:bg-default"
         >
           Clear date
         </button>
@@ -113,10 +113,7 @@ export function DatePicker({ label, value, onChange, min, max, optional, placeho
       aria-invalid={!!error}
       aria-describedby={error || hint ? `${id}-msg` : undefined}
       onClick={() => setOpen(true)}
-      className={cn(
-        'flex h-12 w-full items-center gap-2 rounded-md border border-hairline bg-canvas px-4 text-left text-body-md',
-        'aria-expanded:border-primary aria-[invalid=true]:border-down disabled:bg-surface-soft disabled:text-muted',
-      )}
+      className={cn(inputBox, 'flex h-12 items-center gap-2 px-4 text-left aria-expanded:border-primary aria-expanded:ring-3 aria-expanded:ring-focus/25')}
     >
       <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-muted-soft')}>{selected ? formatDate(value, { withYear: true }) : placeholder}</span>
       <Icon name="calendar" size={20} className="text-muted" />
@@ -139,7 +136,7 @@ export function DatePicker({ label, value, onChange, min, max, optional, placeho
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Anchor asChild>{fieldButton}</Popover.Anchor>
         <Popover.Portal>
-          <Popover.Content align="start" sideOffset={6} className="z-50 w-[320px] rounded-lg border border-hairline bg-canvas shadow-soft">
+          <Popover.Content align="start" sideOffset={6} className="z-50 w-[320px] rounded-2xl bg-overlay shadow-overlay">
             {calendar}
           </Popover.Content>
         </Popover.Portal>

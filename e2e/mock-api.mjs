@@ -31,11 +31,12 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     phone: `98100000${String(i).padStart(2, '0')}`, status: ['contacted', 'interested', 'follow_up_scheduled', 'new'][i % 4], nextFollowUpDate: today, overdueDays: i === 1 ? 2 : null,
     location: { id: 'loc', name: 'Wanowrie' }, owner: { id: i === 3 ? ids.priya : me.id, name: i === 3 ? 'Priya Desai' : me.name, isActive: true }, ownerTag: null, convertedAt: null,
     hasPendingTransfer: false, createdAt: iso(), updatedAt: iso(),
+    dealValue: i === 0 ? 2499 : null, plan: i === 0 ? 'Growth' : null, source: ['walk_in', 'referral', null, 'import'][i % 4], lastActivityAt: iso(), createdBy: { id: me.id, name: me.name },
   })
   const entry = (i, extra = {}) => ({
     id: `3333333${i}-3333-4333-8333-333333333333`, leadId: ids.lead, projectId: ids.online, entryType: 'follow_up', status: 'contacted', note: 'Met the owner, interested in the monthly plan.', nextFollowUpDate: today,
     location: { id: 'loc', name: 'Wanowrie' }, hasPhoto: false, photoUrl: null, latitude: null, longitude: null, gpsAccuracyM: null, lowAccuracy: false,
-    user: { id: me.id, name: me.name }, createdAt: iso(), updatedAt: iso(), edited: false, editable: true, ...extra,
+    user: { id: me.id, name: me.name }, createdAt: iso(), updatedAt: iso(), edited: false, editable: true, reason: null, ...extra,
   })
   const projectRef = (i) => ({ id: projects[i].id, name: projects[i].name, type: projects[i].type, status: 'active' })
   const day = () => [
@@ -57,9 +58,9 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
 
   // ---- admin state
   const users = [
-    { id: ids.priya, name: 'Priya Desai', email: 'priya@example.test', phone: '9811111111', role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true },
-    { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta', email: 'karan@example.test', phone: null, role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true },
-    { id: ids.modOther, name: 'Farah Khan', email: 'farah@example.test', phone: null, role: 'moderator', isActive: true, createdBy: null, createdAt: iso(), canManage: role === 'super_admin' },
+    { id: ids.priya, name: 'Priya Desai', email: 'priya@example.test', phone: '9811111111', role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true, canManageAccount: true },
+    { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta', email: 'karan@example.test', phone: null, role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true, canManageAccount: true },
+    { id: ids.modOther, name: 'Farah Khan', email: 'farah@example.test', phone: null, role: 'moderator', isActive: true, createdBy: null, createdAt: iso(), canManage: role === 'super_admin', canManageAccount: role === 'super_admin' },
   ]
   const members = [
     { userId: ids.priya, name: 'Priya Desai', role: 'sales_person', userIsActive: true, isActive: true, joinedAt: iso(), email: 'priya@example.test', phone: '9811111111', targetCount: 10, targetPeriod: 'weekly', removedAt: null },
@@ -80,7 +81,20 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       { projectId: ids.online, projectName: 'Pune Retail Drive', user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', targetCount: null, targetPeriod: null, achieved: 2, progressPercent: null, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 2, conversionsThisMonth: 5 },
     ],
     newLeads: 6, followUps: 14, followUpsToday: 5,
-    people: [{ user: { id: ids.priya, name: 'Priya Desai' }, role: 'sales_person', newLeads: 4, followUps: 9, conversions: 2, followUpsToday: 3 }],
+    people: [
+      { user: { id: ids.priya, name: 'Priya Desai' }, role: 'sales_person', newLeads: 4, followUps: 9, conversions: 2, followUpsToday: 3, revenue: 4998 },
+      { user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', newLeads: 2, followUps: 5, conversions: 0, followUpsToday: 2, revenue: 0 },
+    ],
+    conversions: 2, revenue: 4998,
+    funnel: [{ stage: 'created', count: 6 }, { stage: 'contacted', count: 5 }, { stage: 'interested', count: 3 }, { stage: 'converted', count: 2 }],
+    trendBucket: 'day',
+    trend: Array.from({ length: 7 }, (_, i) => ({ date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10), followUps: [3, 5, 2, 6, 4, 8, 7][i], newLeads: [1, 0, 2, 1, 0, 1, 1][i], conversions: [0, 1, 0, 0, 1, 0, 0][i], revenue: [0, 2499, 0, 0, 2499, 0, 0][i] })),
+    lostReasons: [{ reason: 'price', count: 3 }, { reason: 'has_alternative', count: 2 }, { reason: 'unspecified', count: 1 }],
+    sources: [{ source: 'walk_in', count: 3 }, { source: 'referral', count: 2 }, { source: 'unspecified', count: 1 }],
+    needsAttention: [
+      { kind: 'overdue_pile', user: { id: ids.priya, name: 'Priya Desai' }, projectName: 'Pune Retail Drive', detail: '6 leads overdue', leadCount: 6 },
+      { kind: 'idle', user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, projectName: null, detail: 'No entries for 3 days', leadCount: 12 },
+    ],
     loggedNothingToday: [{ user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', projects: ['Pune Retail Drive'] }],
     leadsByStatus: ['new', 'contacted', 'interested', 'follow_up_scheduled', 'not_interested', 'converted', 'lost'].map((status, i) => ({ status, count: 20 - i * 3 })),
     conversionsThisWeek: [{ leadId: ids.lead, leadName: 'Asha Patil', businessName: 'Patil General Store', phone: '9810000000', projectName: 'Pune Retail Drive', convertedBy: { id: ids.priya, name: 'Priya Desai' }, currentOwner: { id: ids.priya, name: 'Priya Desai' }, convertedAt: iso(), via: 'follow_up' }],
@@ -112,7 +126,8 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if (p === '/auth/me') return ok(me)
     if (p === '/auth/logout') return ok(null, 'Signed out.')
     if (p === '/me/home')
-      return ok({ targets: [{ projectId: ids.online, projectName: projects[0].name, user: { id: me.id, name: me.name }, role: 'sales_person', targetCount: 20, targetPeriod: 'weekly', achieved: 12, progressPercent: 60, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 12, conversionsThisMonth: 30 }], dueToday: 4, overdue: 1, followUpsToday: 7, myLeads: 42, notice: null })
+      return ok({ targets: [{ projectId: ids.online, projectName: projects[0].name, user: { id: me.id, name: me.name }, role: 'sales_person', targetCount: 20, targetPeriod: 'weekly', achieved: 12, progressPercent: 60, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 12, conversionsThisMonth: 30 }], dueToday: 4, overdue: 1, followUpsToday: 7, myLeads: 42, notice: null, conversionsThisMonth: 30, revenueThisMonth: 74970 })
+    if (p === '/me/agenda') return ok({ overdue: 1, today: 3, tomorrow: 2, thisWeek: 5, cold: 3, untouched: 4 })
     if (p === '/me/due-today') return ok(page([0, 1, 2, 3].map((i) => lead(i))))
     if (p === '/visits/capture-token') return ok({ captureToken: 'v1.test.sig', issuedAt: iso(), expiresAt: new Date(Date.now() + 600_000).toISOString() }, 'Created successfully.')
     if (p === '/timeline') return ok({ date: today, user: { id: me.id, name: me.name }, entries: day(), followUps: 3, visits: 2, statusChanges: 1, message: null })
@@ -140,7 +155,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if (p === '/users' && method === 'POST') {
       const b = json()
       if (b.email === 'old@example.test') return fail(409, 'USER_DEACTIVATED_EXISTS', 'This email belongs to a deactivated user. Reactivate that user instead of creating a new one.', { userId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Old Timer', role: 'sales_person' })
-      const u = { id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', name: b.name, email: b.email, phone: b.phone ?? null, role: b.role, isActive: true, createdBy: me.id, createdAt: iso(), canManage: true }
+      const u = { id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', name: b.name, email: b.email, phone: b.phone ?? null, role: b.role, isActive: true, createdBy: me.id, createdAt: iso(), canManage: true, canManageAccount: true }
       users.push(u)
       return ok(u, 'User created. An email has been sent to set the password.', 201)
     }
@@ -214,7 +229,16 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if ((m = p.match(/^\/leads\/([^/]+)\/reassign$/))) return ok({ reassigned: 1, skipped: 0 }, 'Leads reassigned.')
     if ((m = p.match(/^\/leads\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
     if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
-    if ((m = p.match(/^\/leads\/([^/]+)\/follow-ups$/))) return ok({ entry: entry(8), lead: lead(0) }, 'Follow-up saved.', 201)
+    if ((m = p.match(/^\/leads\/([^/]+)\/follow-ups$/))) {
+      // The saved lead takes the status that was sent (multipart bodies keep the default).
+      let status
+      try {
+        status = JSON.parse(body ?? '{}').status
+      } catch {
+        status = undefined
+      }
+      return ok({ entry: entry(8), lead: { ...lead(0), ...(status ? { status } : {}) } }, 'Follow-up saved.', 201)
+    }
     if ((m = p.match(/^\/leads\/([^/]+)$/))) return ok(detail({ ...lead(Number(m[1][7])), id: m[1] }))
     // ---- release notes
     if (p === '/versions/latest') {

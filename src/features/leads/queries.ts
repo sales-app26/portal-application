@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Entry, LeadDetail, LeadSort, LeadStatus, LeadSummary, MeHome, Member, Paginated } from '@/lib/types'
+import type { Agenda, Entry, LeadDetail, LeadDue, LeadSort, LeadStatus, LeadSummary, MeHome, Member, Paginated } from '@/lib/types'
 
 export interface LeadListFilter {
   search?: string
@@ -10,6 +10,9 @@ export interface LeadListFilter {
   /** Admins: one owner, or leads whose owner is inactive or removed. */
   ownerId?: string
   ownerUnavailable?: boolean
+  due?: LeadDue
+  /** Open leads untouched for 14+ days. */
+  cold?: boolean
 }
 
 export const leadKeys = {
@@ -21,6 +24,7 @@ export const leadKeys = {
 export const homeKeys = {
   home: (projectId?: string) => ['me', 'home', projectId ?? 'all'] as const,
   due: (projectId?: string) => ['me', 'due', projectId ?? 'all'] as const,
+  agenda: (projectId?: string) => ['me', 'agenda', projectId ?? 'all'] as const,
 }
 
 const PAGE = 20
@@ -33,7 +37,7 @@ export function useLeadList(projectId: string | undefined, f: LeadListFilter) {
     queryFn: ({ pageParam, signal }) =>
       api<Paginated<LeadSummary>>(`/projects/${projectId}/leads`, {
         signal,
-        query: { page: pageParam, limit: PAGE, search: f.search, status: f.status ?? undefined, mine: f.mine ? 'true' : undefined, sort: f.sort, ownerId: f.ownerId, ownerUnavailable: f.ownerUnavailable ? 'true' : undefined },
+        query: { page: pageParam, limit: PAGE, search: f.search, status: f.status ?? undefined, mine: f.mine ? 'true' : undefined, sort: f.sort, ownerId: f.ownerId, ownerUnavailable: f.ownerUnavailable ? 'true' : undefined, due: f.due, cold: f.cold ? 'true' : undefined },
       }),
     getNextPageParam: (last) => (last.meta.hasNextPage ? last.meta.page + 1 : undefined),
   })
@@ -62,6 +66,13 @@ export function useHome(projectId?: string) {
   return useQuery({
     queryKey: homeKeys.home(projectId),
     queryFn: () => api<MeHome>('/me/home', { query: { projectId } }),
+  })
+}
+
+export function useAgenda(projectId?: string) {
+  return useQuery({
+    queryKey: homeKeys.agenda(projectId),
+    queryFn: () => api<Agenda>('/me/agenda', { query: { projectId } }),
   })
 }
 

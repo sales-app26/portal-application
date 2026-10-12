@@ -30,7 +30,7 @@ describe('offline', () => {
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
     await page.goto(`${base}/login`, { waitUntil: 'networkidle0' })
-    await waitForText(page, 'Lead tracking for Pronttera teams.')
+    await waitForText(page, 'Your leads, follow-ups and visits in one place.')
 
     // The worker installs and fills its cache in the background.
     await page.waitForFunction(async () => (await navigator.serviceWorker.getRegistration())?.active && (await caches.keys()).some((k) => k.startsWith('st-')), { timeout: 10000 })
@@ -43,7 +43,7 @@ describe('offline', () => {
 
     await page.setOfflineMode(true)
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await waitForText(page, 'Lead tracking for Pronttera teams.')
+    await waitForText(page, 'Your leads, follow-ups and visits in one place.')
 
     // A screen that was never opened before still loads: its code is in the cache.
     await page.goto(`${base}/set-password`, { waitUntil: 'domcontentloaded' })

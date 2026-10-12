@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { after, before, describe, test } from 'node:test'
-import { click, clickNth, fill, LAPTOP, PHONE, sleep, startApp, waitForText } from './harness.mjs'
+import { click, clickNth, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
 
 const SERVICE = new URL('../../service-application/', import.meta.url).pathname
 let server, info, app
@@ -80,7 +80,7 @@ describe('sales person, online project', () => {
     await click(page, 'Sign in', 'button[type=submit]')
     await page.waitForFunction(() => location.pathname === '/home', { timeout: 10000 })
     await waitForText(page, 'Pune Retail Drive')
-    await waitForText(page, 'converted this week')
+    await waitForText(page, 'converted')
     assert.deepEqual(errors, [])
     await page.close()
   })
@@ -328,28 +328,35 @@ describe('summary and bulk import on real data', () => {
     await describeFailure(page, 'form', () => waitForText(page, 'Who gets the leads'))
     await (await page.$('#import-file')).uploadFile(path)
     await waitForText(page, 'import.csv')
-    // Rows without an owner_email are shared by Priya and Karan.
-    await page.$$eval('[role=checkbox]', (rows) => rows.filter((r) => /Priya|Karan/.test(r.textContent)).forEach((r) => r.click()))
-    await waitForText(page, '2 people picked')
     await fill(page, 'Location for rows that have none', 'Pune')
     await click(page, 'Check file', 'button')
 
-    await describeFailure(page, 'report', () => waitForText(page, '3 leads are ready to import'))
+    // Review: Deepak comes with Karan from his owner_email; an unknown owner_email (Ghost) just
+    // leaves the row unassigned, like the two without one. Those three are assigned on screen.
+    await describeFailure(page, 'report', () => waitForText(page, '4 leads ready · 3 not assigned yet'))
     await waitForText(page, '1 duplicate')
-    await waitForText(page, '2 rows with a problem')
     await waitForText(page, 'Phone must be a 10-digit Indian mobile number.')
     await waitForText(page, 'Already a lead in this project, owned by Priya Desai.') // reassigned to Priya in an earlier test
-    await waitForText(page, 'No active member of this project has this owner_email.')
+
+    await clickNth(page, 'Assign', 0, 'li button') // Vikram Rao, first in the file
+    await clickContaining(page, 'Karan Mehta', '[role=option]')
+    await waitForText(page, '2 not assigned yet')
+    await clickNth(page, 'Assign', 0, 'li button') // Sunita Kale
+    await clickContaining(page, 'Priya Desai', '[role=option]')
+    await waitForText(page, '1 not assigned yet')
+    await clickNth(page, 'Assign', 0, 'li button') // Ghost Owner
+    await clickContaining(page, 'Priya Desai', '[role=option]')
+    await waitForText(page, 'all assigned')
 
     // Checking changed nothing: Priya has only the lead she was reassigned.
-    await click(page, 'Import 3 leads', 'button')
-    await describeFailure(page, 'result', () => waitForText(page, '3 leads imported'))
+    await click(page, 'Import 4 leads', 'button')
+    await describeFailure(page, 'result', () => waitForText(page, '4 leads imported'))
     await waitForText(page, 'Who got them')
     assert.deepEqual(errors, [])
     await page.close()
 
-    // The list is alphabetical, so Karan was picked first: he gets the first shared row, Priya the next,
-    // and Deepak goes to Karan by his owner_email. Each finds theirs, as New, in their own list.
+    // Vikram went to Karan, Sunita and Ghost to Priya on screen; Deepak to Karan by his owner_email.
+    // Each finds theirs, as New, in their own list.
     const priya = await as(info.others.priya)
     await priya.go('/leads')
     await describeFailure(priya.page, 'priya leads', () => waitForText(priya.page, 'Sunita Kale'))
@@ -374,8 +381,9 @@ describe('summary and bulk import on real data', () => {
     fs.writeFileSync(path, 'name,phone,location\nVikram Rao,9000000101,Baner\n')
     const { page } = await as(info.moderator)
     await page.goto(`${app.base}/projects/${info.projects.online}/import`, { waitUntil: 'networkidle0' })
+    await clickContaining(page, 'All to one person', '[role=radio]')
     await (await page.$('#import-file')).uploadFile(path)
-    await page.$$eval('[role=checkbox]', (rows) => rows[0].click())
+    await clickContaining(page, 'Priya Desai', '[role=checkbox]')
     await click(page, 'Check file', 'button')
     await describeFailure(page, 'second report', () => waitForText(page, 'Nothing in this file can be imported'))
     await waitForText(page, 'Already a lead in this project')

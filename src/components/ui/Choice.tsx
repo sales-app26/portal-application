@@ -9,7 +9,7 @@ export function StatusChip({ status, size = 'md', className, trailing }: { statu
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-pill text-caption-strong whitespace-nowrap text-ink',
+        'chip inline-flex items-center gap-1.5 rounded-pill text-caption-strong whitespace-nowrap text-ink',
         size === 'sm' ? 'h-6 px-2.5' : 'h-7 px-3',
         STATUS_TINT[status],
         className,
@@ -56,7 +56,7 @@ export function StatusChoice({
               onClick={() => onChange(s)}
               className={cn(
                 'pressable inline-flex h-10 items-center gap-2 rounded-pill border px-3.5 text-nav whitespace-nowrap transition-colors',
-                on ? cn('border-ink font-semibold text-ink', STATUS_TINT[s]) : 'border-hairline bg-canvas text-ink',
+                on ? cn('border-ink font-semibold text-ink', STATUS_TINT[s]) : 'border-border bg-surface text-ink hover:bg-surface-secondary',
               )}
             >
               <span aria-hidden className={cn('size-2.5 rounded-full', STATUS_DOT[s])} />
@@ -108,11 +108,14 @@ export function ChoiceList<T extends string>({
             aria-selected={selected}
             disabled={o.disabled}
             onClick={() => onSelect(o.value)}
-            className="flex min-h-14 items-center gap-3 px-4 text-left active:bg-surface-soft disabled:opacity-40 expanded:px-6 expanded:hover:bg-surface-soft"
+            className={cn(
+              'mx-2 flex min-h-13 items-center gap-3 rounded-xl px-3 text-left transition-colors active:bg-default disabled:opacity-40 expanded:hover:bg-default',
+              selected && 'bg-accent-soft',
+            )}
           >
             {o.leading}
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className={cn('text-body-md', selected && 'font-semibold')}>{o.label}</span>
+              <span className={cn('text-body-md', selected && 'font-semibold text-accent-soft-foreground')}>{o.label}</span>
               {o.description && <span className="text-body-sm text-body">{o.description}</span>}
             </span>
             {selected && <Icon name="checkmark" size={20} className="text-primary" />}
@@ -143,13 +146,13 @@ export function Segmented<T extends string>({
       value={value}
       onValueChange={(v) => v && onChange(v as T)}
       aria-label={label}
-      className={cn('inline-flex h-11 rounded-pill bg-surface-strong p-1', className)}
+      className={cn('inline-flex h-11 rounded-pill bg-default p-1', className)}
     >
       {options.map((o) => (
         <ToggleGroup.Item
           key={o.value}
           value={o.value}
-          className="flex-1 rounded-pill px-4 whitespace-nowrap text-nav text-body transition-colors data-[state=on]:bg-canvas data-[state=on]:font-semibold data-[state=on]:text-ink data-[state=on]:shadow-soft"
+          className="flex-1 rounded-pill px-4 whitespace-nowrap text-nav text-body transition-[background-color,box-shadow,color] duration-200 hover:text-ink data-[state=on]:bg-segment data-[state=on]:font-semibold data-[state=on]:text-segment-foreground data-[state=on]:shadow-[0_1px_3px_rgb(15_17_21/0.12)]"
         >
           {o.label}
         </ToggleGroup.Item>
@@ -182,8 +185,8 @@ export function FilterChips<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              'pressable inline-flex h-9 flex-none items-center gap-2 rounded-pill px-4 text-nav whitespace-nowrap',
-              on ? 'bg-ink text-on-dark' : 'bg-surface-strong text-ink',
+              'pressable inline-flex h-9 flex-none items-center gap-2 rounded-pill border px-4 text-nav whitespace-nowrap transition-colors',
+              on ? 'border-transparent bg-ink text-on-ink' : 'border-border bg-surface text-ink hover:bg-surface-secondary',
             )}
           >
             {o.dot && <span aria-hidden className={cn('size-2 rounded-full', o.dot)} />}

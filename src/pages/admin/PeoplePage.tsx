@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
+import { SearchInput } from '@/components/ui/SearchInput'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { FilterChips, Segmented } from '@/components/ui/Choice'
 import { Avatar, EmptyState, ErrorState, ListSkeleton, Tag } from '@/components/ui/Display'
@@ -14,7 +15,6 @@ import { Button } from '@/components/ui/Button'
 import { AddUserForm, EditUserForm } from '@/features/admin/UserForms'
 import { invalidateProjects, invalidateUsers, useUserList, useUserOptions } from '@/features/admin/queries'
 import { useDebounced } from '@/hooks/useDebounced'
-import { Icon } from '@/icons'
 import { apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
 import type { User, UserRole } from '@/lib/types'
@@ -78,11 +78,7 @@ export function PeoplePage() {
               className="w-full medium:w-auto medium:self-start"
             />
           )}
-          <label className="flex h-11 items-center gap-2 rounded-pill bg-surface-strong px-4 medium:max-w-md">
-            <Icon name="search" size={20} className="text-muted" />
-            <span className="sr-only">Search people</span>
-            <input type="search" enterKeyHint="search" placeholder="Name, email or phone" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={120} className="h-full min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
-          </label>
+          <SearchInput label="Search people" placeholder="Name, email or phone" value={search} onChange={setSearch} className="medium:max-w-md" />
           <FilterChips
             label="Activity"
             value={activity}
@@ -104,7 +100,7 @@ export function PeoplePage() {
         ) : users.length === 0 ? (
           <EmptyState icon="conference-call" title={q ? 'No one matches' : 'No people here yet'} body={q ? 'Try another name, email or number.' : 'Add someone and they get an email to set a password.'} />
         ) : (
-          <div className="-mx-4 border-t border-hairline medium:mx-0 medium:overflow-hidden medium:rounded-xl medium:border">
+          <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {users.map((u) => (
               <div key={u.id} className="flex min-h-[72px] items-center gap-3 border-b border-hairline-soft px-4 py-3 last:border-b-0">
                 <Avatar name={u.name} />
@@ -124,9 +120,9 @@ export function PeoplePage() {
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
                       { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
-                      { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id },
+                      { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id || !u.canManageAccount },
                       { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(u), hidden: !isSuper || u.id === me.id || u.role === 'super_admin' },
-                      { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: !u.isActive && u.id === me.id },
+                      { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: (!u.isActive && u.id === me.id) || !u.canManageAccount },
                     ]}
                   />
                 )}

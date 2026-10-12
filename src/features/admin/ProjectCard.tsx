@@ -7,7 +7,7 @@ import type { Project } from '@/lib/types'
 export function ProjectCard({ p }: { p: Project }) {
   return (
     <li>
-      <Link to={`/projects/${p.id}`} className="pressable flex h-full flex-col gap-3 rounded-xl border border-hairline bg-canvas p-5 active:bg-surface-soft">
+      <Link to={`/projects/${p.id}`} className="card card--default pressable h-full gap-3 rounded-2xl p-5 transition-shadow hover:shadow-lift active:bg-surface-secondary">
         <div className="flex items-start gap-3">
           {p.imageUrl ? <img src={p.imageUrl} alt="" loading="lazy" className="size-12 flex-none rounded-md object-cover" /> : <span className="flex size-12 flex-none items-center justify-center rounded-md bg-surface-strong"><Icon name="briefcase" /></span>}
           <div className="min-w-0 flex-1">

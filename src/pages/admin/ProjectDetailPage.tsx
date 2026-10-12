@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
+import { cn } from '@/lib/cn'
+import { SearchInput } from '@/components/ui/SearchInput'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { FilterChips, Segmented } from '@/components/ui/Choice'
@@ -153,7 +155,7 @@ function MembersTab({ project }: { project: Project }) {
                     items={[
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${m.userId}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${m.userId}/day`) },
-                      { label: 'Set target', icon: 'goal', onSelect: () => setTarget(m) },
+                      { label: 'Set target', icon: 'goal', onSelect: () => setTarget(m), hidden: !isSuper && m.role === 'moderator' && m.userId !== me.id },
                       { label: 'Upload leads for them', icon: 'csv', onSelect: () => navigate(`/projects/${project.id}/import?owner=${m.userId}`), hidden: !m.isActive || !m.userIsActive || m.role === 'super_admin' },
                       { label: 'Remove from project', icon: 'trash', onSelect: () => setRemoving(m), hidden: !canRemove(m) },
                     ]}
@@ -214,11 +216,7 @@ function LeadsTab({ project }: { project: Project }) {
       {/* Search and actions share one row; with no leads at all there's nothing to search or filter. */}
       {!empty && (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex h-11 min-w-0 flex-1 basis-64 items-center gap-2 rounded-pill bg-surface-strong px-4 medium:max-w-md">
-            <Icon name="search" size={20} className="text-muted" />
-            <span className="sr-only">Search leads</span>
-            <input type="search" enterKeyHint="search" placeholder="Name, business or phone" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={120} className="h-full min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
-          </label>
+          <SearchInput label="Search leads" placeholder="Name, business or phone" value={search} onChange={setSearch} className="flex-1 basis-64 medium:max-w-md" />
           {!closed && (
             <div className="flex gap-2">
               {leads.length > 0 && (
@@ -261,7 +259,7 @@ function LeadsTab({ project }: { project: Project }) {
           }
         />
       ) : (
-        <div className={selecting ? '-mx-4 border-t border-hairline pb-24 medium:mx-0 medium:rounded-xl medium:border' : '-mx-4 border-t border-hairline medium:mx-0 medium:overflow-hidden medium:rounded-xl medium:border'}>
+        <div className={cn('card card--default gap-0 overflow-hidden rounded-2xl p-0', selecting && 'mb-24 medium:mb-0')}>
           {leads.map((l) => (
             <LeadRow key={l.id} lead={l} showOwner selected={picked.has(l.id)} onToggle={selecting ? () => toggle(l.id) : undefined} />
           ))}
@@ -270,7 +268,7 @@ function LeadsTab({ project }: { project: Project }) {
       )}
 
       {selecting && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 border-t border-hairline bg-canvas px-4 py-3 medium:bottom-0 medium:left-20 large:left-[280px]">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 border-t border-separator bg-surface/90 backdrop-blur-xl px-4 py-3 medium:bottom-0 medium:left-20 large:left-[280px]">
           <span className="flex-1 text-body-sm" aria-live="polite">
             {picked.size} selected
           </span>

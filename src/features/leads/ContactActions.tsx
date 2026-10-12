@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { telHref, whatsappHref } from '@/lib/contact'
+import { telHref } from '@/lib/contact'
+import { rememberContact } from '@/lib/contactPrompt'
+import { WhatsAppSheet, type ContactLead } from './WhatsAppSheet'
 
 /** A chat bubble with a handset: reads as "WhatsApp" next to the green fill without copying the logo. */
 export function ChatIcon({ size = 22, className }: { size?: number; className?: string }) {
@@ -18,28 +21,41 @@ export function ChatIcon({ size = 22, className }: { size?: number; className?: 
 const round = 'pressable inline-flex flex-none items-center justify-center rounded-full'
 
 /**
- * Call and WhatsApp as two round buttons. Used in list rows, so it stops the tap from
- * reaching the row behind it.
+ * Call and WhatsApp as two round buttons, for list rows. Starting either one remembers the
+ * lead, so coming back to the app offers to log what happened.
  */
-export function ContactButtons({ phone, name, size = 40, className }: { phone: string; name: string; size?: number; className?: string }) {
+export function ContactButtons({ lead, size = 40, className }: { lead: ContactLead; size?: number; className?: string }) {
+  const [chat, setChat] = useState(false)
   const style = { width: size, height: size }
   return (
     <span className={cn('flex flex-none items-center gap-2', className)}>
-      <a href={telHref(phone)} aria-label={`Call ${name}`} title="Call" style={style} className={cn(round, 'bg-primary/10 text-primary active:bg-primary/20')} onClick={(e) => e.stopPropagation()}>
+      <a
+        href={telHref(lead.phone)}
+        aria-label={`Call ${lead.name}`}
+        title="Call"
+        style={style}
+        className={cn(round, 'bg-primary/10 text-primary active:bg-primary/20')}
+        onClick={(e) => {
+          e.stopPropagation()
+          rememberContact({ leadId: lead.id, name: lead.name, kind: 'call' })
+        }}
+      >
         <Icon name="phone" size={20} />
       </a>
-      <a
-        href={whatsappHref(phone)}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`WhatsApp ${name}`}
+      <button
+        type="button"
+        aria-label={`WhatsApp ${lead.name}`}
         title="WhatsApp"
         style={style}
-        className={cn(round, 'bg-[#25d366]/12 text-[#128c4a] active:bg-[#25d366]/25')}
-        onClick={(e) => e.stopPropagation()}
+        className={cn(round, 'bg-[#25d366]/12 text-[#128c4a] active:bg-[#25d366]/25 dark:text-[#3ddc84]')}
+        onClick={(e) => {
+          e.stopPropagation()
+          setChat(true)
+        }}
       >
         <ChatIcon size={21} />
-      </a>
+      </button>
+      <WhatsAppSheet open={chat} onOpenChange={setChat} lead={lead} />
     </span>
   )
 }

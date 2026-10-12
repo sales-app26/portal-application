@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, Outlet, useParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
+import { SearchInput } from '@/components/ui/SearchInput'
 import { ChoiceList, FilterChips } from '@/components/ui/Choice'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Display'
@@ -26,6 +27,8 @@ const SORTS: { value: LeadSort; label: string; short: string }[] = [
   { value: 'updated', label: 'Recently active', short: 'Recently active' },
   { value: 'created', label: 'Newest first', short: 'Newest' },
   { value: 'name', label: 'Name, A to Z', short: 'Name' },
+  { value: 'value', label: 'Highest deal value', short: 'Value' },
+  { value: 'activity', label: 'Untouched longest', short: 'Untouched' },
 ]
 const SORT_KEY = 'st.leadSort'
 
@@ -123,24 +126,7 @@ function LeadList() {
       cta={closed ? undefined : { label: 'Add lead', icon: 'plus-math', onClick: () => setAdding(true) }}
       header={
         <div className="flex flex-col gap-3">
-          <label className="flex h-11 items-center gap-2 rounded-pill bg-surface-strong px-4">
-            <Icon name="search" size={20} className="text-muted" />
-            <span className="sr-only">Search leads</span>
-            <input
-              type="search"
-              enterKeyHint="search"
-              placeholder="Name, business or phone"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              maxLength={120}
-              className="h-full min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
-            />
-            {search && (
-              <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="-mr-2 flex size-9 items-center justify-center text-muted">
-                <Icon name="multiply" size={16} />
-              </button>
-            )}
-          </label>
+          <SearchInput label="Search leads" placeholder="Name, business or phone" value={search} onChange={setSearch} />
           <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]} />
         </div>
       }
@@ -181,7 +167,7 @@ function LeadList() {
           />
         )
       ) : (
-        <div className="-mx-4 border-t border-hairline medium:-mx-6 expanded:-mx-8">
+        <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0 expanded:-mx-2">
           {leads.map((l) => (
             <LeadRow key={l.id} lead={l} contact />
           ))}

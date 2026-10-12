@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
-import { axeViolations, click, clickNth, fill, LAPTOP, PHONE, sleep, startApp, waitForText } from './harness.mjs'
+import { axeViolations, click, clickNth, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -119,7 +119,7 @@ describe('person summary', () => {
 
 describe('bulk import', () => {
   const owners = async (page) => {
-    await click(page, 'Priya Desai', '[role=checkbox]').catch(() => {})
+    await clickContaining(page, 'Priya Desai', '[role=checkbox]').catch(() => {})
   }
 
   test('the project’s Leads tab offers it', async () => {
@@ -156,12 +156,12 @@ describe('bulk import', () => {
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Assign 4 more')?.disabled), true)
 
     // One lead by hand, the rest in bulk.
-    await click(page, 'Assign', 'li button')
-    await click(page, 'Priya Desai', '[role=option]')
+    await clickNth(page, 'Assign', 0, 'li button') // the first lead in the file
+    await clickContaining(page, 'Priya Desai', '[role=option]')
     await waitForText(page, '3 not assigned yet')
     await click(page, 'Select unassigned (3)', 'button')
     await click(page, 'Assign 3', 'button')
-    await click(page, 'Ravi Kumar', '[role=option]')
+    await clickContaining(page, 'Meera Nair', '[role=option]')
     await waitForText(page, 'all assigned')
 
     await click(page, 'Import 4 leads', 'button')
@@ -180,12 +180,12 @@ describe('bulk import', () => {
     const { page, go, api, errors } = await app.open(PHONE, { role: 'moderator' })
     await go(`/projects/${ids.online}/import`)
     await waitForText(page, 'Who gets the leads')
-    await click(page, 'All to one person', '[role=radio]')
+    await clickContaining(page, 'All to one person', '[role=radio]')
     await (await page.$('#import-file')).uploadFile(csvFile('leads.csv', GOOD_CSV))
     await waitForText(page, 'leads.csv')
     // A person must be picked first.
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check file')?.disabled), true)
-    await click(page, 'Priya Desai', '[role=checkbox]')
+    await clickContaining(page, 'Priya Desai', '[role=checkbox]')
     await click(page, 'Check file', 'button')
     await waitForText(page, '4 leads are ready to import')
     const dry = api.writes.find((w) => w.path.endsWith('/leads/import'))
@@ -252,7 +252,7 @@ describe('bulk import', () => {
     assert.deepEqual(await axeViolations(page), [], 'report')
     await click(page, 'Select all', 'button')
     await click(page, 'Assign 4', 'button')
-    await click(page, 'Priya Desai', '[role=option]')
+    await clickContaining(page, 'Priya Desai', '[role=option]')
     await click(page, 'Import 4 leads', 'button')
     await waitForText(page, '4 leads imported')
     await sleep(500)

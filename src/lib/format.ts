@@ -1,4 +1,4 @@
-import type { LeadStatus, UserRole } from './types'
+import type { LeadSource, LeadStatus, LostReason, UserRole } from './types'
 
 export const STATUS_LABEL: Record<LeadStatus, string> = {
   new: 'New',
@@ -33,6 +33,31 @@ export const STATUS_TINT: Record<LeadStatus, string> = {
   converted: 'bg-status-converted/12',
   lost: 'bg-status-lost/10',
 }
+
+export const SOURCE_LABEL: Record<LeadSource, string> = {
+  walk_in: 'Walk-in',
+  referral: 'Referral',
+  phone: 'Phone call',
+  whatsapp: 'WhatsApp',
+  social: 'Social media',
+  event: 'Event',
+  import: 'Imported',
+  other: 'Other',
+}
+/** What a rep can pick (imports set their own source). */
+export const SOURCES = (Object.keys(SOURCE_LABEL) as LeadSource[]).filter((s) => s !== 'import')
+
+export const REASON_LABEL: Record<LostReason, string> = {
+  price: 'Price too high',
+  has_alternative: 'Already uses another',
+  not_ready: 'Not ready yet',
+  no_need: "Doesn't need it",
+  owner_unavailable: 'Owner not available',
+  shop_closed: 'Shop closed',
+  competitor: 'Chose a competitor',
+  other: 'Other',
+}
+export const REASONS = Object.keys(REASON_LABEL) as LostReason[]
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   super_admin: 'Super Admin',
@@ -112,6 +137,17 @@ export function normalizePhone(raw: string): string | null {
 /** "98765 43210" */
 export function formatPhone(digits: string): string {
   return digits.length === 10 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : digits
+}
+
+/** Indian grouping: ₹1,49,900. */
+export const rupees = (n: number) => `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`
+
+/** ₹1.2L, ₹45K: for tight spaces like KPI tiles and chart labels. */
+export function rupeesShort(n: number): string {
+  if (n >= 1_00_00_000) return `₹${(n / 1_00_00_000).toFixed(n >= 10_00_00_000 ? 0 : 1)}Cr`
+  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(n >= 10_00_000 ? 0 : 1)}L`
+  if (n >= 1_000) return `₹${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`
+  return `₹${n}`
 }
 
 export function plural(n: number, one: string, many = `${one}s`) {

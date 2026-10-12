@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import { z } from 'zod'
-import { BrandMark } from '@/components/layout/AppShell'
+import { ProntteraLockup } from '@/components/brand/Logo'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/Display'
 import { TextField } from '@/components/ui/Field'
@@ -46,8 +46,8 @@ export function SetPasswordPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas pt-safe pb-safe expanded:items-center expanded:justify-center expanded:bg-surface-soft">
-      <div className="flex flex-1 flex-col px-4 pt-12 medium:px-6 expanded:w-[400px] expanded:flex-none expanded:rounded-xl expanded:border expanded:border-hairline expanded:bg-canvas expanded:p-8">
-        <BrandMark size={48} />
+      <div className="flex flex-1 flex-col px-4 pt-12 medium:px-6 expanded:w-[400px] expanded:flex-none expanded:rounded-3xl expanded:border expanded:border-hairline expanded:bg-canvas expanded:p-8">
+        <ProntteraLockup size={44} />
         {!link.tokenHash ? (
           <EmptyState
             icon="error"

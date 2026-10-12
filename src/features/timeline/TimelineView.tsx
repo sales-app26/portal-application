@@ -55,9 +55,9 @@ export function TimelineView({ userId }: { userId?: string }) {
   ) : q.isError ? (
     <ErrorState message={q.error.message} onRetry={() => void q.refetch()} />
   ) : entries.length === 0 ? (
-    <EmptyState icon="timeline" title={q.data?.message ?? 'Nothing logged on this day.'} />
+    <EmptyState icon="timeline" title={q.data?.message ?? 'Nothing logged on this day.'} className="card card--default rounded-2xl" />
   ) : (
-    <ol>
+    <ol className="card card--default gap-0 rounded-2xl px-3 py-2 expanded:px-4">
       {entries.map((e) => (
         <TimelineEntryCard
           key={e.id}
@@ -95,7 +95,7 @@ export function TimelineView({ userId }: { userId?: string }) {
             {controls}
             {list}
           </div>
-          <div className="sticky top-20 h-[calc(100dvh-176px)] overflow-hidden rounded-xl border border-hairline">
+          <div className="card card--default sticky top-20 h-[calc(100dvh-176px)] overflow-hidden rounded-2xl p-0">
             {q.isLoading ? <Skeleton className="size-full rounded-none" /> : points.length ? <LazyMap points={points} selectedId={selectedId} onSelect={setSelectedId} className="size-full" /> : <EmptyState icon="marker" title="No visits with a location" body="Door-to-door visits appear here as numbered pins." className="pt-24" />}
           </div>
         </div>

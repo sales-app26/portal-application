@@ -18,6 +18,9 @@ import { haptic } from '@/lib/haptics'
 import { Tag } from '@/components/ui/Display'
 import { useLatestVersion } from '@/features/versions/queries'
 import type { Me } from '@/lib/types'
+import { ProntteraMark } from '@/components/brand/Logo'
+import { Segmented } from '@/components/ui/Choice'
+import { getThemeChoice, setThemeChoice, type ThemeChoice } from '@/lib/theme'
 
 export function ProfilePage() {
   const me = useMe()
@@ -25,16 +28,18 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [theme, setTheme] = useState<ThemeChoice>(getThemeChoice)
   const { data: latest } = useLatestVersion()
 
   return (
     <Page title="Profile">
       <div className="flex flex-col gap-6 medium:max-w-[640px]">
-        <div className="flex items-center gap-4">
+        <div className="card card--default flex-row items-center gap-4 rounded-3xl p-5">
           <Avatar name={me.name} size={64} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-title-md">{me.name}</p>
-            <p className="text-body-sm text-body">{ROLE_LABEL[me.role]}</p>
+            <p className="truncate text-body-sm text-muted">{me.email}</p>
+            <span className="chip chip--soft chip--accent chip--sm mt-1.5 h-6 px-2.5 text-caption-strong">{ROLE_LABEL[me.role]}</span>
           </div>
         </div>
 
@@ -57,6 +62,26 @@ export function ProfilePage() {
           </ListGroup>
         )}
 
+        <section aria-labelledby="appearance-title">
+          <h2 id="appearance-title" className="mb-2 px-1 text-caption-strong text-muted uppercase">
+            Appearance
+          </h2>
+          <div className="card card--default gap-0 rounded-2xl p-4">
+            <Segmented<ThemeChoice>
+              label="Theme"
+              value={theme}
+              onChange={(t) => (setTheme(t), setThemeChoice(t))}
+              options={[
+                { value: 'system', label: 'System' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              className="w-full"
+            />
+            <p className="mt-2 px-1 text-caption text-muted">System follows your phone's light or dark setting. Dark is easier on the eyes at night.</p>
+          </div>
+        </section>
+
         <ListGroup title="About">
           <ListRow
             icon="timeline"
@@ -66,27 +91,20 @@ export function ProfilePage() {
             to="/whats-new"
             chevron
           />
-          <ListRow
-            icon="info"
-            title="Credits"
-            subtitle={
-              <>
-                Icons by{' '}
-                <a href="https://icons8.com" target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  Icons8
-                </a>{' '}
-                · Map data ©{' '}
-                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  OpenStreetMap contributors
-                </a>
-              </>
-            }
-          />
         </ListGroup>
 
         <ListGroup>
           <ListRow icon="logout-rounded" title="Log out" destructive onClick={() => setLogoutOpen(true)} />
         </ListGroup>
+
+        <footer className="flex flex-col items-center gap-2 pt-2 pb-4 text-center">
+          <ProntteraMark size={36} />
+          <p className="text-caption text-muted">
+            Pronttera Sales{latest ? ` · v${latest.version}` : ''}
+            <br />
+            Made by Pronttera
+          </p>
+        </footer>
       </div>
 
       <EditProfile open={editOpen} onOpenChange={setEditOpen} me={me} />

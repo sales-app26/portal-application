@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/Button'
 import { Icon } from '@/icons'
 import { useAuth, useMe } from '@/auth/AuthProvider'
 import { ProjectProvider } from '@/features/projects/ProjectContext'
-import { AppShell, BrandMark } from '@/components/layout/AppShell'
+import { AppShell } from '@/components/layout/AppShell'
+import { ProntteraLockup } from '@/components/brand/Logo'
 import { homePath } from '@/components/layout/navigation'
 import { Spinner } from '@/components/ui/Spinner'
 import type { UserRole } from '@/lib/types'
@@ -13,7 +14,7 @@ import { NotFound } from '@/pages/misc/NotFound'
 function Splash() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-canvas">
-      <BrandMark size={56} />
+      <ProntteraLockup size={52} />
       <Spinner size={24} className="text-muted" />
     </div>
   )
@@ -102,7 +103,16 @@ export const router = createBrowserRouter([
               },
               {
                 element: <RequireRole roles={FIELD} />,
-                children: [{ path: 'home', lazy: async () => ({ Component: (await import('@/pages/field/HomePage')).HomePage }) }],
+                children: [
+                  { path: 'home', lazy: async () => ({ Component: (await import('@/pages/field/HomePage')).HomePage }) },
+                  {
+                    path: 'performance',
+                    lazy: async () => {
+                      const { PersonSummaryPage } = await import('@/pages/timeline/PersonSummaryPage')
+                      return { Component: () => <PersonSummaryPage self /> }
+                    },
+                  },
+                ],
               },
               {
                 element: <RequireRole roles={ADMIN} />,

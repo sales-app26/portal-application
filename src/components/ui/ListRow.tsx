@@ -20,7 +20,11 @@ interface ListRowProps {
 export function ListRow({ icon, leading, title, subtitle, trailing, to, onClick, chevron, destructive, className }: ListRowProps) {
   const content = (
     <>
-      {icon && <Icon name={icon} className={destructive ? 'text-down' : 'text-ink'} />}
+      {icon && (
+        <span className={cn('flex size-9 flex-none items-center justify-center rounded-full', destructive ? 'bg-danger-soft text-down' : 'bg-default text-ink')}>
+          <Icon name={icon} size={20} />
+        </span>
+      )}
       {leading}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className={cn('truncate text-title-sm', destructive && 'text-down')}>{title}</span>
@@ -31,8 +35,8 @@ export function ListRow({ icon, leading, title, subtitle, trailing, to, onClick,
     </>
   )
   const cls = cn(
-    'flex min-h-14 w-full items-center gap-3 border-b border-hairline-soft px-4 py-3 text-left last:border-b-0',
-    (to || onClick) && 'active:bg-surface-soft expanded:hover:bg-surface-soft',
+    'flex min-h-14 w-full items-center gap-3 border-b border-separator px-4 py-3 text-left transition-colors last:border-b-0',
+    (to || onClick) && 'active:bg-surface-secondary expanded:hover:bg-surface-secondary',
     className,
   )
   if (to)
@@ -53,8 +57,8 @@ export function ListRow({ icon, leading, title, subtitle, trailing, to, onClick,
 export function ListGroup({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
   return (
     <section className={className}>
-      {title && <h2 className="mb-2 px-1 text-caption-strong text-muted uppercase">{title}</h2>}
-      <div className="overflow-hidden rounded-xl border border-hairline bg-canvas">{children}</div>
+      {title && <h2 className="mb-2 px-1 text-caption-strong tracking-wide text-muted uppercase">{title}</h2>}
+      <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0">{children}</div>
     </section>
   )
 }

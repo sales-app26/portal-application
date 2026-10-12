@@ -1,74 +1,219 @@
 @import 'tailwindcss';
+/*
+ * HeroUI v3 styles, imported piece by piece: the package's index pulls in all ~70 components
+ * (55 KB gzip). These are the components whose classes the app uses, in HeroUI's order;
+ * the colour variables come from the theme files below, whatever is imported here.
+ */
+@layer theme, base, components, utilities;
+@import 'tw-animate-css';
+@import '@heroui/styles/base/base.css' layer(base);
+@import '@heroui/styles/base/scrollbar.css' layer(base);
+@import '@heroui/styles/components/description.css' layer(components);
+@import '@heroui/styles/components/field-error.css' layer(components);
+@import '@heroui/styles/components/label.css' layer(components);
+@import '@heroui/styles/components/button.css' layer(components);
+@import '@heroui/styles/components/chip.css' layer(components);
+@import '@heroui/styles/components/alert.css' layer(components);
+@import '@heroui/styles/components/skeleton.css' layer(components);
+@import '@heroui/styles/components/progress-bar.css' layer(components);
+@import '@heroui/styles/components/card.css' layer(components);
+@import '@heroui/styles/components/avatar.css' layer(components);
+@import '@heroui/styles/themes/shared/theme.css';
+@import '@heroui/styles/themes/default/variables.css' layer(theme);
+@import '@heroui/styles/utilities';
+@import '@heroui/styles/variants';
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
 @import '@fontsource/jetbrains-mono/500.css';
 
-/* DESIGN.md tokens. Values live here only; components use the utilities. */
+/*
+ * Design system: HeroUI v3 with the Pronttera palette.
+ *
+ * HeroUI's own variables (--background, --surface, --accent, --border…) carry the brand, per
+ * theme, below. The app's older token names (canvas, ink, primary, hairline…) are aliases of
+ * those, so every screen and every HeroUI component draw from one palette.
+ */
 @theme {
-  /* Window classes (UX-COMPONENTS.md §2) replace Tailwind's default screens. */
-  --breakpoint-*: initial;
+  /* Window classes (UX-COMPONENTS.md §2), alongside Tailwind's sm/md/lg that HeroUI uses. */
   --breakpoint-medium: 600px;
   --breakpoint-expanded: 840px;
   --breakpoint-large: 1200px;
 
-  --color-*: initial;
-  --color-primary: #0052ff;
-  --color-primary-active: #003ecc;
-  --color-primary-disabled: #a8b8cc;
-  --color-ink: #0a0b0d;
-  --color-body: #5b616e;
-  /* DESIGN.md has #7c828a here (3.9:1 on white, below WCAG AA 4.5:1 for small text); darkened to pass on white and on surface-strong. */
-  --color-muted: #656a75;
-  --color-muted-soft: #a8acb3;
-  --color-hairline: #dee1e6;
-  --color-hairline-soft: #eef0f3;
-  --color-canvas: #ffffff;
-  --color-surface-soft: #f7f7f7;
-  --color-surface-strong: #eef0f3;
-  --color-surface-dark: #0a0b0d;
-  --color-surface-dark-elevated: #16181c;
-  --color-on-primary: #ffffff;
-  --color-on-dark: #ffffff;
-  --color-on-dark-soft: #a8acb3;
-  --color-up: #05b169;
-  --color-down: #cf202f;
-  --color-accent-yellow: #f4b000;
-  /* One hue per lead status, so a list can be scanned by colour (dot, tint, chart, pin). */
-  --color-status-new: #8a909a;
-  --color-status-contacted: #2b6cf0;
-  --color-status-interested: #e08600;
-  --color-status-scheduled: #7a4ae0;
-  --color-status-not-interested: #5f6b7a;
-  --color-status-converted: #05a864;
-  --color-status-lost: #d22f3c;
-  --color-transparent: transparent;
-  --color-current: currentColor;
-
   --font-sans: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-pill: 100px;
-
-  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
+  --radius-pill: 9999px;
+  --shadow-soft: var(--surface-shadow);
+  --shadow-lift: 0 1px 2px rgb(15 17 21 / 0.04), 0 8px 24px -6px rgb(15 17 21 / 0.08);
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized-in: cubic-bezier(0.05, 0.7, 0.1, 1);
   --ease-emphasized-out: cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 
+/* App token names → HeroUI variables (inline, so they follow the theme on every element). */
+@theme inline {
+  --color-canvas: var(--background);
+  --color-ink: var(--foreground);
+  --color-body: var(--body);
+  --color-muted-soft: var(--muted-soft);
+  --color-hairline: var(--border);
+  --color-hairline-soft: var(--separator);
+  --color-surface-soft: var(--surface-secondary);
+  --color-surface-strong: var(--default);
+  --color-primary: var(--accent);
+  --color-primary-active: var(--accent-hover);
+  --color-primary-disabled: var(--primary-disabled);
+  --color-on-primary: var(--accent-foreground);
+  --color-on-ink: var(--on-ink);
+  --color-up: var(--success);
+  --color-down: var(--danger);
+  --color-brand: var(--brand);
+  --color-brand-ring: var(--brand-ring);
+  --color-accent-yellow: var(--yellow);
+  --color-surface-dark: #0a0b0d;
+  --color-surface-dark-elevated: var(--dark-elevated);
+  --color-on-dark: #ffffff;
+  --color-on-dark-soft: #a8acb3;
+  /* One hue per lead status, so a list can be scanned by colour (dot, tint, chart, pin). */
+  --color-status-new: var(--status-new);
+  --color-status-contacted: var(--status-contacted);
+  --color-status-interested: var(--status-interested);
+  --color-status-scheduled: var(--status-scheduled);
+  --color-status-not-interested: var(--status-not-interested);
+  --color-status-converted: var(--status-converted);
+  --color-status-lost: var(--status-lost);
+}
+
+/* `dark:` follows the resolved theme on <html data-theme>, which lib/theme.ts sets from the
+   person's choice (System, Light, Dark) before the first paint. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Light: a soft cool-grey page with white surfaces, Pronttera blue for every action. */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --field-radius: 0.75rem;
+
+  --background: #f3f4f6;
+  --foreground: #0f1115;
+  --surface: #ffffff;
+  --surface-secondary: #f6f7f9;
+  --surface-tertiary: #eef0f3;
+  --overlay: #ffffff;
+  --muted: #5d6470;
+  --default: #eceef2;
+  --default-foreground: #0f1115;
+  --segment: #ffffff;
+  --segment-foreground: #0f1115;
+  --border: #e2e5ea;
+  --separator: #eceef2;
+  --field-background: #ffffff;
+  --field-foreground: #0f1115;
+  --field-placeholder: #8a909a;
+  --field-border: #dcdfe5;
+  --field-border-width: 1px;
+  --field-shadow: 0 1px 2px rgb(15 17 21 / 0.04);
+
+  /* Pronttera blue. The logo's #1eace4 is too light behind white text (2.6:1), so actions use
+     a deeper shade of it (4.9:1) and the bright one is kept for the mark and highlights. */
+  --accent: #0a78b0;
+  --accent-foreground: #ffffff;
+  --success: #0b8a55;
+  --success-foreground: #ffffff;
+  --warning: #e08600;
+  --warning-foreground: #1a1200;
+  --danger: #cf2d3a;
+  --danger-foreground: #ffffff;
+  --focus: #1eace4;
+
+  --surface-shadow: 0 1px 2px rgb(15 17 21 / 0.04), 0 1px 3px rgb(15 17 21 / 0.04);
+  --overlay-shadow: 0 2px 8px rgb(15 17 21 / 0.06), 0 16px 40px -8px rgb(15 17 21 / 0.18);
+
+  --body: #4b5260;
+  --muted-soft: #a3a9b3;
+  --on-ink: #ffffff;
+  --primary-disabled: #a9c7d8;
+  --brand: #1eace4;
+  --brand-ring: #2a2a2a;
+  --yellow: #f4b000;
+  --dark-elevated: #16181c;
+  --status-new: #8a909a;
+  --status-contacted: #2b6cf0;
+  --status-interested: #e08600;
+  --status-scheduled: #7a4ae0;
+  --status-not-interested: #5f6b7a;
+  --status-converted: #05a864;
+  --status-lost: #d22f3c;
+  --fab-glow: rgb(10 120 176 / 0.35);
+}
+
+/* Dark: surfaces step up in lightness instead of using shadows; text stays at AA or better. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #0b0d11;
+  --foreground: #f1f3f6;
+  --surface: #14171d;
+  --surface-secondary: #1a1d24;
+  --surface-tertiary: #21252d;
+  --overlay: #191c23;
+  --muted: #9aa1ac;
+  --default: #23272f;
+  --default-foreground: #f1f3f6;
+  --segment: #2c313a;
+  --segment-foreground: #f1f3f6;
+  --border: #2a2f38;
+  --separator: #21252c;
+  --field-background: #14171d;
+  --field-foreground: #f1f3f6;
+  --field-placeholder: #737a86;
+  --field-border: #2d323b;
+  --field-shadow: none;
+
+  --accent: #38b4ea;
+  --accent-foreground: #04131c;
+  --success: #2ccf86;
+  --success-foreground: #03140b;
+  --warning: #f5bf2a;
+  --warning-foreground: #1a1200;
+  --danger: #ff5b66;
+  --danger-foreground: #1b0205;
+  --focus: #38b4ea;
+
+  --surface-shadow: none;
+  --overlay-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 16px 40px -8px rgb(0 0 0 / 0.6);
+
+  --body: #b6bcc6;
+  --muted-soft: #687080;
+  --on-ink: #0f1115;
+  --primary-disabled: #27465a;
+  --brand-ring: #ffffff;
+  --yellow: #f5bf2a;
+  --dark-elevated: #23272f;
+  --status-new: #9aa1ac;
+  --status-contacted: #6a9bf7;
+  --status-interested: #f0a73a;
+  --status-scheduled: #a585f2;
+  --status-not-interested: #8a95a5;
+  --status-converted: #2ccf86;
+  --status-lost: #ff5b66;
+  --fab-glow: rgb(56 180 234 / 0.28);
+}
+
+/* Map tiles are drawn light; inverting them keeps the map calm at night. Pins are not tiles. */
+[data-theme='dark'] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+
 /* App type scale (UX-COMPONENTS.md §1, "App typography"). */
 @utility text-title-lg {
-  font-size: 32px;
-  line-height: 1.13;
-  letter-spacing: -0.4px;
-  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.7px;
+  font-weight: 700;
 }
 @utility text-title-md {
   font-size: 18px;
@@ -105,10 +250,10 @@
   font-variant-numeric: tabular-nums;
 }
 @utility text-display-sm {
-  font-size: 36px;
-  line-height: 1.11;
-  letter-spacing: -0.5px;
-  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  font-weight: 650;
 }
 @utility text-button {
   font-size: 16px;
@@ -188,26 +333,10 @@
   }
 }
 
-/* Icon: Icons8 PNG used as a mask so it takes the text colour (UX-COMPONENTS.md §8). */
+/* Icon: a Gravity UI symbol from the sprite; its paths fill with the text colour. */
 .icon {
   display: inline-block;
-  flex: none;
-  width: var(--icon-size, 24px);
-  height: var(--icon-size, 24px);
-  background-color: currentColor;
-  -webkit-mask: var(--icon-src) center / contain no-repeat;
-  mask: var(--icon-src) center / contain no-repeat;
-}
-
-.skeleton {
-  background: linear-gradient(90deg, var(--color-surface-strong) 0%, var(--color-hairline-soft) 50%, var(--color-surface-strong) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
-  }
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

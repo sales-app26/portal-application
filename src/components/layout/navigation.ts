@@ -18,6 +18,7 @@ const team: NavItem = { to: '/people', label: 'Team', icon: 'conference-call' }
 const people: NavItem = { to: '/people', label: 'People', icon: 'conference-call' }
 const projects: NavItem = { to: '/projects', label: 'Projects', icon: 'briefcase' }
 const versions: NavItem = { to: '/versions', label: 'Versions', icon: 'timeline' }
+const performance: NavItem = { to: '/performance', label: 'Performance', icon: 'statistics' }
 const profile: NavItem = { to: '/profile', label: 'Profile', icon: 'user-male-circle' }
 export const moreItem: NavItem = { to: '/more', label: 'More', icon: 'menu-2' }
 
@@ -27,8 +28,8 @@ export const moreItem: NavItem = { to: '/more', label: 'More', icon: 'menu-2' }
  * drawer show bar + more flat, so nothing is nested on a laptop.
  */
 export const NAV: Record<UserRole, { bar: NavItem[]; more: NavItem[] }> = {
-  sales_person: { bar: [home, leads, day, profile], more: [] },
-  moderator: { bar: [home, leads, dashboard, transfers, moreItem], more: [day, team, projects, profile] },
+  sales_person: { bar: [home, leads, day, performance, profile], more: [] },
+  moderator: { bar: [home, leads, dashboard, transfers, moreItem], more: [day, performance, team, projects, profile] },
   super_admin: { bar: [dashboard, projects, people, transfers, moreItem], more: [versions, profile] },
 }
 

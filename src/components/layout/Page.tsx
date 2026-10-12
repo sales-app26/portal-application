@@ -89,15 +89,15 @@ export function Page({ title, back, actions, leading, cta, header, wide, subtitl
           className="pointer-events-none fixed inset-x-0 top-0 z-30 flex justify-center pt-[calc(env(safe-area-inset-top)+8px)]"
           style={{ transform: `translateY(${pull - 40}px)`, opacity: Math.min(1, pull / 48) }}
         >
-          <span className="flex size-10 items-center justify-center rounded-full border border-hairline bg-canvas shadow-soft">
+          <span className="flex size-10 items-center justify-center rounded-full bg-surface shadow-overlay">
             <Spinner size={18} className={cn('text-ink', !refreshing && 'animate-none')} />
           </span>
         </div>
       )}
       <header
         className={cn(
-          'sticky top-0 z-10 bg-canvas pt-safe transition-[border-color] duration-150',
-          scrolled ? 'border-b border-hairline' : 'border-b border-transparent',
+          'sticky top-0 z-10 pt-safe transition-[border-color,background-color] duration-200',
+          scrolled ? 'border-b border-separator bg-background/80 backdrop-blur-xl backdrop-saturate-150' : 'border-b border-transparent bg-background',
         )}
       >
         <div className="flex h-14 items-center gap-1 px-2 medium:h-16 medium:px-4 expanded:px-6">
@@ -137,7 +137,7 @@ export function Page({ title, back, actions, leading, cta, header, wide, subtitl
 
       {/* Phones: a floating action button above the tab bar, so the list keeps the screen. */}
       {cta?.bar && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 border-t border-hairline bg-canvas px-4 py-3 medium:hidden">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 border-t border-separator bg-surface/90 px-4 py-3 backdrop-blur-xl medium:hidden">
           <Button size="lg" block icon={cta.icon} onClick={cta.onClick} disabled={cta.disabled} loading={cta.loading}>
             {cta.label}
           </Button>
@@ -152,7 +152,7 @@ export function Page({ title, back, actions, leading, cta, header, wide, subtitl
             disabled={cta.disabled}
             loading={cta.loading}
             aria-label={cta.label}
-            className={cn('pointer-events-auto shadow-[0_6px_20px_rgba(0,82,255,0.35)] transition-[padding,width] duration-200', fabSmall ? 'w-14 px-0' : 'px-6')}
+            className={cn('pointer-events-auto shadow-[0_6px_20px_var(--fab-glow)] transition-[padding,width] duration-200', fabSmall ? 'w-14 px-0' : 'px-6')}
           >
             {!fabSmall && cta.label}
           </Button>

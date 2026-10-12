@@ -44,7 +44,7 @@ export function TransferCard({ t }: { t: Transfer }) {
 
   const pending = t.status === 'pending'
   return (
-    <li className="rounded-xl border border-hairline bg-canvas p-4">
+    <li className="card card--default gap-0 rounded-2xl p-4 expanded:p-5">
       <div className="flex items-start justify-between gap-3">
         <Link to={`/leads/${t.lead.id}`} className="min-w-0 active:underline">
           <p className="truncate text-title-sm">{t.lead.name}</p>

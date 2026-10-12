@@ -3,7 +3,9 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
-const BUDGET = { initialJs: 215, initialCss: 20, lazyChunk: 60 } // KB
+// CSS rose from 20 to 28 with the HeroUI design system (only the components the app uses are
+// imported); JS by 2 KB with the theme switcher and agenda. A ratchet: lower these when you can.
+const BUDGET = { initialJs: 217, initialCss: 28, lazyChunk: 60 } // KB
 const dist = new URL('../dist/', import.meta.url)
 const gz = (file) => gzipSync(readFileSync(new URL(file.replace(/^\//, ''), dist))).length / 1024
 

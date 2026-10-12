@@ -2,4 +2,5 @@
 export const haptic = {
   success: () => navigator.vibrate?.(10),
   error: () => navigator.vibrate?.([20, 40, 20]),
+  celebrate: () => navigator.vibrate?.([30, 60, 30, 60, 90]),
 }

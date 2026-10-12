@@ -14,8 +14,9 @@ import { ApiError, apiWithMessage } from '@/lib/api'
 import { formatPhone, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import type { EntrySaveResult, LeadDetail } from '@/lib/types'
-import { checkNextDate, followUpSchema, followUpShape, type FollowUpValues } from './entrySchema'
+import type { EntrySaveResult, LeadDetail, LeadSource } from '@/lib/types'
+import { checkNextDate, followUpSchema, followUpShape, outcomeBody, type FollowUpValues } from './entrySchema'
+import { SourceChoice } from './SourceChoice'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
 import { invalidateLeadData, leadKeys, useMembers } from './queries'
@@ -35,8 +36,14 @@ function useSaveHelpers(lead: LeadDetail, onOpenChange: (o: boolean) => void) {
   const qc = useQueryClient()
   return {
     done(message: string, result?: EntrySaveResult) {
-      haptic.success()
-      toast.success(message)
+      // A new conversion is the moment the whole job is about: say so.
+      if (result?.lead.status === 'converted' && lead.status !== 'converted') {
+        haptic.celebrate()
+        toast.success('Converted! 🎉 Great work, it counts toward your target.', { duration: 6000 })
+      } else {
+        haptic.success()
+        toast.success(message)
+      }
       invalidateLeadData(qc, lead.id)
       if (result) void qc.invalidateQueries({ queryKey: leadKeys.entries(lead.id) })
       onOpenChange(false)
@@ -70,6 +77,10 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
     note: '',
     nextFollowUpDate: '',
     location: lead.location.name,
+    reason: null,
+    // An expected deal set earlier carries into "Mark as won".
+    dealValue: lead.dealValue ? String(lead.dealValue) : '',
+    plan: lead.plan ?? '',
   })
   const { register, control, handleSubmit, formState, reset, setError } = useForm<FollowUpValues>({ resolver: zodResolver(followUpSchema), mode: 'onBlur', defaultValues: defaults() })
 
@@ -95,6 +106,7 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
         note: v.note.trim(),
         nextFollowUpDate: nextDateRule(v.status) === 'hidden' ? undefined : v.nextFollowUpDate || undefined,
         location: v.location.trim().replace(/\s+/g, ' '),
+        ...outcomeBody(v),
       }
       const { data, message } = await apiWithMessage<EntrySaveResult>(`/leads/${lead.id}/follow-ups`, { method: 'POST', body: entryBody(fields, doorToDoor ? proof : null) })
       helpers.done(message, data)
@@ -106,7 +118,7 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate', 'location'])
+      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate', 'location', 'reason', 'dealValue', 'plan'])
     }
   })
 
@@ -141,7 +153,7 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
 // ---------------------------------------------------------------- change status
 
 const changeSchema = z
-  .object({ status: followUpShape.status, note: followUpShape.note, nextFollowUpDate: z.string() })
+  .object({ status: followUpShape.status, note: followUpShape.note, nextFollowUpDate: z.string(), reason: followUpShape.reason, dealValue: followUpShape.dealValue, plan: followUpShape.plan })
   .superRefine(checkNextDate)
 type ChangeValues = z.input<typeof changeSchema>
 
@@ -153,12 +165,12 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
   const { register, control, handleSubmit, formState, reset, setError } = useForm<ChangeValues>({
     resolver: zodResolver(changeSchema),
     mode: 'onBlur',
-    defaultValues: { status: null, note: '', nextFollowUpDate: '' },
+    defaultValues: { status: null, note: '', nextFollowUpDate: '', reason: null, dealValue: lead.dealValue ? String(lead.dealValue) : '', plan: lead.plan ?? '' },
   })
 
   useEffect(() => {
     if (!open) return
-    reset({ status: null, note: '', nextFollowUpDate: '' })
+    reset({ status: null, note: '', nextFollowUpDate: '', reason: null, dealValue: lead.dealValue ? String(lead.dealValue) : '', plan: lead.plan ?? '' })
     setRequestId(crypto.randomUUID())
   }, [open, reset])
 
@@ -171,12 +183,13 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
           status: v.status,
           note: v.note.trim(),
           ...(nextDateRule(v.status) !== 'hidden' && v.nextFollowUpDate ? { nextFollowUpDate: v.nextFollowUpDate } : {}),
+          ...outcomeBody(v),
         },
       })
       helpers.done(message, data)
     } catch (err) {
       if (helpers.stale(err)) return
-      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate'])
+      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate', 'reason', 'dealValue', 'plan'])
     }
   })
 
@@ -212,6 +225,9 @@ const editSchema = z.object({
   phone: z.string().trim().refine((v) => normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
   notes: z.string().trim().max(2000),
   location: followUpShape.location,
+  dealValue: followUpShape.dealValue,
+  plan: followUpShape.plan,
+  source: z.string().nullable(),
 })
 type EditValues = z.input<typeof editSchema>
 
@@ -223,6 +239,9 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
     phone: formatPhone(lead.phone),
     notes: lead.notes ?? '',
     location: lead.location.name,
+    dealValue: lead.dealValue ? String(lead.dealValue) : '',
+    plan: lead.plan ?? '',
+    source: lead.source,
   })
   const { register, control, handleSubmit, formState, reset, setError } = useForm<EditValues>({ resolver: zodResolver(editSchema), mode: 'onBlur', defaultValues: defaults() })
 
@@ -233,13 +252,19 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
 
   const onSubmit = handleSubmit(async (v) => {
     // Only changed fields: the API re-checks the phone for duplicates when it is sent.
-    const body: Record<string, string | null> = {}
+    const body: Record<string, string | number | null> = {}
     const d = formState.dirtyFields
     if (d.name) body.name = v.name.trim()
     if (d.businessName) body.businessName = v.businessName.trim() || null
     if (d.phone) body.phone = normalizePhone(v.phone) ?? v.phone
     if (d.notes) body.notes = v.notes.trim() || null
     if (d.location) body.location = v.location.trim().replace(/\s+/g, ' ')
+    if (d.dealValue) {
+      const digits = (v.dealValue ?? '').replace(/[,\s₹]/g, '')
+      body.dealValue = digits ? Number(digits) : null
+    }
+    if (d.plan) body.plan = v.plan?.trim() || null
+    if (d.source) body.source = v.source ?? null
     if (Object.keys(body).length === 0) return onOpenChange(false)
     try {
       const { data } = await apiWithMessage<LeadDetail>(`/leads/${lead.id}`, { method: 'PATCH', body })
@@ -254,7 +279,7 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'location'])
+      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'location', 'dealValue', 'plan', 'source'])
     }
   })
 
@@ -281,6 +306,11 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
           render={({ field }) => <LocationField projectId={lead.projectId} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />}
         />
         <TextAreaField label="About the client" optional error={formState.errors.notes?.message} {...register('notes')} />
+        <Controller control={control} name="source" render={({ field }) => <SourceChoice value={(field.value as LeadSource | null) ?? null} onChange={field.onChange} />} />
+        <div className="grid grid-cols-1 gap-4 medium:grid-cols-2">
+          <TextField label="Monthly value" optional prefix="₹" inputMode="numeric" placeholder="2,499" error={formState.errors.dealValue?.message} {...register('dealValue')} />
+          <TextField label="Plan or package" optional maxLength={80} error={formState.errors.plan?.message} {...register('plan')} />
+        </div>
       </form>
     </ResponsiveOverlay>
   )

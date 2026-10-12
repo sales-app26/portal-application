@@ -21,10 +21,12 @@ Set `VITE_API_URL` only when the API is not same-origin. It defaults to `/api/v1
 
 ## Stack
 
-- React 19, Vite 8, TypeScript, Tailwind v4. The DESIGN.md tokens live in `src/styles/index.css`.
+- React 19, Vite 8, TypeScript, Tailwind v4.
+- **HeroUI v3** design system (`@heroui/styles`) with the Pronttera palette: HeroUI's variables (`--background`, `--surface`, `--accent`…) carry the brand in light and dark, set in `src/styles/index.css`; the app's token names (`canvas`, `ink`, `primary`…) alias them. Components use HeroUI's classes (`button`, `card`, `chip`, `avatar`, `alert`, `skeleton`, `progress-bar`) on native elements, so forms and links behave as plain HTML and the first load stays small. Only the components used are imported.
+- Light, dark or follow the phone: Profile → Appearance (`src/lib/theme.ts`, applied before first paint in `index.html`).
 - Radix primitives (shadcn-style, styled in-house), Vaul for bottom sheets, Sonner for toasts.
 - TanStack Query for server state, React Hook Form with Zod for forms, React Router 8 with lazy routes.
-- Icons8 iOS 17, free plan: 100px PNGs in `src/icons/`, drawn through a CSS mask (`<Icon name="camera" />`). The "Icons by Icons8" credit link is required and must stay.
+- Icons: Gravity UI (MIT, the set HeroUI v3 uses) as one SVG sprite, `src/icons/sprite.svg`, built by `node scripts/build-icons.mjs` from the name map in that script (`<Icon name="camera" />`). No credit line needed; maps keep OpenStreetMap's attribution in their corner.
 
 ## Layout
 
@@ -35,7 +37,7 @@ src/
     layout/        AppShell (bottom bar / rail / drawer), Page, navigation per role
     ui/            Button, Field, Overlay (sheet ↔ dialog), Choice, Display, ListRow
   hooks/           window class, overlay back-button history, online, keyboard
-  icons/           Icons8 PNGs + <Icon>
+  icons/           Gravity UI sprite + <Icon>
   lib/             api client, types, formatting, form errors
   pages/           one folder per area
 ```
@@ -59,7 +61,7 @@ npm run build:check     # production build, then fail if the first load or a scr
 **Against the real API.** `test:e2e:real` starts `../service-application/test/support/dev-server.ts`: the actual NestJS API on an in-memory PostgreSQL with a fake Supabase, seeded with a Super Admin, a moderator, three sales persons and two projects. Nothing touches the hosted Supabase project. It checks what a fake can't: real validation messages, phone normalisation, duplicate detection, the server stamping a real camera frame, signed photo links, transfer approval, reassign, the dashboard and the CSV. To poke at it by hand: `cd ../service-application && npm run dev:fake`, then `VITE_API_PROXY=<the printed baseUrl> npm run dev`. The API allows 10 sign-ins a minute per address, so the tests sign in once per person.
 
 - **Offline:** the build writes `dist/sw.js` listing every built file. After one visit the app shell and every screen open with no signal; API calls, map tiles and signed photo links are never cached, and nothing can be saved offline (PRD §8). A new version waits behind an "Update" toast so an open form is never reloaded away.
-- **Budget** (`scripts/check-bundle.mjs`, gzip): first-load JavaScript 215 KB, first-load CSS 20 KB, any one lazy screen 60 KB. The numbers are a ratchet just above today's size; lower them when you can.
+- **Budget** (`scripts/check-bundle.mjs`, gzip): first-load JavaScript 217 KB, first-load CSS 28 KB (HeroUI), any one lazy screen 60 KB. The numbers are a ratchet just above today's size; lower them when you can.
 - **Muted text colour:** DESIGN.md's `muted` (#7c828a) is 3.9:1 on white, under WCAG AA (4.5:1) for small text, so the app uses #656a75. Everything else follows DESIGN.md.
 
 ## Browser tests

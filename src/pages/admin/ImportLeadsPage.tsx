@@ -298,7 +298,7 @@ function AssignStep({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-hairline p-5">
+      <div className="flex flex-col gap-3 card card--default rounded-2xl p-5">
         <p className="text-title-md" role="status">
           {plural(rows.length, 'lead')} ready · {unassigned.length ? `${unassigned.length} not assigned yet` : 'all assigned'}
         </p>
@@ -333,7 +333,7 @@ function AssignStep({
           />
         </div>
 
-        <ul className="overflow-hidden rounded-xl border border-hairline">
+        <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
           {rows.map((r) => {
             const selected = picked.includes(r.row)
             const owner = assignments[r.row]
@@ -447,7 +447,7 @@ function Problems({ result }: { result: ImportResult }) {
           Download list
         </Button>
       </div>
-      <ul className="overflow-hidden rounded-xl border border-hairline">
+      <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
         {result.problems.map((p) => (
           <li key={p.row} className="border-b border-hairline-soft px-4 py-3 last:border-b-0">
             <p className="flex flex-wrap items-center gap-2">
@@ -467,7 +467,7 @@ function Problems({ result }: { result: ImportResult }) {
 function Preview({ result, onBack }: { result: ImportResult; onBack: () => void }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-hairline p-5">
+      <div className="flex flex-col gap-3 card card--default rounded-2xl p-5">
         <p className="text-title-md" role="status">
           {result.importable === 0 ? 'Nothing in this file can be imported' : `${plural(result.importable, 'lead')} ${result.importable === 1 ? 'is' : 'are'} ready to import`}
         </p>
@@ -487,7 +487,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
       {result.sample.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-title-md">First rows</h2>
-          <ul className="overflow-hidden rounded-xl border border-hairline">
+          <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {result.sample.map((s) => (
               <li key={s.row} className="flex items-center gap-3 border-b border-hairline-soft px-4 py-3 last:border-b-0">
                 <span className="min-w-0 flex-1">
@@ -515,7 +515,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
 function Done({ result, projectId, onAgain }: { result: ImportResult; projectId: string; onAgain: () => void }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-start gap-3 rounded-xl border border-hairline p-5">
+      <div className="flex flex-col items-start gap-3 card card--default rounded-2xl p-5">
         <Icon name="ok" size={32} className="text-up" />
         <p className="text-title-md" role="status">
           {plural(result.imported, 'lead')} imported

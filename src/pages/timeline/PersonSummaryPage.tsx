@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
+import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { IconButton } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Choice'
-import { EmptyState, ErrorState, Skeleton, StatTile } from '@/components/ui/Display'
+import { Card, EmptyState, ErrorState, Skeleton, StatTile } from '@/components/ui/Display'
+import { ColumnChart } from '@/components/charts/ColumnChart'
 import { Button } from '@/components/ui/Button'
 import { useSummary } from '@/features/timeline/queries'
 import { cn } from '@/lib/cn'
@@ -21,9 +24,15 @@ const describeDay = (d: DaySummary) => {
   return d.followUps + d.statusChanges === 0 ? 'nothing logged' : bits.join(', ')
 }
 
-/** One person's week or month, day by day (admins; opens a day's timeline on tap). */
-export function PersonSummaryPage() {
-  const { id = '' } = useParams()
+/**
+ * One person's week or month, day by day; a day opens its timeline.
+ * Admins open anyone from People; with `self`, a rep sees their own ("My performance").
+ */
+export function PersonSummaryPage({ self = false }: { self?: boolean }) {
+  const me = useMe()
+  const params0 = useParams()
+  const id = self ? me.id : (params0.id ?? '')
+  const dayHref = (date?: string) => (self ? `/day${date ? `?date=${date}` : ''}` : `/people/${id}/day${date ? `?date=${date}` : ''}`)
   const [params, setParams] = useSearchParams()
   const today = todayIST()
   const kind: PeriodKind = params.get('period') === 'month' ? 'month' : 'week'
@@ -37,10 +46,10 @@ export function PersonSummaryPage() {
   const s = q.data
 
   return (
-    <Page title="Summary" back="/people" wide>
+    <Page title={self ? 'My performance' : 'Summary'} back={self ? undefined : '/people'} wide>
       <div className="flex flex-col gap-6 expanded:max-w-[900px]">
         <div className="flex flex-col gap-4">
-          {s && <h2 className="text-title-md">{s.user.name}</h2>}
+          {s && !self && <h2 className="text-title-md">{s.user.name}</h2>}
           <div className="flex flex-wrap items-center gap-3">
             <Segmented<PeriodKind>
               label="Period"
@@ -81,21 +90,22 @@ export function PersonSummaryPage() {
               <StatTile label="Leads added" value={s.totals.newLeads} />
               <StatTile label="Conversions" value={s.totals.conversions} />
             </div>
+            <SummaryChart days={s.days} today={today} kind={kind} />
             <p className="text-body-sm text-body" aria-live="polite">
               Active on {s.totals.activeDays} of {plural(s.days.filter((d) => d.date <= today).length, 'day')}
               {s.totals.statusChanges > 0 && ` · ${plural(s.totals.statusChanges, 'status change')}`}
             </p>
 
             {s.totals.followUps + s.totals.statusChanges === 0 ? (
-              <EmptyState icon="timeline" title={kind === 'week' ? 'Nothing logged this week' : 'Nothing logged this month'} body="Days with entries show up here as soon as there are some." className="rounded-xl border border-hairline" />
+              <EmptyState icon="timeline" title={kind === 'week' ? 'Nothing logged this week' : 'Nothing logged this month'} body="Days with entries show up here as soon as there are some." className="card card--default rounded-2xl" />
             ) : kind === 'week' ? (
-              <WeekRows userId={id} days={s.days} today={today} />
+              <WeekRows dayHref={dayHref} days={s.days} today={today} />
             ) : (
-              <MonthGrid userId={id} days={s.days} today={today} />
+              <MonthGrid dayHref={dayHref} days={s.days} today={today} />
             )}
 
             <Button asChild variant="secondary" className="self-start">
-              <Link to={`/people/${id}/day`}>Open today's timeline</Link>
+              <Link to={dayHref()}>Open today's timeline</Link>
             </Button>
           </>
         ) : null}
@@ -104,22 +114,49 @@ export function PersonSummaryPage() {
   )
 }
 
-function WeekRows({ userId, days, today }: { userId: string; days: DaySummary[]; today: string }) {
+type Measure = 'followUps' | 'visits' | 'newLeads' | 'conversions'
+const MEASURE_LABEL: Record<Measure, string> = { followUps: 'Follow-ups', visits: 'Visits', newLeads: 'New', conversions: 'Won' }
+const MEASURE_DESC: Record<Measure, string> = { followUps: 'Follow-ups', visits: 'Visits with photo', newLeads: 'Leads added', conversions: 'Conversions' }
+
+/** Day by day for the week or month: one measure at a time, so the chart keeps one axis. */
+function SummaryChart({ days, today, kind }: { days: DaySummary[]; today: string; kind: PeriodKind }) {
+  const [measure, setMeasure] = useState<Measure>('followUps')
+  const label = (d: string) =>
+    kind === 'week' ? WEEKDAYS[weekdayIndex(d)] : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`))
+  const shown = days.filter((d) => d.date <= today)
+  const best = shown.reduce((m, d) => Math.max(m, d[measure]), 0)
+  return (
+    <Card>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-title-md">Activity</h2>
+          <p className="mt-0.5 text-body-sm text-muted">
+            {MEASURE_DESC[measure]} per day{best > 0 && <> · best day <span className="font-semibold text-ink">{best}</span></>}
+          </p>
+        </div>
+        <Segmented<Measure> label="Measure" value={measure} onChange={setMeasure} options={(Object.keys(MEASURE_LABEL) as Measure[]).map((k) => ({ value: k, label: MEASURE_LABEL[k] }))} className="h-10 max-w-full overflow-x-auto [&>button]:px-3" />
+      </div>
+      <ColumnChart title={MEASURE_DESC[measure]} data={days.map((d) => ({ key: d.date, label: label(d.date), value: d.date <= today ? d[measure] : 0 }))} />
+    </Card>
+  )
+}
+
+function WeekRows({ dayHref, days, today }: { dayHref: (date: string) => string; days: DaySummary[]; today: string }) {
   // A week still in progress lists the days so far; days to come have nothing to show.
   const shown = days.filter((d) => d.date <= today)
   const max = Math.max(1, ...shown.map((d) => d.followUps))
   return (
-    <ul className="overflow-hidden rounded-xl border border-hairline">
+    <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
       {shown.map((d) => (
         <li key={d.date} className="border-b border-hairline-soft last:border-b-0">
-          <Link to={`/people/${userId}/day?date=${d.date}`} className="flex min-h-16 items-center gap-3 px-4 py-2 active:bg-surface-soft expanded:hover:bg-surface-soft">
+          <Link to={dayHref(d.date)} className="flex min-h-16 items-center gap-3 px-4 py-2 active:bg-surface-soft expanded:hover:bg-surface-soft">
             <span className="w-24 flex-none">
               <span className={cn('block text-title-sm', d.date === today && 'text-primary')}>{WEEKDAYS[weekdayIndex(d.date)]}</span>
               <span className="block text-caption text-muted">{new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${d.date}T00:00:00Z`))}</span>
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span aria-hidden className="h-2 overflow-hidden rounded-pill bg-surface-strong">
-                <span className="block h-full rounded-pill bg-ink" style={{ width: `${(d.followUps / max) * 100}%` }} />
+                <span className="block h-full rounded-pill bg-primary" style={{ width: `${(d.followUps / max) * 100}%` }} />
               </span>
               <span className="truncate text-caption text-body">{describeDay(d)}</span>
             </span>
@@ -132,15 +169,15 @@ function WeekRows({ userId, days, today }: { userId: string; days: DaySummary[];
 }
 
 /** Calendar grid, Monday first; a darker cell is a busier day. */
-function MonthGrid({ userId, days, today }: { userId: string; days: DaySummary[]; today: string }) {
+function MonthGrid({ dayHref, days, today }: { dayHref: (date: string) => string; days: DaySummary[]; today: string }) {
   const max = Math.max(1, ...days.map((d) => d.followUps))
   const blanks = weekdayIndex(days[0].date)
   const shade = (n: number) => {
     const r = n / max
-    return n === 0 ? 'bg-surface-strong text-body' : r <= 0.25 ? 'bg-ink/15 text-ink' : r <= 0.5 ? 'bg-ink/35 text-ink' : r <= 0.75 ? 'bg-ink/65 text-on-dark' : 'bg-ink text-on-dark'
+    return n === 0 ? 'bg-surface-strong text-body' : r <= 0.25 ? 'bg-ink/15 text-ink' : r <= 0.5 ? 'bg-ink/35 text-ink' : r <= 0.75 ? 'bg-ink/65 text-on-ink' : 'bg-ink text-on-ink'
   }
   return (
-    <div className="rounded-xl border border-hairline p-3 medium:p-4">
+    <div className="card card--default gap-0 rounded-2xl p-3 medium:p-4">
       <div className="mb-2 grid grid-cols-7 gap-1.5 text-center text-caption-strong text-muted uppercase" aria-hidden>
         {WEEKDAYS.map((w) => (
           <span key={w}>{w}</span>
@@ -157,7 +194,7 @@ function MonthGrid({ userId, days, today }: { userId: string; days: DaySummary[]
           ) : (
             <Link
               key={d.date}
-              to={`/people/${userId}/day?date=${d.date}`}
+              to={dayHref(d.date)}
               className={cn('pressable flex aspect-square flex-col items-center justify-center rounded-md', shade(d.followUps + (d.followUps === 0 ? d.statusChanges : 0)))}
             >
               <span className="sr-only">

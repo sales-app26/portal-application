@@ -4,7 +4,7 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { formatTime, relativeDay } from '@/lib/format'
+import { formatTime, REASON_LABEL, relativeDay } from '@/lib/format'
 import type { TimelineEntry } from '@/lib/types'
 
 interface Props {
@@ -27,7 +27,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
     <li
       data-entry-id={entry.id}
       onMouseEnter={onSelect}
-      className={cn('group relative flex gap-3 rounded-lg px-1 py-3 transition-colors', selected && 'bg-surface-soft')}
+      className={cn('group relative flex gap-3 rounded-xl px-1 py-3 transition-colors', selected && 'bg-accent-soft')}
     >
       <span aria-hidden className="absolute top-12 bottom-0 left-[16px] w-px bg-hairline group-last:hidden" />
       <span className="relative z-[1] flex size-8 flex-none items-center justify-center rounded-full bg-surface-strong">
@@ -50,6 +50,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusChip status={entry.status} />
           {entry.entryType === 'status_change' && <Tag>Manual change</Tag>}
+          {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
           {entry.nextFollowUpDate && (
             <span className="inline-flex items-center gap-1 text-caption text-body">
               <Icon name="calendar" size={16} /> {relativeDay(entry.nextFollowUpDate)}

@@ -7,7 +7,11 @@ import { AuthProvider } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api'
 import { registerServiceWorker } from '@/pwa'
 import { router } from '@/router'
+import { applyTheme, watchSystemTheme } from '@/lib/theme'
 import '@/styles/index.css'
+
+applyTheme()
+watchSystemTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,8 +39,12 @@ createRoot(document.getElementById('root')!).render(
           mobileOffset={{ bottom: 'calc(80px + env(safe-area-inset-bottom))', left: '16px', right: '16px' }}
           toastOptions={{
             classNames: {
-              toast: '!bg-surface-dark !text-on-dark !border-0 !rounded-lg !font-sans !text-body-sm',
-              actionButton: '!bg-transparent !text-primary-disabled !font-semibold',
+              // HeroUI overlay look: a floating surface with a soft shadow, in both themes.
+              toast: '!bg-overlay !text-overlay-foreground !border !border-border !rounded-2xl !shadow-overlay !font-sans !text-body-sm !gap-3',
+              title: '!font-medium',
+              success: '[&_[data-icon]]:!text-up',
+              error: '[&_[data-icon]]:!text-down',
+              actionButton: '!bg-accent-soft !text-accent-soft-foreground !font-semibold !rounded-pill !px-3 !h-8',
             },
           }}
         />

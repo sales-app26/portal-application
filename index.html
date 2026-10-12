@@ -4,26 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#ffffff" />
+    <script>
+      // Theme before first paint (see src/lib/theme.ts): no white flash for dark-mode users.
+      try {
+        var t = localStorage.getItem('st.theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+        document.documentElement.classList.add(t)
+        if (t === 'dark') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f1115')
+      } catch (e) {}
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Pronttera Sales" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/app-icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Pronttera Sales</title>
     <!-- Link previews (WhatsApp, SMS, Slack…). Crawlers don't run JS, so these live here, and
          the image must be an absolute URL: __APP_URL__ is filled in at build time (vite.config.ts). -->
-    <meta name="description" content="Lead tracking for Pronttera sales teams." />
+    <meta name="description" content="Leads, follow-ups and visits for the Pronttera sales team." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Pronttera Sales" />
     <meta property="og:title" content="Pronttera Sales" />
-    <meta property="og:description" content="Lead tracking for Pronttera sales teams. Open the link to continue." />
+    <meta property="og:description" content="Leads, follow-ups and visits for the Pronttera sales team. Open the link to continue." />
     <meta property="og:image" content="__APP_URL__/og-banner.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="A smiling Pronttera salesperson on a call, with the text Pronttera Sales" />
+    <meta property="og:image:alt" content="The Pronttera logo and the words Pronttera Sales, beside a salesperson smiling on a call" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="__APP_URL__/og-banner.jpg" />
   </head>

@@ -52,7 +52,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
   })
 
   const discardBar = confirmDiscard && (
-    <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-hairline bg-surface-soft px-4 py-3 expanded:px-6">
+    <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-separator bg-warning-soft px-4 py-3 expanded:px-6">
       <p className="flex-1 text-body-sm text-ink">Discard what you typed?</p>
       <Button size="sm" variant="secondary" onClick={() => setConfirmDiscard(false)}>
         Keep editing
@@ -90,7 +90,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
       <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 expanded:px-6', variant === 'choice' ? 'px-0 expanded:px-0' : 'pb-4')}>
         {children}
       </div>
-      {footer && <div className="border-t border-hairline bg-canvas px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] expanded:px-6 expanded:pb-4">{footer}</div>}
+      {footer && <div className="border-t border-separator bg-overlay px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] expanded:px-6 expanded:pb-4">{footer}</div>}
     </>
   )
 
@@ -98,15 +98,15 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
     return (
       <Drawer.Root open={open} onOpenChange={(o) => (o ? onOpenChange(true) : requestClose())} repositionInputs dismissible={dismissible && !confirmDiscard}>
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-40 bg-[rgba(10,11,13,0.4)]" />
+          <Drawer.Overlay className="fixed inset-0 z-40 bg-backdrop backdrop-blur-[2px]" />
           <Drawer.Content
             className={cn(
-              'fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-xl bg-canvas outline-none',
+              'fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[28px] bg-overlay text-overlay-foreground shadow-overlay outline-none',
               variant === 'form' ? 'h-[92dvh]' : 'max-h-[92dvh]',
               !footer && 'pb-safe',
             )}
           >
-            <div aria-hidden className="mx-auto mt-2 h-1 w-9 flex-none rounded-pill bg-hairline" />
+            <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 flex-none rounded-pill bg-border" />
             {body}
           </Drawer.Content>
         </Drawer.Portal>
@@ -117,7 +117,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
   return (
     <Dialog.Root open={open} onOpenChange={(o) => (o ? onOpenChange(true) : requestClose())}>
       <Dialog.Portal>
-        <Dialog.Overlay className="overlay-scrim fixed inset-0 z-40 bg-[rgba(10,11,13,0.4)]" />
+        <Dialog.Overlay className="overlay-scrim fixed inset-0 z-40 bg-backdrop backdrop-blur-[2px]" />
         <Dialog.Content
           onPointerDownOutside={(e) => !dismissible && e.preventDefault()}
           onEscapeKeyDown={(e) => {
@@ -128,10 +128,10 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
             }
           }}
           className={cn(
-            'fixed z-50 flex flex-col bg-canvas shadow-soft outline-none',
+            'fixed z-50 flex flex-col bg-overlay text-overlay-foreground shadow-overlay outline-none',
             variant === 'form'
-              ? 'side-panel inset-y-0 right-0 w-[480px] max-w-full border-l border-hairline'
-              : 'dialog-pop top-1/2 left-1/2 max-h-[85dvh] w-[440px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 rounded-xl pb-2',
+              ? 'side-panel inset-y-2 right-2 w-[480px] max-w-[calc(100vw-16px)] rounded-3xl'
+              : 'dialog-pop top-1/2 left-1/2 max-h-[85dvh] w-[440px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl pb-2',
           )}
         >
           {body}

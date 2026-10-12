@@ -86,7 +86,7 @@ export function VisitProofField({ value, onChange, error }: { value: VisitProof 
 
   return (
     <>
-      <div className="flex items-center gap-4 rounded-lg border border-hairline p-3">
+      <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface-secondary p-3">
         <img src={value.previewUrl} alt="Visit photo" className="size-20 flex-none rounded-md bg-surface-strong object-cover" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1 text-title-sm">
@@ -119,11 +119,11 @@ function useRemaining(deadline: number | null) {
 }
 
 /** JSON for online projects; multipart with the photo for door-to-door (api-contract §4). */
-export function entryBody(fields: Record<string, string | undefined>, proof: VisitProof | null): Record<string, string> | FormData {
-  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== '')) as Record<string, string>
+export function entryBody(fields: Record<string, string | number | undefined>, proof: VisitProof | null): Record<string, string | number> | FormData {
+  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== '')) as Record<string, string | number>
   if (!proof) return clean
   const fd = new FormData()
-  for (const [k, v] of Object.entries(clean)) fd.append(k, v)
+  for (const [k, v] of Object.entries(clean)) fd.append(k, String(v))
   fd.append('latitude', String(proof.latitude))
   fd.append('longitude', String(proof.longitude))
   fd.append('gpsAccuracyM', String(proof.gpsAccuracyM))

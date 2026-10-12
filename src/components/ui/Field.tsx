@@ -12,33 +12,37 @@ interface FieldShellProps {
   className?: string
 }
 
-/** Label above, helper or error below (UX-COMPONENTS.md §4.3). */
+/** Label above, helper or error below (UX-COMPONENTS.md §4.3), with HeroUI's label/description/error styles. */
 export function FieldShell({ label, hint, error, htmlFor, optional, children, className }: FieldShellProps) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label && (
-        <label htmlFor={htmlFor} className="text-title-sm text-ink">
+        <label htmlFor={htmlFor} className="label text-[15px] font-semibold text-ink">
           {label}
           {optional && <span className="ml-1 text-body-sm font-normal text-muted">(optional)</span>}
         </label>
       )}
       {children}
       {error ? (
-        <p id={`${htmlFor}-msg`} role="alert" className="flex items-center gap-1 text-caption text-down">
+        <p id={`${htmlFor}-msg`} role="alert" data-visible className="field-error flex items-center gap-1 text-caption font-medium text-down">
           <Icon name="error" size={16} />
           {error}
         </p>
       ) : hint ? (
-        <p id={`${htmlFor}-msg`} className="text-caption text-muted">{hint}</p>
+        <p id={`${htmlFor}-msg`} className="description text-caption text-muted">
+          {hint}
+        </p>
       ) : null}
     </div>
   )
 }
 
-const inputBox =
-  'w-full rounded-md border border-hairline bg-canvas text-body-md text-ink placeholder:text-muted-soft ' +
-  'focus-within:border-primary focus-within:shadow-[inset_0_0_0_1px_var(--color-primary)] ' +
-  'aria-[invalid=true]:border-down disabled:bg-surface-soft disabled:text-muted'
+/** HeroUI field look (rounded-field, field background, border, focus ring) on a wrapper. */
+export const inputBox =
+  'w-full rounded-field border border-field-border bg-field text-body-md text-field-foreground shadow-field placeholder:text-field-placeholder ' +
+  'transition-[border-color,box-shadow] duration-150 hover:border-field-border-hover ' +
+  'focus-within:border-primary focus-within:ring-3 focus-within:ring-focus/25 ' +
+  'aria-[invalid=true]:border-down aria-[invalid=true]:ring-down/20 disabled:opacity-60'
 
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label?: string
