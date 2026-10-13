@@ -124,6 +124,9 @@ export const router = createBrowserRouter([
                   { path: 'people', lazy: async () => ({ Component: (await import('@/pages/admin/PeoplePage')).PeoplePage }) },
                   { path: 'people/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonSummaryPage')).PersonSummaryPage }) },
                   { path: 'people/:id/day', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonTimelinePage')).PersonTimelinePage }) },
+                  { path: 'people/:id/review', lazy: async () => ({ Component: (await import('@/pages/performance/RepReviewPage')).RepReviewPage }) },
+                  // The team scorecard is People's third view; this address keeps a short link to it.
+                  { path: 'performance/team', element: <Navigate to="/people?view=scorecard" replace /> },
                   { path: 'projects', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectsPage')).ProjectsPage }) },
                   { path: 'projects/:id/import', lazy: async () => ({ Component: (await import('@/pages/admin/ImportLeadsPage')).ImportLeadsPage }) },
                   { path: 'projects/:id', lazy: async () => ({ Component: (await import('@/pages/admin/ProjectDetailPage')).ProjectDetailPage }) },
@@ -131,7 +134,10 @@ export const router = createBrowserRouter([
               },
               {
                 element: <RequireRole roles={OWNER} />,
-                children: [{ path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) }],
+                children: [
+                  { path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) },
+                  { path: 'plans-offers', lazy: async () => ({ Component: (await import('@/pages/admin/PlansOffersPage')).PlansOffersPage }) },
+                ],
               },
               { path: '*', element: <NotFound /> },
             ],

@@ -118,6 +118,18 @@ export function VisitProofField({ value, onChange, error }: { value: VisitProof 
   )
 }
 
+/** "Save within 8:41" for a taken photo: the same clock as the photo card, for the save confirmation. */
+export function ProofCountdown({ proof }: { proof: VisitProof }) {
+  const remaining = useRemaining(proof.deadline - SAFETY_MS) ?? 0
+  const mins = Math.max(Math.floor(remaining / 60_000), 0)
+  const secs = Math.max(Math.floor((remaining % 60_000) / 1000), 0)
+  return (
+    <span className={cn('tabular-nums', remaining < 120_000 ? 'text-down' : 'text-muted')}>
+      save within {mins}:{String(secs).padStart(2, '0')}
+    </span>
+  )
+}
+
 function useRemaining(deadline: number | null) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -129,8 +141,8 @@ function useRemaining(deadline: number | null) {
 }
 
 /** JSON for online projects; multipart with the photo for door-to-door (api-contract §4). */
-export function entryBody(fields: Record<string, string | number | undefined>, proof: VisitProof | null): Record<string, string | number> | FormData {
-  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== '')) as Record<string, string | number>
+export function entryBody(fields: Record<string, string | number | null | undefined>, proof: VisitProof | null): Record<string, string | number> | FormData {
+  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== null && v !== '')) as Record<string, string | number>
   if (!proof) return clean
   const fd = new FormData()
   for (const [k, v] of Object.entries(clean)) fd.append(k, String(v))

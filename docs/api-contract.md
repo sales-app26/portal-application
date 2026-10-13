@@ -215,6 +215,9 @@ Other database errors:
 - `CommentKind` (`lead_comments.kind`): `comment`, `help`, `feedback`, `handover`. `POST /leads/:id/comments` accepts only `comment` and `feedback`; `help` comes from `POST /leads/:id/help`, `handover` from transfers and reassignments.
 - `NotificationKind` (`notifications.kind`): `transfer_requested`, `transfer_decided`, `lead_assigned`, `mention`, `help_requested`, `help_resolved`, `comment`, `feedback`, `leave_cover`
 - `LeaderboardPeriod` (`GET /projects/:id/leaderboard?period=`): `week` (default), `month`
+- `PlanCode` (`leads.plan_code`, `plan_prices.plan`): `free`, `growth`, `growth_plus`, `pro` (shown as Free, Growth, Growth Plus, Pro)
+- `DiscountType` (`leads.discount_type`, `offers.discount_type`): `percent` (0–100, two decimals at most, off the whole deal), `amount` (whole rupees off the whole deal)
+- Deal tenures (`leads.deal_tenure_months`): 1, 3, 6, 12 months
 
 Related constants:
 - `TERMINAL_STATUSES` = `NOT_DUE_STATUSES` = [`not_interested`, `converted`, `lost`]
@@ -318,6 +321,14 @@ All paths below are relative to `/api/v1`.
     "convertedAt": "ISO|null",
     "dealValue": "number|null",
     "plan": "string|null",
+    "planCode": "<PlanCode>|null",
+    "dealTenureMonths": "1|3|6|12|null",
+    "discountType": "percent|amount|null",
+    "discountValue": "number|null",
+    "couponCode": "string|null",
+    "offer": "{id,name}|null",
+    "dealTotal": "number|null",
+    "effectiveMonthlyValue": "number|null",
     "source": "<LeadSource>|null",
     "lastActivityAt": "ISO",
     "createdBy": "{id,name}|null",
@@ -327,7 +338,7 @@ All paths below are relative to `/api/v1`.
   ```
   - `overdueDays` is set when `nextFollowUpDate` is before today and the status is not terminal; otherwise null.
   - `ownerTag` is always null for non-admins.
-  - `dealValue` is whole rupees per month (0–100000000). `plan` is the plan sold or offered (1–80 chars). Both are set on create, on an entry that converts the lead, or by `PATCH /leads/:id`. Leaving Converted keeps them, but revenue only counts converted leads.
+  - The deal (see §3b): `dealValue` is the **list price per month** in whole rupees (0–100000000), before any discount. `planCode` is the plan sold or offered. `plan` is the **old free-text plan**, kept for history: never written any more, shown when `planCode` is null, and cleared when a new deal is saved. `dealTenureMonths` null reads as 1. `discountType`/`discountValue`/`couponCode` are the discount (copied from the offer when `offer` is set). `dealTotal` = price × tenure − discount (what the client pays for the whole tenure); `effectiveMonthlyValue` = `dealTotal` ÷ tenure, two decimals — what the deal adds to revenue. Both null without a price. The deal is set on create, on an entry that wins the lead, or by `PATCH /leads/:id`. Leaving Converted keeps it, but revenue only counts converted leads.
   - `lastActivityAt` is the time of the latest live entry, or `createdAt` if there is none (imported leads). Every follow-up and status change moves it; it falls back when the Super Admin deletes the latest entry. Editing the lead or an entry, and transfers, do not move it.
   - `createdBy` is who added the lead (the person who logged its first entry) or the admin who imported it. It does not change on transfer. Null only for leads imported before it was recorded.
 - **LeadDetailDto** is `LeadSummaryDto` plus:
@@ -481,10 +492,10 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `coveringFor?` (uuid v4; the owner the caller is covering for today — that owner's leads, any other value is 403 "You are not covering for this person in this project today."; overrides `mine`/`ownerId`, every other filter still applies), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `due?` (LeadDue, see below), `cold?` ("true"/"false"), `source?` (LeadSource), `sort?` (`updated`, `created`, `name`, `next_follow_up`, `value` or `activity`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. Filters combine with AND. | Paginated `LeadSummaryDto` |
 | GET | `/leads/:id` | any (admin of the project, owner and active member, or the backup covering for the owner today; else 404) | | `LeadDetailDto` |
 | GET | `/leads/:id/entries` | same | Query: pagination | Paginated `EntryDto`, newest first |
-| PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace); `dealValue?` (integer 0–100000000, or null to clear); `plan?` (string or null, trimmed, max 80, "" becomes null); `source?` (LeadSource, or null to clear) | `LeadDetailDto` |
+| PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace); the deal fields (§3b), each also nullable — **sending any of them replaces the whole deal** (fields left out are cleared; all null clears it); `source?` (LeadSource, or null to clear). `plan` is no longer accepted (400 "isn't used here"). | `LeadDetailDto` |
 | DELETE | `/leads/:id` | **SA** | | `null`, "Deleted successfully." This is a soft delete. |
 | POST | `/leads/:id/follow-ups` | **SP, MOD** (owner, or the backup covering for him) | JSON or multipart. **LogFollowUpDto**, see below. | `EntrySaveResultDto`. **201**, "Follow-up saved." |
-| POST | `/leads/:id/status` | any (owner, an admin of the project, or the backup covering for the owner) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); `dealValue?`, `plan?` (only with `converted`; same validation as on create) | `EntrySaveResultDto`. **200**, "Status changed." |
+| POST | `/leads/:id/status` | any (owner, an admin of the project, or the backup covering for the owner) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); the deal fields (§3b; only with `converted`) | `EntrySaveResultDto`. **200**, "Stage updated." |
 
 **CreateLeadDto fields.** It extends `LogFollowUpDto`, so it includes every follow-up field.
 
@@ -494,8 +505,7 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | `businessName` | string\|null | no | "" becomes null, max 160 |
 | `phone` | string | yes | non-empty, max 20. Server: Indian mobile, else 400 VALIDATION_FAILED "Enter a 10-digit Indian mobile number." |
 | `notes` | string\|null | no | max 2000. About the client, separate from the note. |
-| `dealValue` | integer | no | 0–100000000, rupees per month. Numeric strings accepted (multipart); "" is ignored. Allowed with any status on create. |
-| `plan` | string\|null | no | trimmed, max 80; "" becomes null |
+| deal fields | | no | `dealValue`, `planCode`, `dealTenureMonths`, `offerId`, `discountType`, `discountValue`, `couponCode` — see §3b. Allowed with any status on create (the expected deal). Numeric strings accepted (multipart); "" is ignored. |
 | `source` | LeadSource | no | "" is ignored. Not sent → null. |
 | `reason` | LostReason | no | only with `not_interested` or `lost`, else 400 (see below); "" is ignored |
 | `clientRequestId` | uuid v4 | yes | idempotency key |
@@ -518,7 +528,7 @@ Other create errors:
 - Not a member: 404.
 - Closed project: 409 PROJECT_CLOSED "This project is closed."
 
-**LogFollowUpDto fields:** `clientRequestId`, `status`, `note`, `nextFollowUpDate?`, `location` (required; pre-fill it with the lead's location), `reason?`, `dealValue?`, `plan?`, plus `latitude?`, `longitude?`, `gpsAccuracyM?`, `captureToken?` and the `photo` file. Constraints are the same as in the table above, except that `dealValue` and `plan` are allowed only when `status` is `converted`.
+**LogFollowUpDto fields:** `clientRequestId`, `status`, `note`, `nextFollowUpDate?`, `location` (required; pre-fill it with the lead's location), `reason?`, the deal fields (§3b), plus `latitude?`, `longitude?`, `gpsAccuracyM?`, `captureToken?` and the `photo` file. Constraints are the same as in the table above, except that the deal fields are allowed only when `status` is `converted`.
 
 **List filters (`GET /projects/:id/leads`).** "Today" is the IST date.
 - `due=overdue`: `nextFollowUpDate` before today.
@@ -544,7 +554,7 @@ Follow-up and status rules (`lead-rules.ts`):
   - `new` gives 422.
   - Leaving `converted` as a non-admin gives 403 "Ask your moderator to change this."
 - Reason (create, follow-up, status change): optional. Allowed only when `status` is `not_interested` or `lost`; otherwise 400 VALIDATION_FAILED "A reason can be given only for Not interested or Lost." An unknown value is a 400 from the validator.
-- Deal value and plan on a follow-up or status change: allowed only when `status` is `converted` (a new conversion, or a follow-up on a lead that stays converted); otherwise 400 VALIDATION_FAILED "Deal value and plan can be sent only when the lead is Converted." Values sent overwrite the lead's; values not sent (or blank) leave the lead's as they are.
+- The deal on a follow-up or status change: allowed only when `status` is `converted` (a new conversion, or a follow-up on a lead that stays converted); otherwise 400 VALIDATION_FAILED "Deal details can be added only when the lead is Won." When any deal field is sent with a value, the whole deal is replaced (fields left out are cleared); when none is (or all are blank), the lead's deal is left as it is.
 - Every follow-up and status change sets the lead's `lastActivityAt` to the entry's `createdAt`.
 - A follow-up by an admin who is not the owner gives 403 "Only the lead's owner can log a follow-up."
 - If the lead was transferred away from the caller (an approved transfer from them), the error is 409 `LEAD_TRANSFERRED`, "This lead now belongs to {name}." Otherwise 404.
@@ -556,7 +566,7 @@ Follow-up and status rules (`lead-rules.ts`):
 | GET | `/entries/:id` | any (author, owner who is an active member, admin of the project, or the backup covering for the owner today; else 404) | | `EntryDto` |
 | GET | `/entries/:id/photo` | same | | `{ url: string, expiresInSeconds: number }` (default 600). No photo: 404 "This entry has no photo." Storage failure: 502 INTEGRATION_ERROR. |
 | PATCH | `/entries/:id` | any (author only) | `note?` (trimmed, 5–2000); `nextFollowUpDate?` (YYYY-MM-DD, or null/"" to clear; follow-ups only). At least one field is required, else 400 "Send a note or a next follow-up date to change." | `EntrySaveResultDto`, "Updated successfully." |
-| DELETE | `/entries/:id` | **SA** | | `null`. The lead's status, next date, conversion and `lastActivityAt` are rebuilt from the remaining entries (`lastActivityAt` falls back to the lead's `createdAt` if none remain). Deal value and plan are kept. |
+| DELETE | `/entries/:id` | **SA** | | `null`. The lead's status, next date, conversion and `lastActivityAt` are rebuilt from the remaining entries (`lastActivityAt` falls back to the lead's `createdAt` if none remain). The deal is kept. |
 
 Entry edit errors:
 - An admin who is not the author: 403 "Only the person who logged this entry can edit it."
@@ -631,7 +641,7 @@ Transfer notifications (never to the person who acted):
   - `dueToday` counts due plus overdue.
   - `followUpsToday` counts `follow_up` entries the caller logged today in IST.
   - `conversionsThisMonth` counts leads whose `convertedBy` is the caller and whose `convertedAt` falls in the current IST calendar month, across the caller's projects (or `projectId`).
-  - `revenueThisMonth` is the sum of `dealValue` (₹/month) over those leads; a lead without a deal value adds 0. A number, not a string.
+  - `revenueThisMonth` is the sum of `effectiveMonthlyValue` (₹/month after discount, §3b) over those leads, rounded to paise; a lead without a price adds 0. A number, not a string.
   - `notice` is "You are not assigned to any project yet." when the caller has no projects.
 
 **GET `/me/agenda`** (roles SP, MOD; a Super Admin gets 403)
@@ -736,7 +746,7 @@ Transfer notifications (never to the person who acted):
   - `targets` are for the current week or month, not the date range.
   - `newLeads` counts leads whose `createdAt` is in the range, credited to `createdBy` (the person who added the lead, or the admin who imported it), so imported leads count. With `userId`, only leads that person created. `people[].newLeads` uses the same rule, so an admin who imported leads appears in `people` with them. Leads imported before `createdBy` was recorded count in the total only. `/timeline/summary` counts `newLeads` the same way.
   - `followUps` counts entries in the range.
-  - `conversions` counts leads whose `convertedAt` is in the range; `revenue` is the sum of their `dealValue` (₹/month, a lead without one adds 0). With `userId`, conversions credited to that person (`convertedBy`). `people[].conversions` / `people[].revenue` are the same per person.
+  - `conversions` counts leads whose `convertedAt` is in the range; `revenue` is the sum of their `effectiveMonthlyValue` (₹/month after discount, §3b; a lead without a price adds 0), rounded to paise. With `userId`, conversions credited to that person (`convertedBy`). `people[].conversions` / `people[].revenue` are the same per person.
   - `funnel` covers leads **created** in the range, by current status: `created` = all of them; `contacted` = any status but `new`; `interested` = `interested`, `follow_up_scheduled` or `converted`; `converted` = `converted`. Always four items in that order. With `userId` it follows the lead's current **owner** (whose pipeline it is), unlike `newLeads`.
   - `trend` has one point per IST day in the range, zeros included, and `trendBucket` is `day`. When the range is longer than 92 days the points are Monday–Sunday weeks instead (`trendBucket` is `week`, at most 53 points); each point's `date` is the week's Monday, except the first, which is `from` when the range starts mid-week. `followUps` counts `follow_up` entries (filtered by who logged them), `newLeads` as above, `conversions` and `revenue` as above.
   - `lostReasons` counts `not_interested` and `lost` entries logged in the range by `reason` (null → `"unspecified"`), filtered by who logged them; only non-zero reasons, most common first.
@@ -769,6 +779,64 @@ Transfer notifications (never to the person who acted):
 - `periodEnd` is exclusive.
 
 ---
+
+### Team scorecard and rep review (`modules/reports/performance.controller.ts`)
+
+| Method | Path | Roles |
+|---|---|---|
+| GET | `/reports/scorecard` | SA, MOD |
+| GET | `/reports/people/:id/review` | SA, MOD |
+| GET | `/exports/scorecard` (CSV, §5) | SA, MOD |
+
+Sales reps get 403. **Query (`ScorecardQueryDto`)**: `from`, `to` (YYYY-MM-DD, IST, **required**, inclusive, at most 366 days, else 400 "A scorecard or review can cover at most 366 days."; `from > to` gives 400) and `projectId?` (one campaign; a campaign the caller cannot see gives 404).
+
+**Scope.** The sales head sees every campaign; a sales manager only the campaigns he is an active member of. Rows are **sales reps** with a membership in scope: everyone on a campaign team now, plus anyone who has since left but did something in the dates. A review's person must be visible to the caller (the sales head: anyone but himself; a sales manager: someone who is, or was, on one of his campaigns), else 404 "We couldn’t find this person on your team."; its numbers cover only the caller's campaigns.
+
+**ScorecardNumbers** (on every row, `totals`, `averages`, `numbers`, `teamAverage`):
+- `leadsAdded`: leads whose `createdAt` is in the dates, credited to `createdBy` (as the dashboard's `newLeads`).
+- `followUps`: `follow_up` entries in the dates; `visits`: those with a photo.
+- `activeDays`: **working days** with at least one entry of any kind (follow-up, visit or stage change). `workingDays` = days of the period up to today minus `leaveDays`. An entry on a leave day counts as a follow-up but not as an active day, so `activeDays ≤ workingDays`.
+- `leaveDays`: days on leave (not cancelled, overlaps counted once) between `from` and the earlier of `to` and today.
+- `dealsWon`: leads with `convertedAt` in the dates credited to `convertedBy`; `wonRevenue`: their monthly revenue (₹/month), summed exactly as the dashboard's `revenue`.
+- `lostLeads`: leads the rep marked `not_interested` or `lost` in the dates, each lead once, leaving out leads that are `converted` now.
+- `conversionPercent` = `dealsWon ÷ (dealsWon + lostLeads)`, whole %; null when both are 0.
+- `avgDaysToWin`: average days from `createdAt` to `convertedAt` over the deals won, one decimal; null without wins.
+- `target`: each campaign target (active member, active campaign) scaled to the dates — monthly: once per calendar month, by share of days for part of one; weekly: per 7 days; rounded, at least 1 — summed; null without a target. `achieved`: deals won in the campaigns with a target (all deals won when there is none). `targetPercent` = achieved ÷ target, null without a target.
+- `overdueNow`, `openNow`: open (not Not interested, Won or Lost) leads the rep owns **now** in active campaigns in scope; overdue = next follow-up date before today.
+- `handoversAsked`: transfers the rep asked for (`requestedBy`) in the dates, whatever the answer; `handoversReceived`: approved transfers to the rep decided in the dates.
+
+**`GET /reports/scorecard`** `data`:
+```json
+{
+  "from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "daysSoFar": 13,
+  "rows": [ { "user": { "id": "...", "name": "..." }, "isActive": true, "campaigns": ["North"],
+              "topLostReason": "<LostReason>|unspecified|null", "...ScorecardNumbers": 0 } ],
+  "totals": { "...ScorecardNumbers": 0 },
+  "averages": "{...ScorecardNumbers}|null"
+}
+```
+- `rows` are ordered by name. `totals` add the counts; `conversionPercent` and `targetPercent` are worked out from those sums, `avgDaysToWin` is weighted by wins. `averages` is the average rep: counts ÷ number of rows (one decimal), percentages and days to win averaged over the reps that have one; null with no rows.
+
+**`GET /reports/people/:id/review`** `data`:
+```json
+{
+  "from": "...", "to": "...",
+  "person": { "id": "...", "name": "...", "role": "sales_person|moderator", "isActive": true, "campaigns": ["..."] },
+  "numbers": "{ScorecardRow}", "teamAverage": "{ScorecardNumbers}|null", "teamSize": 3,
+  "trendBucket": "day|week",
+  "trend": [ { "date": "YYYY-MM-DD", "followUps": 0, "visits": 0, "newLeads": 0, "wins": 0 } ],
+  "funnel": [ { "stage": "created|contacted|interested|converted", "count": 0 } ],
+  "lostReasons": [ { "reason": "<LostReason>|unspecified", "count": 0 } ],
+  "sources": [ { "source": "<LeadSource>|unspecified", "count": 0 } ],
+  "planMix": [ { "plan": "growth|unspecified|<as typed>", "count": 0, "revenue": 0 } ],
+  "recentWins": [ { "leadId": "...", "leadName": "...", "businessName": "string|null", "projectName": "...", "plan": "string|null", "dealValue": "number|null", "wonAt": "ISO" } ],
+  "weekdays": [ { "weekday": 0, "followUps": 0, "visits": 0 } ],
+  "feedback": { "count": 0, "recent": [ { "id": "...", "body": "...", "author": { "id": "...", "name": "..." }, "leadId": "...", "leadName": "...", "entryId": "uuid|null", "createdAt": "ISO" } ] }
+}
+```
+- `teamAverage` is the scorecard's `averages` for the caller's scope and the same dates; `teamSize` is its number of reps.
+- `trend`: every IST day for ranges up to 31 days, else Monday–Sunday weeks (first point labelled `from`), zeros included.
+- `funnel` and `sources`: leads created in the dates that the person owns **or** added. `lostReasons`: the `lostLeads`, by their latest reason. `planMix`: deals won by the lead's `plan` column (empty → `unspecified`), most first. `recentWins`: the 10 latest deals won in the dates. `weekdays`: Monday (0) to Sunday (6), follow-ups and visits. `feedback`: managers' `feedback` comments in the dates on this person's own entries; `recent` is the latest 5.
 
 ## 3a. Team collaboration (`06_team_collaboration.sql`)
 
@@ -976,6 +1044,54 @@ Writes in a closed project: 409 `PROJECT_CLOSED`.
 
 ---
 
+## 3b. Deals, plan prices and offers (`08_deal_terms.sql`)
+
+**Deal fields** (create, follow-up and status change with `converted`, `PATCH /leads/:id`). All optional; JSON or multipart.
+
+| field | type | validation |
+|---|---|---|
+| `dealValue` | integer | 0–100000000. The **list price per month**, before any discount. 0 for Free. |
+| `planCode` | PlanCode | `free`, `growth`, `growth_plus`, `pro` |
+| `dealTenureMonths` | integer | 1, 3, 6 or 12. Not sent: 1. Not with Free. |
+| `offerId` | uuid v4 | an offer live today (`GET /offers?active=true`). Its discount and coupon are **copied onto the lead**; editing or ending the offer later never changes this deal. Don't send `discountType`/`discountValue`/`couponCode` with it. |
+| `discountType` | DiscountType | a discount typed by hand ("Other discount"): `percent` or `amount` |
+| `discountValue` | number | with `discountType`. Percent 0–100 (two decimals at most); amount whole rupees, at most price × tenure. |
+| `couponCode` | string | with a typed discount only. Letters, digits, `-` and `_`, max 40; trimmed and stored in capitals. |
+
+Rules (400 VALIDATION_FAILED unless noted):
+- Free: no price (0), tenure, offer or discount — "The Free plan has no price, tenure or discount."
+- An offer and a typed discount together — "Pick an offer or type a discount, not both."; a coupon with an offer — "This offer fills in its own coupon."
+- Half a discount — "Choose % off or ₹ off, and how much."; a discount without a price — "Enter the monthly price before adding a discount."; a coupon without a discount — "A coupon goes with a discount. Add the discount too."
+- Percent over 100 — "A % discount must be between 0 and 100."; ₹ off more than price × tenure — "The ₹ discount can't be more than the deal total."
+- An offer that is ended, removed, not started or past its dates — **422** UNPROCESSABLE "This offer has ended. Pick another offer or type the discount." The offer **already on the lead** is accepted (its copied discount is kept), so re-saving a won deal after its offer ended works.
+
+**The money** (`leads/deal-rules.ts`, and in SQL `reports/revenue-rules.ts`):
+- Deal total = price × tenure − discount. A percent comes off the whole deal and the client's total is **rounded down to a rupee** (10% off ₹2,499 × 6 = ₹14,994 → ₹13,494).
+- Effective monthly value = deal total ÷ tenure (₹2,249). **Every revenue figure** — home `revenueThisMonth`, dashboard `revenue`, `people[].revenue`, `trend[].revenue`, exports — sums this.
+- Deals saved before this (no tenure, no discount) count exactly as before: their monthly price.
+
+**Plan prices**
+
+| Method | Path | Roles | Body | data |
+|---|---|---|---|---|
+| GET | `/settings/plan-prices` | any signed in | | `[{ plan, monthlyPrice \| null }]` — always the four plans in order free, growth, growth_plus, pro. `null`: not set yet. Free is always 0. |
+| PUT | `/settings/plan-prices` | **SA** (else 403) | `{ prices: [{ plan: PlanCode, monthlyPrice: integer 0–100000000 \| null }] }`, 1–4 items; plans left out keep their price. Free accepts only 0 or null ("The Free plan is always ₹0."); a plan twice is 400 "Each plan can be priced once." | same list, "Plan prices saved." |
+
+The Won picker prefills `dealValue` from the plan's price; deals already saved keep their price.
+
+**Offers** (company-wide). **OfferDto:** `{ "id": "uuid", "name": "string", "couponCode": "string|null", "discountType": "percent|amount", "discountValue": 10, "startsOn": "YYYY-MM-DD|null", "endsOn": "YYYY-MM-DD|null", "active": true }`. `active` is the sales head's switch (false = ended). Reps can pick an offer only while it is **live**: active, not removed, and today (IST) within `startsOn`–`endsOn` (inclusive; null = no limit).
+
+| Method | Path | Roles | Body | data |
+|---|---|---|---|---|
+| GET | `/offers` | any signed in | Query `active?` ("true"/"false") | `OfferDto[]`. SP and MOD always get only live offers. SA gets every offer not removed, newest first; with `active=true`, only live ones. |
+| POST | `/offers` | **SA** | `name` (trimmed, 1–60); `couponCode?` (string or null; trimmed, capitals, letters/digits/`-`/`_`, max 40; "" becomes null); `discountType`; `discountValue` (percent: more than 0, at most 100, two decimals; amount: whole rupees more than 0); `startsOn?`, `endsOn?` (YYYY-MM-DD or null; "" becomes null; `endsOn` ≥ `startsOn`); `active?` (default true) | `OfferDto`. **201**, "Offer saved." |
+| PATCH | `/offers/:id` | **SA** | any of the above. `active: false` **ends** it; `true` brings it back. Nothing sent: 400 "Change something, then save." | `OfferDto`, "Offer saved." |
+| DELETE | `/offers/:id` | **SA** | | `null`, "Offer removed." Hidden from every list (404 afterwards); deals won on it keep its name and discount. |
+
+Errors: unknown or removed offer 404 "We couldn't find this offer."; percent out of range 400 "A % off must be more than 0 and at most 100."; amount 400 "A ₹ off must be whole rupees, more than 0."; dates 400 "The last day must be on or after the first day."
+
+---
+
 ## 4. Door-to-door visit flow
 
 **Step 1: get a capture token.** Call `POST /api/v1/visits/capture-token` (SP or MOD, no body) when the camera opens, and **again on every retake**.
@@ -991,7 +1107,7 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - `latitude`, `longitude`, `gpsAccuracyM`: text parts with numeric strings, converted on the server.
 - `captureToken`: text part.
 - `clientRequestId`, `status`, `note`, `nextFollowUpDate` (optional; an empty string means not sent), `location`: text parts.
-- Optional text parts: `reason`, `dealValue` (a numeric string), `plan`. An empty string means not sent (for `plan`, null).
+- Optional text parts: `reason` and the deal fields (`dealValue`, `dealTenureMonths`, `discountValue` as numeric strings; `planCode`, `offerId`, `discountType`, `couponCode`). An empty string means not sent.
 - For create only: `name`, `businessName`, `phone`, `notes`, `source`.
 - Do not send any other parts; `forbidNonWhitelisted` rejects them with 400.
 
@@ -1039,6 +1155,7 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 |---|---|---|
 | GET | `/exports/leads` | SA, MOD |
 | GET | `/exports/follow-ups` | SA, MOD |
+| GET | `/exports/scorecard` | SA, MOD |
 
 **Query (`ExportFilterDto`):**
 - `from`: YYYY-MM-DD, **required**.
@@ -1056,7 +1173,9 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - The CSV is UTF-8 with a BOM, CRLF line endings, and RFC 4180 quoting. Cells starting with `= + - @ tab CR` get a leading `'` (numbers are left alone).
 - Date-times are formatted `YYYY-MM-DD HH:mm` in IST.
 
-**Leads columns:** Lead ID, Project, Name, Business name, Phone, Location, Status, Next follow-up, Owner, Owner active (yes/no), Converted at (IST), Converted by, Deal value (₹/month), Plan, Source (LeadSource value or blank), Added at (IST), Updated at (IST), Last activity (IST), Notes. Rows are leads whose `created_at` falls in the range.
+**Leads columns:** Lead reference, Campaign, Contact person, Business name, Phone, Location, Stage, Next follow-up, Lead owner, Owner still on team, Won on (IST), Won by, **Plan** (Free/Growth/Growth Plus/Pro, or the old free text), **Tenure (months)** (blank for Free or no price; 1 when not recorded), **Monthly price (₹)**, **Discount** ("10% off", "₹500 off", with the offer's name in brackets when one was picked), **Coupon**, **Deal total (₹)**, **Monthly revenue after discount (₹)**, Lead source, Added on (IST), Last changed (IST), Last activity (IST), Notes. Rows are leads whose `created_at` falls in the range.
+
+**Scorecard** (`/exports/scorecard?from&to&projectId?`, same 92-day limit; numbers as in §3 "Team scorecard"): `filename="scorecard_<from>_<to>.csv"`. Columns: Sales rep, Campaign(s), Leads added, Follow-ups, Visits, Active days, Days on leave, Deals won, Revenue won (₹/month), Conversion %, Avg days to win, Target, Achieved, Target %, Overdue now, Open leads now, Lost leads, Top lost reason, Handovers asked, Handovers received, Working days, Still on team. One line per sales rep, then "Team total" and "Team average". Blank cells where a number does not apply (no target, nothing closed).
 
 **Follow-ups columns:** Entry ID, Logged at (IST), Project, Lead, Business name, Phone, Logged by, Type (`follow_up`/`status_change`), Status, Reason (LostReason value or blank), Note, Next follow-up, Typed location, Latitude, Longitude, GPS accuracy (m), Low accuracy (yes/no/blank), Photo (login required), Edited (yes/no).
 - The photo cell is `${APP_URL}/entries/<entryId>`, or `entries/<entryId>` if `APP_URL` is not set.
@@ -1197,7 +1316,7 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - CLIENT_REQUEST_REUSED: "This request id was already used for a different entry."
 - NOTHING_TO_UPDATE: "Send a note or a next follow-up date to change."
 - REASON_NOT_ALLOWED: "A reason can be given only for Not interested or Lost."
-- DEAL_ONLY_WHEN_CONVERTED: "Deal value and plan can be sent only when the lead is Converted."
+- DEAL_ONLY_WHEN_CONVERTED: "Deal details can be added only when the lead is Won."
 
 **VISIT_ERROR**
 - PHOTO_REQUIRED: "Take a photo of the visit to save it."
@@ -1269,6 +1388,9 @@ The messages use the typographic apostrophe `’` in "lead’s".
 | NOTIFICATIONS_READ | "Marked as read." |
 | LEAD_REQUESTED | "Request sent. The lead moves to you once an admin approves it." |
 | TEMPLATE_SAVED | "Template saved." |
+| PLAN_PRICES_SAVED | "Plan prices saved." |
+| OFFER_SAVED | "Offer saved." |
+| OFFER_REMOVED | "Offer removed." |
 | NOTHING_LOGGED | "Nothing logged on this day." |
 | NO_DATA | "No data for these dates." |
 | NO_PROJECTS | "You are not assigned to any project yet." |

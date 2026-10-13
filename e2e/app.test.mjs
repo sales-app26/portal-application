@@ -4,6 +4,12 @@ import { after, before, describe, test } from 'node:test'
 import { tap, click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
+/** Save follow-up asks for a last look first; the confirmation's own button saves. */
+async function confirmSave(page) {
+  await waitForText(page, 'Save this follow-up?')
+  await click(page, 'Save follow-up')
+}
+
 let app
 before(async () => (app = await startApp()))
 after(async () => app?.close())
@@ -61,6 +67,7 @@ describe('field work', () => {
     await click(page, 'Interested', '[role=radio]') // status chips: one tap
     await fill(page, 'Note', 'Called back, wants a demo next week.')
     await click(page, 'Save follow-up')
+    await confirmSave(page)
     await waitForText(page, 'Follow-up saved.')
     const w = api.writes.find((x) => x.path.endsWith('/follow-ups'))
     assert.ok(w, 'follow-up was posted')
@@ -84,13 +91,14 @@ describe('field work', () => {
     await fill(page, 'Note', 'ok')
     await click(page, 'Save follow-up')
     await waitForText(page, 'Write at least 5 characters.')
+    assert.ok(!(await page.evaluate(() => document.body.innerText.includes('Save this follow-up?'))), 'no confirmation for a form with mistakes')
     assert.equal(api.writes.filter((x) => x.path.endsWith('/follow-ups')).length, 0)
     await page.close()
   })
 })
 
 describe('deals, reasons and the agenda', () => {
-  test('converting asks for the deal and sends the monthly value as a number', async () => {
+  test('converting asks for the deal: the expected plan and price carry over, the price is sent as a number', async () => {
     const { page, go, api, errors } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
@@ -99,13 +107,16 @@ describe('deals, reasons and the agenda', () => {
     const value = await page.$('input[inputmode=numeric]')
     await value.evaluate((el) => (el.scrollIntoView({ block: 'center' }), el.focus(), el.select()))
     await page.keyboard.type('3,999') // replaces the prefilled expected value
+    await waitForText(page, 'Client pays ₹3,999 for 1 month')
     await fill(page, 'Note', 'Signed up today, wants onboarding.')
     await click(page, 'Save follow-up')
+    await confirmSave(page)
     await waitForText(page, 'Won!')
     const body = JSON.parse(api.writes.find((x) => x.path.endsWith('/follow-ups')).body)
     assert.equal(body.status, 'converted')
     assert.equal(body.dealValue, 3999)
-    assert.equal(body.plan, 'Growth', 'the expected plan carries over')
+    assert.equal(body.planCode, 'growth', 'the expected plan carries over')
+    assert.equal(body.plan, undefined, 'no free-text plan any more')
     assert.deepEqual(errors, [])
     await page.close()
   })
@@ -118,10 +129,12 @@ describe('deals, reasons and the agenda', () => {
     await click(page, 'Price too high', '[role=radio]')
     await fill(page, 'Note', 'Went with a cheaper option.')
     await click(page, 'Save follow-up')
+    await confirmSave(page)
     await waitForText(page, 'Follow-up saved.')
     const body = JSON.parse(api.writes.find((x) => x.path.endsWith('/follow-ups')).body)
     assert.equal(body.reason, 'price')
     assert.equal(body.dealValue, undefined)
+    assert.equal(body.planCode, undefined)
     await page.close()
   })
 
@@ -154,6 +167,8 @@ describe('visit proof (door-to-door)', () => {
     assert.ok(!(await page.evaluate(() => document.body.innerText.includes('Discard what you typed?'))), 'the sheet stayed quiet')
     await fill(page, 'Note', 'Met the owner at the counter, wants pricing.')
     await tap(page, 'button', 'Save follow-up')
+    await waitForText(page, 'Visit photo attached')
+    await tap(page, 'button', 'Save follow-up') // the confirmation's button, a real finger again
     await waitForText(page, 'Follow-up saved.')
     const w = api.writes.find((x) => x.path === `/leads/${ids.d2dLead}/follow-ups`)
     assert.ok(w, 'follow-up was posted')

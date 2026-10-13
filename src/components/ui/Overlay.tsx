@@ -176,10 +176,12 @@ interface ConfirmProps {
   loading?: boolean
   /** Red confirm button, for what can't be undone (deleting). */
   danger?: boolean
+  /** The way back, when "Cancel" would sound like losing what was typed ("Go back"). */
+  cancelLabel?: string
 }
 
 /** Action sheet on phones, dialog on laptops. Never window.confirm (UX-COMPONENTS.md §4.2). */
-export function Confirm({ open, onOpenChange, title, body, confirmLabel, onConfirm, loading, danger }: ConfirmProps) {
+export function Confirm({ open, onOpenChange, title, body, confirmLabel, onConfirm, loading, danger, cancelLabel = 'Cancel' }: ConfirmProps) {
   const sheet = useIsSheetLayout()
   return (
     <ResponsiveOverlay open={open} onOpenChange={onOpenChange} title={title} variant="confirm">
@@ -189,7 +191,7 @@ export function Confirm({ open, onOpenChange, title, body, confirmLabel, onConfi
           {confirmLabel}
         </Button>
         <Button block={sheet} variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
-          Cancel
+          {cancelLabel}
         </Button>
       </div>
     </ResponsiveOverlay>

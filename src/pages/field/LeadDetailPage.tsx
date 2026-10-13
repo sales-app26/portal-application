@@ -26,6 +26,7 @@ import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import { ago, formatDateTime, formatPhone, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { dealOf } from '@/lib/deal'
 import { ChatIcon } from '@/features/leads/ContactActions'
 import { LeadComments, PinnedNote } from '@/features/team/LeadComments'
 import { telHref } from '@/lib/contact'
@@ -150,6 +151,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
   const [deletingEntry, setDeletingEntry] = useState(false)
   const mine = lead.owner.id === me.id
+  const deal = dealOf(lead)
   const [showOlder, setShowOlder] = useState(false)
   const [chat, setChat] = useState(false)
   const older = useLeadEntries(lead.id, showOlder)
@@ -238,11 +240,13 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       )}
 
       <ListGroup>
-        {(lead.dealValue || lead.plan) && (
+        {deal.hasDeal && (
           <ListRow
             icon="goal"
-            title={[lead.dealValue ? `${rupees(lead.dealValue)} a month` : null, lead.plan].filter(Boolean).join(' · ')}
-            subtitle={lead.status === 'converted' ? 'Deal won' : 'Expected deal'}
+            title={[deal.plan, deal.price, deal.tenure ? `for ${deal.tenure}` : null].filter(Boolean).join(' · ')}
+            subtitle={[lead.status === 'converted' ? 'Deal won' : 'Expected deal', deal.offer, lead.dealTotal !== null && lead.planCode !== 'free' && (lead.dealTenureMonths ?? 1) > 1 ? `${rupees(lead.dealTotal)} in all` : null]
+              .filter(Boolean)
+              .join(' · ')}
           />
         )}
         <ListRow icon="marker" title={lead.location.name} subtitle="Location" />

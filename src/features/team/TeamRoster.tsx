@@ -114,6 +114,7 @@ export function TeamRoster({ projects }: { projects: { id: string; name: string 
                       items={[
                         { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${r.user.id}`) },
                         { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${r.user.id}/day`) },
+                        { label: 'Performance review', icon: 'goal', onSelect: () => navigate(`/people/${r.user.id}/review`) },
                         { label: r.onLeave || r.nextLeave ? 'Add more leave' : 'Set leave', icon: 'leave', onSelect: () => setLeaveFor(r), hidden: r.role !== 'sales_person' },
                       ]}
                     />

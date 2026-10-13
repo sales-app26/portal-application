@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import { Controller, useWatch, type Control, type FieldErrors, type FieldValues, type Path, type UseFormRegister } from 'react-hook-form'
 import { StatusChoice } from '@/components/ui/Choice'
 import { DatePicker } from '@/components/ui/DatePicker'
-import { TextAreaField, TextField } from '@/components/ui/Field'
+import { TextAreaField } from '@/components/ui/Field'
 import { cn } from '@/lib/cn'
 import { addDays, todayIST } from '@/lib/format'
 import { REASON_LABEL, REASONS } from '@/lib/format'
-import type { LeadStatus, LostReason } from '@/lib/types'
+import type { LeadStatus, LeadSummary, LostReason } from '@/lib/types'
+import { DealFields } from './DealFields'
 import { REASON_STATUSES, type FollowUpValues } from './entrySchema'
 import { LocationField } from './LocationField'
 import { NEXT_DATE_MAX, NEXT_DATE_MIN, NOTE_MIN, nextDateRule } from './rules'
@@ -22,6 +23,8 @@ interface Props<T extends FieldValues> {
   showLocation?: boolean
   /** Add lead: the deal fields show for every status, as the expected value. */
   dealAlways?: boolean
+  /** The lead's saved deal, so an offer that has since ended still shows as picked. */
+  dealLead?: LeadSummary
 }
 
 const n = <T extends FieldValues>(name: keyof FollowUpValues) => name as Path<T>
@@ -47,7 +50,7 @@ const QUICK_DATES = [
 const chip = 'pressable h-9 flex-none rounded-pill px-3.5 text-body-sm whitespace-nowrap'
 
 /** Status, note, next date, location: the body of every follow-up (PRD §5.6). */
-export function FollowUpFields<T extends FieldValues>({ projectId, statuses, control, register, errors: allErrors, showLocation = true, dealAlways = false }: Props<T>) {
+export function FollowUpFields<T extends FieldValues>({ projectId, statuses, control, errors: allErrors, showLocation = true, dealAlways = false, dealLead }: Props<T>) {
   const errors = allErrors as FieldErrors<FollowUpValues>
   const status = useWatch({ control, name: n<T>('status') }) as LeadStatus | null
   const note = (useWatch({ control, name: n<T>('note') }) as string | undefined) ?? ''
@@ -63,24 +66,7 @@ export function FollowUpFields<T extends FieldValues>({ projectId, statuses, con
       {status && REASON_STATUSES.includes(status) && (
         <Controller control={control} name={n<T>('reason')} render={({ field }) => <ReasonChoice value={(field.value as LostReason | null) ?? null} onChange={field.onChange} />} />
       )}
-      {(status === 'converted' || dealAlways) && (
-        <div className={cn('flex flex-col gap-4 rounded-2xl p-4', status === 'converted' ? 'bg-success-soft' : 'bg-surface-secondary')}>
-          <p className="flex items-center gap-2 text-title-sm">
-            {status === 'converted' ? (
-              <>
-                <span aria-hidden>🎉</span> Mark as won
-              </>
-            ) : (
-              'Expected deal'
-            )}
-            <span className="text-body-sm font-normal text-muted">(optional)</span>
-          </p>
-          <div className="grid grid-cols-1 gap-4 medium:grid-cols-2">
-            <TextField label="Monthly value" prefix="₹" inputMode="numeric" placeholder="2,499" error={errors.dealValue?.message} {...register(n<T>('dealValue'))} />
-            <TextField label="Plan or package" placeholder="e.g. Growth" maxLength={80} error={errors.plan?.message} {...register(n<T>('plan'))} />
-          </div>
-        </div>
-      )}
+      {(status === 'converted' || dealAlways) && <DealFields control={control} errors={allErrors} tone={status === 'converted' ? 'won' : 'expected'} lead={dealLead} />}
       <Controller
         control={control}
         name={n<T>('note')}

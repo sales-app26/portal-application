@@ -126,9 +126,16 @@ export function PersonSummaryPage({ self = false }: { self?: boolean }) {
 
             {self && project && <TeamLeaderboard projectId={project.id} projectName={project.name} />}
 
-            <Button asChild variant="secondary" className="self-start">
-              <Link to={dayHref()}>Open today's activity</Link>
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="secondary">
+                <Link to={dayHref()}>Open today's activity</Link>
+              </Button>
+              {!self && (
+                <Button asChild variant="soft">
+                  <Link to={`/people/${id}/review`}>Performance review</Link>
+                </Button>
+              )}
+            </div>
           </>
         ) : null}
       </div>

@@ -1,0 +1,258 @@
+/*
+ * Team scorecard and rep review. Plain CSS on the app's colour tokens, loaded with these lazy
+ * screens only, so the first page load's stylesheet does not grow.
+ */
+
+/* ---------------------------------------------------------------- scorecard table (laptop) */
+
+.sc-scroll {
+  overflow-x: auto;
+}
+.sc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.sc-table th,
+.sc-table td {
+  padding: 10px 6px;
+  text-align: right;
+  vertical-align: top;
+  white-space: nowrap;
+  border-top: 1px solid var(--separator);
+}
+.sc-table th:first-child,
+.sc-table td:first-child {
+  padding-left: 20px;
+}
+.sc-table th:last-child,
+.sc-table td:last-child {
+  padding-right: 20px;
+}
+.sc-table thead th {
+  border-top: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  vertical-align: bottom;
+  white-space: normal;
+}
+.sc-table .sc-name {
+  text-align: left;
+  white-space: normal;
+  min-width: 140px;
+}
+.sc-table tbody tr {
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.sc-table tbody tr:hover {
+  background: var(--surface-secondary);
+}
+.sc-table tfoot td {
+  background: var(--surface-secondary);
+  font-weight: 600;
+}
+.sc-table tfoot tr + tr td {
+  font-weight: 500;
+  color: var(--body);
+}
+.sc-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  border-radius: 8px;
+}
+.sc-sort:hover,
+.sc-sort[data-active] {
+  color: var(--foreground);
+}
+.sc-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sc-rank {
+  display: inline-block;
+  min-width: 1.5em;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- vs team average */
+
+.vs-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.vs-team[data-tone='up'] {
+  color: var(--success);
+}
+.vs-team[data-tone='down'] {
+  color: var(--danger);
+}
+.vs-team[data-tone='even'] {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- print: a clean one-page review */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+  /* Paper is always light, whatever the screen theme. */
+  html:root[data-theme] {
+    color-scheme: light;
+    --background: #fff;
+    --foreground: #0f1115;
+    --surface: #fff;
+    --surface-secondary: #f6f7f9;
+    --overlay: #fff;
+    --muted: #5d6470;
+    --body: #4b5260;
+    --default: #eceef2;
+    --border: #d9dce1;
+    --separator: #e2e5ea;
+    --accent: #0870a5;
+    --success: #087a4b;
+    --danger: #cf2d3a;
+    --status-lost: #d22f3c;
+    --status-converted: #05a864;
+  }
+  html,
+  body,
+  .bg-canvas {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+  /* The app around the review: navigation, top bar, buttons, toasts, table views. */
+  nav,
+  header,
+  .no-print,
+  [data-sonner-toaster],
+  details {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  main,
+  main > div,
+  main > div > div,
+  main > div > div > div,
+  .review-print {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  /* The shell leaves room for the side rail; paper has none. */
+  div:has(> main) {
+    padding-left: 0 !important;
+  }
+  /* The page's own large title: the review prints its own heading. */
+  main div:has(> h1.text-title-lg) {
+    display: none !important;
+  }
+  .review-print {
+    gap: 6px !important;
+  }
+  .review-print .text-title-lg {
+    font-size: 20px !important;
+  }
+  .review-print .card {
+    box-shadow: none !important;
+    border: 1px solid var(--border) !important;
+    background: #fff !important;
+    padding: 5px 8px !important;
+    border-radius: 8px !important;
+    break-inside: avoid;
+  }
+  .review-print .text-title-md,
+  .review-print .text-title-sm {
+    font-size: 11.5px !important;
+  }
+  .review-print .text-body-sm,
+  .review-print .text-body-md {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+  }
+  .review-print .text-caption,
+  .review-print .text-caption-strong,
+  .review-print .vs-team {
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+  }
+  .review-print .mb-3,
+  .review-print .mb-4 {
+    margin-bottom: 4px !important;
+  }
+  .review-print ul.gap-3,
+  .review-print ul.flex-col {
+    gap: 3px !important;
+  }
+  .review-tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+  .review-tiles .text-display-sm {
+    font-size: 16px !important;
+  }
+  .review-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+  .review-grid > .review-wide {
+    grid-column: span 2;
+  }
+  /* Keep a busy month on one page: the latest five wins and three notes, two lines each. */
+  .review-wins li:nth-child(n + 6),
+  .review-notes li:nth-child(n + 4) {
+    display: none;
+  }
+  .review-notes li > p:first-child {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .review-wins a {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  /* The peak's number floats above its column; on short print charts it would drift. */
+  .review-print figure [role='listitem'] > span.absolute {
+    display: none;
+  }
+  .review-print > p {
+    margin-top: 0 !important;
+  }
+  .review-print > div:last-child p {
+    font-size: 8.5px !important;
+  }
+  /* Shorter charts: the y ticks, the grid and the columns shrink together. */
+  .review-print figure [aria-hidden].flex-none {
+    height: 92px !important;
+  }
+  .review-print figure [role='list'],
+  .review-print figure .pointer-events-none.absolute {
+    height: 68px !important;
+  }
+}

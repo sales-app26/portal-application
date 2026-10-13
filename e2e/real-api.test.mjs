@@ -135,6 +135,10 @@ describe('sales person, online project', () => {
     await page.waitForSelector(`[role=gridcell][data-day="${tomorrow}"]`, { timeout: 5000 })
     await page.$eval(`[role=gridcell][data-day="${tomorrow}"] button`, (b) => b.click())
     await click(page, 'Save follow-up')
+    // A last look before it goes into the history, with the real edit rule.
+    await waitForText(page, 'Save this follow-up?')
+    await waitForText(page, 'You can fix the note and next follow-up date until midnight today')
+    await click(page, 'Save follow-up')
     await waitForText(page, 'Follow-up saved.')
     await waitForText(page, 'Called, wants a demo on Monday.')
     assert.deepEqual(errors, [])
@@ -346,6 +350,37 @@ describe('summary and bulk import on real data', () => {
     await page.close()
   })
 
+  test('the team scorecard and Ravi’s review show the same month on the real server, and the file downloads', async () => {
+    const t = await app.openReal(LAPTOP)
+    await signIn(t.page, info.moderator)
+    await t.go('/people?view=scorecard')
+    const page = t.page
+    await describeFailure(page, 'scorecard', () => waitForText(page, 'Average sales rep'))
+    const ravi = await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.sc-table tbody tr')].find((r) => r.textContent.includes('Ravi Kumar'))
+      const head = [...document.querySelectorAll('.sc-table thead th')].map((th) => th.textContent.trim())
+      return Object.fromEntries([...row.children].map((td, i) => [head[i], td.textContent.trim()]))
+    })
+    // The same work the summary counted: three follow-ups, one with a photo, two leads added.
+    assert.equal(ravi['Follow-ups'], '3')
+    assert.equal(ravi['Visits'], '1')
+    assert.equal(ravi['Leads added'], '2')
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), LAPTOP.width)
+
+    await click(page, 'Download scorecard')
+    await describeFailure(page, 'scorecard file', () => waitForText(page, 'Saved scorecard_'))
+
+    await click(page, 'Ravi Kumar', '.sc-table a')
+    await describeFailure(page, 'review', () => waitForText(page, 'Feedback received'))
+    const tiles = await page.evaluate(() =>
+      Object.fromEntries([...document.querySelectorAll('.review-tiles > div')].map((d) => [d.children[1]?.textContent, d.children[0]?.textContent])),
+    )
+    assert.equal(tiles['Follow-ups'], '3')
+    assert.equal(tiles['Visits'], '1')
+    assert.equal(tiles['Leads added'], '2')
+    await page.close()
+  })
+
   test('a moderator imports a CSV: check, report, import; the people picked find the leads in My leads', async () => {
     const csv = [
       'name,phone,business_name,location,notes,owner_email',
@@ -427,6 +462,53 @@ describe('summary and bulk import on real data', () => {
     await click(page, 'Check sheet', 'button')
     await describeFailure(page, 'second report', () => waitForText(page, 'Nothing in this sheet can be added'))
     await waitForText(page, 'Already a lead in this campaign')
+    await page.close()
+  })
+})
+
+describe('plans, offers and a won deal', () => {
+  test('the sales head prices a plan and adds an offer; a rep wins a deal with them', async () => {
+    const head = await as(info.superAdmin)
+    await head.page.goto(`${app.base}/plans-offers`, { waitUntil: 'networkidle0' })
+    await waitForText(head.page, 'Plan prices')
+    await fill(head.page, 'Growth', '2499')
+    await click(head.page, 'Save prices')
+    await waitForText(head.page, 'Plan prices saved.')
+    await click(head.page, 'Add offer')
+    await fill(head.page, 'Name', 'Diwali offer')
+    await fill(head.page, 'How much % off', '10')
+    await fill(head.page, 'Coupon code', 'diwali10')
+    await click(head.page, 'Save offer')
+    await waitForText(head.page, 'Offer saved.')
+    await waitForText(head.page, 'Live')
+    assert.deepEqual(head.errors, [])
+    await head.page.close()
+
+    const { page, errors } = await as(info.sales)
+    await click(page, 'Add lead')
+    await fill(page, 'Contact person', 'Rohit Shah')
+    await fill(page, 'Phone', '9876501234')
+    await fill(page, 'Location', 'Wanowrie')
+    await fill(page, 'Note', 'Wants billing for two counters.')
+    await click(page, 'Save lead')
+    await page.waitForFunction(() => /^\/leads\/[0-9a-f-]{36}$/.test(location.pathname), { timeout: 10000 })
+
+    await click(page, 'Log follow-up')
+    await click(page, 'Won', '[role=radio]')
+    await click(page, 'Growth', '[role=radio]')
+    await click(page, '6 months', '[role=radio]')
+    await clickContaining(page, 'Diwali offer', '[role=radio]')
+    await waitForText(page, 'Client pays ₹13,494 for 6 months (₹2,249/month after 10% off · DIWALI10)')
+    await fill(page, 'Note', 'Signed for six months with the Diwali offer.')
+    await click(page, 'Save follow-up')
+    await waitForText(page, 'Once won, only your sales manager can move this lead to another stage.')
+    await click(page, 'Save follow-up')
+    await waitForText(page, 'Won!')
+    // The server worked out the same price after discount.
+    await waitForText(page, 'Growth · ₹2,249/mo · for 6 months')
+    await waitForText(page, 'Diwali offer · DIWALI10')
+    await waitForText(page, '₹13,494 in all')
+    assert.deepEqual(errors, [])
     await page.close()
   })
 })

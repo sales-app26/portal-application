@@ -14,7 +14,7 @@ import { formatPhone, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import type { LeadDetail, LeadSource, LeadSummary, MeProject, Paginated } from '@/lib/types'
-import { leadSchema, outcomeBody, type LeadValues } from './entrySchema'
+import { dealDefaults, leadSchema, outcomeBody, type LeadValues } from './entrySchema'
 import { SourceChoice } from './SourceChoice'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
@@ -33,8 +33,7 @@ const EMPTY: LeadValues = {
   location: '',
   source: null,
   reason: null,
-  dealValue: '',
-  plan: '',
+  ...dealDefaults(),
 }
 
 /** Add lead = client details + first follow-up in one save (PRD §5.5, flow 7.1). */
@@ -148,7 +147,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'status', 'note', 'nextFollowUpDate', 'location', 'source', 'reason', 'dealValue', 'plan'])
+      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'status', 'note', 'nextFollowUpDate', 'location', 'source', 'reason', 'planCode', 'dealTenureMonths', 'dealValue', 'discountType', 'discountValue', 'couponCode'])
     }
   })
 

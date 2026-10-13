@@ -145,7 +145,8 @@ export function rupeesShort(n: number): string {
   if (n >= 1_00_00_000) return `₹${(n / 1_00_00_000).toFixed(n >= 10_00_00_000 ? 0 : 1)}Cr`
   if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(n >= 10_00_000 ? 0 : 1)}L`
   if (n >= 1_000) return `₹${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`
-  return `₹${n}`
+  // Revenue after a discount can carry paise; a tile shows whole rupees.
+  return `₹${Math.round(n)}`
 }
 
 export function plural(n: number, one: string, many = `${one}s`) {

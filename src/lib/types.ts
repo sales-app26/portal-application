@@ -190,9 +190,21 @@ export interface LeadSummary {
   hasPendingTransfer: boolean
   createdAt: string
   updatedAt: string
-  /** Whole rupees per month. */
+  /** List price per month in whole rupees, before any discount. */
   dealValue: number | null
+  /** Old free-text plan, kept for history; shown only when `planCode` is null. */
   plan: string | null
+  planCode: PlanCode | null
+  /** Null reads as 1 month. */
+  dealTenureMonths: number | null
+  discountType: DiscountType | null
+  discountValue: number | null
+  couponCode: string | null
+  offer: PersonRef | null
+  /** What the client pays for the whole tenure (price × tenure − discount). */
+  dealTotal: number | null
+  /** Deal total ÷ tenure: what the deal adds to monthly revenue. */
+  effectiveMonthlyValue: number | null
   source: LeadSource | null
   lastActivityAt: string
   createdBy: PersonRef | null
@@ -521,4 +533,93 @@ export interface VersionViews {
   seen: { userId: string; name: string; email: string; role: UserRole; seenAt: string }[]
   /** Active people who haven't been shown it yet. */
   pending: number
+}
+
+// ---------------------------------------------------------------- team scorecard and rep review
+
+/** The numbers on a scorecard row, the team total and the average rep (docs/api-contract.md, "Scorecard"). */
+export interface ScorecardNumbers {
+  leadsAdded: number
+  followUps: number
+  visits: number
+  /** Working days (not on leave, up to today) with any follow-up, visit or stage change. */
+  activeDays: number
+  /** Days of the period up to today, minus days on leave. */
+  workingDays: number
+  leaveDays: number
+  dealsWon: number
+  /** ₹/month, as the dashboard counts it. */
+  wonRevenue: number
+  lostLeads: number
+  /** Deals won ÷ (deals won + lost leads). Null when nothing was closed. */
+  conversionPercent: number | null
+  avgDaysToWin: number | null
+  target: number | null
+  achieved: number
+  targetPercent: number | null
+  overdueNow: number
+  openNow: number
+  handoversAsked: number
+  handoversReceived: number
+}
+
+export interface ScorecardRow extends ScorecardNumbers {
+  user: PersonRef
+  isActive: boolean
+  campaigns: string[]
+  topLostReason: LostReason | 'unspecified' | null
+}
+
+export interface Scorecard {
+  from: string
+  to: string
+  daysSoFar: number
+  rows: ScorecardRow[]
+  totals: ScorecardNumbers
+  averages: ScorecardNumbers | null
+}
+
+export interface RepReview {
+  from: string
+  to: string
+  person: PersonRef & { role: UserRole; isActive: boolean; campaigns: string[] }
+  numbers: ScorecardRow
+  teamAverage: ScorecardNumbers | null
+  teamSize: number
+  trendBucket: 'day' | 'week'
+  trend: { date: string; followUps: number; visits: number; newLeads: number; wins: number }[]
+  funnel: { stage: FunnelStage; count: number }[]
+  lostReasons: { reason: LostReason | 'unspecified'; count: number }[]
+  sources: { source: LeadSource | 'unspecified'; count: number }[]
+  planMix: { plan: string; count: number; revenue: number }[]
+  recentWins: { leadId: string; leadName: string; businessName: string | null; projectName: string; plan: string | null; dealValue: number | null; wonAt: string }[]
+  /** Monday = 0 … Sunday = 6. */
+  weekdays: { weekday: number; followUps: number; visits: number }[]
+  feedback: {
+    count: number
+    recent: { id: string; body: string; author: PersonRef; leadId: string; leadName: string; entryId: string | null; createdAt: string }[]
+  }
+}
+
+// ---------------------------------------------------------------- deals, plan prices and offers
+
+export type PlanCode = 'free' | 'growth' | 'growth_plus' | 'pro'
+export type DiscountType = 'percent' | 'amount'
+
+export interface PlanPrice {
+  plan: PlanCode
+  /** Whole rupees a month; null until the sales head sets it. Free is 0. */
+  monthlyPrice: number | null
+}
+
+export interface Offer {
+  id: string
+  name: string
+  couponCode: string | null
+  discountType: DiscountType
+  discountValue: number
+  startsOn: string | null
+  endsOn: string | null
+  /** False once the sales head ends it. */
+  active: boolean
 }

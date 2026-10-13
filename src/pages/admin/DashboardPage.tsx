@@ -486,6 +486,10 @@ function Leaderboard({ people, date }: { people: Dashboard['people']; date: stri
           ))}
         </ol>
       )}
+      <Link to="/people?view=scorecard" className="flex items-center gap-1 border-t border-separator px-5 py-3 text-body-sm font-semibold text-primary hover:underline expanded:px-6">
+        Team scorecard for the month
+        <Icon name="chevron-right" size={16} />
+      </Link>
     </Card>
   )
 }

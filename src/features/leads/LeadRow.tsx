@@ -3,7 +3,8 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Avatar, Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { plural, relativeDay, rupees } from '@/lib/format'
+import { dealOf } from '@/lib/deal'
+import { plural, relativeDay } from '@/lib/format'
 import type { LeadSummary } from '@/lib/types'
 import { ContactButtons } from './ContactActions'
 
@@ -16,10 +17,13 @@ export function LeadWhen({ lead }: { lead: LeadSummary }) {
   return null
 }
 
-/** "₹2,499/mo" when the lead carries a deal value. */
+/** "Growth · ₹2,249/mo · 6 months · Diwali offer": plan, price after discount, tenure and offer. */
 function DealValue({ lead }: { lead: LeadSummary }) {
-  if (!lead.dealValue) return null
-  return <span className="text-caption-strong whitespace-nowrap text-ink tabular-nums">{rupees(lead.dealValue)}/mo</span>
+  const deal = dealOf(lead)
+  if (!deal.hasDeal || (!deal.plan && !lead.dealValue)) return null
+  return (
+    <span className="min-w-0 truncate text-caption-strong text-ink tabular-nums">{[deal.plan, deal.price, deal.tenure, deal.offer].filter(Boolean).join(' · ')}</span>
+  )
 }
 
 const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [lead.businessName, lead.location.name, showOwner ? lead.owner.name : null].filter(Boolean).join(' · ')
@@ -105,6 +109,7 @@ export function LeadRow({
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-title-sm">{lead.name}</span>
         <span className="truncate text-body-sm text-body">{secondary}</span>
+        <DealValue lead={lead} />
       </span>
       <span className="flex flex-none flex-col items-end gap-1">
         <StatusChip status={lead.status} />

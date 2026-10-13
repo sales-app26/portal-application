@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
@@ -21,6 +21,10 @@ import { handleFormError } from '@/lib/forms'
 import type { User, UserRole } from '@/lib/types'
 
 type Activity = 'active' | 'inactive' | 'all'
+type View = 'roster' | 'accounts' | 'scorecard'
+
+// The scorecard (a wide table and its own filters) loads only when that view is opened.
+const TeamScorecard = lazy(() => import('@/features/performance/TeamScorecard').then((m) => ({ default: m.TeamScorecard })))
 
 /** Super Admin: Team and Moderators. Moderator: his sales persons (PRD §6). */
 export function PeoplePage() {
@@ -32,8 +36,8 @@ export function PeoplePage() {
   // The live roster is what a manager checks every day; accounts are for adding and editing people.
   // Kept in the URL, so Back from a person returns to the same view.
   const [params, setParams] = useSearchParams()
-  const view = params.get('view') === 'accounts' ? 'accounts' : 'roster'
-  const setView = (v: 'roster' | 'accounts') => setParams(v === 'roster' ? {} : { view: v }, { replace: true })
+  const view: View = params.get('view') === 'accounts' ? 'accounts' : params.get('view') === 'scorecard' ? 'scorecard' : 'roster'
+  const setView = (v: View) => setParams(v === 'roster' ? {} : { view: v }, { replace: true })
   const projectOptions = useProjectOptions()
   const scopeProjects = isSuper
     ? (projectOptions.data ?? []).filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name }))
@@ -73,7 +77,8 @@ export function PeoplePage() {
     <Page
       title={isSuper ? 'People' : 'Team'}
       wide
-      cta={{ label: role === 'moderator' ? 'Add sales manager' : 'Add sales rep', icon: 'add-user-male', onClick: () => setAdding(true) }}
+      // The scorecard is for reviewing, not adding people; the button would sit over the ranked list.
+      cta={view === 'scorecard' ? undefined : { label: role === 'moderator' ? 'Add sales manager' : 'Add sales rep', icon: 'add-user-male', onClick: () => setAdding(true) }}
       header={
         <div className="flex flex-col gap-3">
           <Segmented
@@ -83,6 +88,7 @@ export function PeoplePage() {
             options={[
               { value: 'roster', label: 'Today' },
               { value: 'accounts', label: 'Team list' },
+              { value: 'scorecard', label: 'Scorecard' },
             ]}
             className="w-full medium:w-auto medium:self-start"
           />
@@ -114,8 +120,12 @@ export function PeoplePage() {
         </div>
       }
     >
-      <div className="expanded:max-w-[900px]">
-        {view === 'roster' ? (
+      <div className={view === 'scorecard' ? undefined : 'expanded:max-w-[900px]'}>
+        {view === 'scorecard' ? (
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <TeamScorecard keep={{ view: 'scorecard' }} />
+          </Suspense>
+        ) : view === 'roster' ? (
           <TeamRoster projects={scopeProjects} />
         ) : list.isLoading ? (
           <ListSkeleton />
@@ -146,6 +156,7 @@ export function PeoplePage() {
                     items={[
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${u.id}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
+                      { label: 'Performance review', icon: 'goal', onSelect: () => navigate(`/people/${u.id}/review`), hidden: u.role !== 'sales_person' },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
                       { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
                       { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id || !u.canManageAccount },

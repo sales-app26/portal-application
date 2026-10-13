@@ -53,7 +53,15 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     createdAt: iso(),
     updatedAt: iso(),
     dealValue: i === 0 ? 2499 : null,
-    plan: i === 0 ? 'Growth' : null,
+    plan: null,
+    planCode: i === 0 ? 'growth' : null,
+    dealTenureMonths: null,
+    discountType: null,
+    discountValue: null,
+    couponCode: null,
+    offer: null,
+    dealTotal: i === 0 ? 2499 : null,
+    effectiveMonthlyValue: i === 0 ? 2499 : null,
     source: ['walk_in', 'referral', null, 'import'][i % 4],
     lastActivityAt: iso(),
     createdBy: { id: me.id, name: me.name },
@@ -354,6 +362,30 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     message: null,
   })
 
+  /** Three reps with different strengths, so each sort order differs. */
+  const scorecardRows = (projectId) => {
+    const base = { workingDays: 13, leaveDays: 0, handoversAsked: 0, handoversReceived: 0, lostLeads: 2, topLostReason: 'price', isActive: true, campaigns: ['Pune Retail Drive'] }
+    const rows = [
+      { ...base, user: { id: ids.priya, name: 'Priya Desai' }, leadsAdded: 12, followUps: 40, visits: 14, activeDays: 12, dealsWon: 6, wonRevenue: 14994, conversionPercent: 75, avgDaysToWin: 8, target: 10, achieved: 6, targetPercent: 60, overdueNow: 1, openNow: 18 },
+      { ...base, user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, leadsAdded: 9, followUps: 55, visits: 20, activeDays: 11, leaveDays: 2, workingDays: 11, dealsWon: 2, wonRevenue: 4998, conversionPercent: 33, avgDaysToWin: 12.5, target: null, achieved: 2, targetPercent: null, overdueNow: 4, openNow: 9, topLostReason: 'competitor', lostLeads: 4 },
+      { ...base, user: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Sunil Patil' }, leadsAdded: 5, followUps: 45, visits: 2, activeDays: 9, dealsWon: 4, wonRevenue: 9996, conversionPercent: 67, avgDaysToWin: 9, target: 10, achieved: 4, targetPercent: 40, overdueNow: 0, openNow: 6, campaigns: ['Kondhwa Door-to-door'], topLostReason: null, lostLeads: 0 },
+    ]
+    return projectId ? rows.filter((r) => r.campaigns.some((c) => projects.find((x) => x.id === projectId)?.name === c)) : rows
+  }
+
+  // ---- plan prices and offers (api-contract §3b)
+  const planPrices = [
+    { plan: 'free', monthlyPrice: 0 },
+    { plan: 'growth', monthlyPrice: 2499 },
+    { plan: 'growth_plus', monthlyPrice: 3499 },
+    { plan: 'pro', monthlyPrice: null },
+  ]
+  const offers = [
+    { id: 'eeeeeee1-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Diwali offer', couponCode: 'DIWALI10', discountType: 'percent', discountValue: 10, startsOn: null, endsOn: null, active: true },
+    { id: 'eeeeeee2-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Monsoon', couponCode: null, discountType: 'amount', discountValue: 500, startsOn: null, endsOn: null, active: false },
+  ]
+  const offerLive = (o) => o.active && (!o.startsOn || o.startsOn <= today) && (!o.endsOn || o.endsOn >= today)
+
   const page = (items) => ({ items, meta: { page: 1, limit: 20, total: items.length, totalPages: 1, hasNextPage: false, hasPreviousPage: false } })
   const ok = (data, message = 'Done.', status = 200) => ({ status, body: { success: true, statusCode: status, message, data } })
   const fail = (status, errorCode, message, details) => ({ status, body: { success: false, statusCode: status, errorCode, message, ...(details ? { details } : {}) } })
@@ -505,6 +537,25 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         conversionsThisMonth: 30,
         revenueThisMonth: 74970,
       })
+    if (p === '/settings/plan-prices' && method === 'GET') return ok(planPrices)
+    if (p === '/settings/plan-prices' && method === 'PUT') {
+      if (role !== 'super_admin') return fail(403, 'FORBIDDEN', 'You don’t have access to this. Ask your sales manager if you need it.')
+      for (const x of json().prices) planPrices.find((y) => y.plan === x.plan).monthlyPrice = x.monthlyPrice
+      return ok(planPrices, 'Plan prices saved.')
+    }
+    if (p === '/offers' && method === 'GET') return ok(offers.filter((o) => (query.get('active') === 'true' || role !== 'super_admin' ? offerLive(o) : true)))
+    if (p === '/offers' && method === 'POST') {
+      const o = { id: `eeeeeee${offers.length + 1}-eeee-4eee-8eee-eeeeeeeeeeee`, couponCode: null, startsOn: null, endsOn: null, active: true, ...json() }
+      offers.unshift(o)
+      return ok(o, 'Offer saved.', 201)
+    }
+    {
+      const om = p.match(/^\/offers\/([^/]+)$/)
+      const o = om && offers.find((x) => x.id === om[1])
+      if (om && !o) return fail(404, 'NOT_FOUND', 'We couldn’t find this offer.')
+      if (o && method === 'PATCH') return ok(Object.assign(o, json()), 'Offer saved.')
+      if (o && method === 'DELETE') return (offers.splice(offers.indexOf(o), 1), ok(null, 'Offer removed.'))
+    }
     if (p === '/me/agenda') return ok({ overdue: 1, today: 3, tomorrow: 2, thisWeek: 5, cold: 3, untouched: 4 })
     if (p === '/me/due-today') return ok(page([0, 1, 2, 3].map((i) => lead(i))))
     // The area a position is in (the API asks OpenStreetMap). Out at sea: no name known.
@@ -584,6 +635,87 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       return ok(u, 'Added to the team. We’ve emailed them an invite to set a password.', 201)
     }
     let m
+    // ---- team scorecard and rep review
+    if (p === '/reports/scorecard') {
+      const rows = scorecardRows(query.get('projectId'))
+      const total = (k) => rows.reduce((n, r) => n + r[k], 0)
+      const mean = (k) => Math.round((total(k) / rows.length) * 10) / 10
+      const keys = Object.keys(rows[0]).filter((k) => typeof rows[0][k] === 'number')
+      const totals = Object.fromEntries(keys.map((k) => [k, total(k)]))
+      const averages = Object.fromEntries(keys.map((k) => [k, mean(k)]))
+      return ok({
+        from: query.get('from'),
+        to: query.get('to'),
+        daysSoFar: 13,
+        rows,
+        totals: { ...totals, conversionPercent: 60, avgDaysToWin: 9.5, target: 20, targetPercent: 60 },
+        averages: { ...averages, conversionPercent: 58, avgDaysToWin: 9.8 },
+      })
+    }
+    if ((m = p.match(/^\/reports\/people\/([^/]+)\/review$/))) {
+      const all = scorecardRows()
+      const row = all.find((r) => r.user.id === m[1])
+      if (!row) return fail(404, 'NOT_FOUND', 'We couldn’t find this person on your team.')
+      const from = query.get('from')
+      const to = query.get('to')
+      const trend = []
+      for (let d = from, i = 0; d <= to; d = new Date(Date.parse(`${d}T00:00:00Z`) + 86400000).toISOString().slice(0, 10), i++)
+        trend.push({ date: d, followUps: d > today ? 0 : (i % 5) + 1, visits: d > today ? 0 : i % 3 === 0 ? 1 : 0, newLeads: i % 4 === 0 ? 1 : 0, wins: i % 6 === 0 ? 1 : 0 })
+      return ok({
+        from,
+        to,
+        person: { id: row.user.id, name: row.user.name, role: 'sales_person', isActive: row.isActive, campaigns: row.campaigns },
+        numbers: row,
+        teamAverage: { ...row, dealsWon: 4, wonRevenue: 9996, followUps: 46.7, visits: 12, conversionPercent: 58, targetPercent: 60, overdueNow: 2, avgDaysToWin: 9.8, target: 10 },
+        teamSize: all.length,
+        trendBucket: 'day',
+        trend,
+        funnel: [
+          { stage: 'created', count: 12 },
+          { stage: 'contacted', count: 10 },
+          { stage: 'interested', count: 7 },
+          { stage: 'converted', count: row.dealsWon },
+        ],
+        lostReasons: [
+          { reason: 'price', count: 3 },
+          { reason: 'competitor', count: 1 },
+        ],
+        sources: [
+          { source: 'walk_in', count: 7 },
+          { source: 'referral', count: 3 },
+          { source: 'unspecified', count: 2 },
+        ],
+        planMix: [
+          { plan: 'growth', count: 4, revenue: 9996 },
+          { plan: 'pro', count: 2, revenue: 4998 },
+        ],
+        // A full month: the 10 latest wins and 5 notes, as the API sends at most.
+        recentWins: [
+          { leadId: ids.lead, leadName: 'Asha Patil', businessName: 'Patil Sweets', projectName: 'Pune Retail Drive', plan: 'growth', dealValue: 2499, wonAt: iso() },
+          { leadId: '22222222-2222-4222-8222-222222222222', leadName: 'Neha Joshi', businessName: null, projectName: 'Pune Retail Drive', plan: 'pro', dealValue: 4999, wonAt: iso() },
+          ...Array.from({ length: 8 }, (_, i) => ({ leadId: `w${i}`, leadName: `Bakery ${i + 1}`, businessName: `Sweet Spot ${i + 1}`, projectName: 'Pune Retail Drive', plan: 'growth', dealValue: 1999, wonAt: iso() })),
+        ],
+        weekdays: [8, 9, 7, 10, 6, 3, 0].map((followUps, weekday) => ({ weekday, followUps, visits: Math.floor(followUps / 3) })),
+        feedback: {
+          count: 5,
+          recent: [
+            { id: 'f1', body: 'Great visit notes, keep the photos clear.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: 'e1', createdAt: iso() },
+            { id: 'f2', body: 'Call back within two days after a demo.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: 'e2', createdAt: iso() },
+            ...[3, 4, 5].map((i) => ({ id: `f${i}`, body: 'Good follow-up. Next time, show the billing screen and the daily sales report before talking price, and leave the brochure with the owner so the family can see it too.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: `e${i}`, createdAt: iso() })),
+          ],
+        },
+      })
+    }
+    if (p === '/exports/scorecard')
+      return {
+        status: 200,
+        raw: '﻿Sales rep,Campaign(s),Leads added\r\nPriya Desai,Pune Retail Drive,12\r\n',
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': `attachment; filename="scorecard_${query.get('from')}_${query.get('to')}.csv"`,
+          'access-control-expose-headers': 'Content-Disposition',
+        },
+      }
     // ---- team collaboration
     if (p === '/notifications/unread-count') return ok({ count: notifications.filter((n) => !n.readAt).length })
     if (p === '/notifications' && method === 'GET') return ok(page(notifications))
