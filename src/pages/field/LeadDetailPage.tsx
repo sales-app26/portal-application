@@ -96,6 +96,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
         body="The lead disappears everywhere, its phone number can be added again, and a win no longer counts toward the target. This can't be undone from the app."
         confirmLabel="Delete lead"
         loading={deleting}
+        danger
         onConfirm={async () => {
           setDeleting(true)
           try {

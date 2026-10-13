@@ -730,6 +730,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
           : result.sample
       return ok(result, 'Leads added.')
     }
+    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/delete$/))) return ok({ deleted: json().leadIds.length }, 'Leads deleted.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/reassign$/))) return ok({ reassigned: json().leadIds.length, skipped: 0 }, 'Leads assigned.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads$/))) {
       // A teammate already has this number: the rep may ask for it.

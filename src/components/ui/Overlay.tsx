@@ -174,16 +174,18 @@ interface ConfirmProps {
   confirmLabel: string
   onConfirm: () => void | Promise<void>
   loading?: boolean
+  /** Red confirm button, for what can't be undone (deleting). */
+  danger?: boolean
 }
 
 /** Action sheet on phones, dialog on laptops. Never window.confirm (UX-COMPONENTS.md §4.2). */
-export function Confirm({ open, onOpenChange, title, body, confirmLabel, onConfirm, loading }: ConfirmProps) {
+export function Confirm({ open, onOpenChange, title, body, confirmLabel, onConfirm, loading, danger }: ConfirmProps) {
   const sheet = useIsSheetLayout()
   return (
     <ResponsiveOverlay open={open} onOpenChange={onOpenChange} title={title} variant="confirm">
       <div className="text-body-md text-body">{body}</div>
       <div className={cn('mt-6 flex gap-3', sheet ? 'flex-col' : 'flex-row-reverse')}>
-        <Button block={sheet} loading={loading} onClick={() => void onConfirm()}>
+        <Button block={sheet} variant={danger ? 'danger' : undefined} loading={loading} onClick={() => void onConfirm()}>
           {confirmLabel}
         </Button>
         <Button block={sheet} variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>

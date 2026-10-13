@@ -278,7 +278,7 @@ describe('transfers and admin', () => {
     const { page, errors } = await as(info.moderator)
     await page.goto(`${app.base}/projects/${info.projects.online}?tab=leads`, { waitUntil: 'networkidle0' })
     await waitForText(page, 'Asha Patil')
-    await click(page, 'Assign') // enters selection mode
+    await click(page, 'Select') // enters selection mode
     await page.$$eval('[role=checkbox]', (rows) => rows[0].click())
     await click(page, 'Assign 1')
     await click(page, 'Choose a person', 'button[aria-haspopup=listbox]')

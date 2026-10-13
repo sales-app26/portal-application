@@ -20,7 +20,7 @@ import { AddMemberForm, ReassignForm, SetTargetForm } from '@/features/admin/Mem
 import { ProjectForm } from '@/features/admin/ProjectForm'
 import { invalidateProjects, projectMembersKey, useProjectDetail, useProjectMembers } from '@/features/admin/queries'
 import { LeadRow } from '@/features/leads/LeadRow'
-import { useLeadList } from '@/features/leads/queries'
+import { invalidateLeadData, useLeadList } from '@/features/leads/queries'
 import { useDebounced } from '@/hooks/useDebounced'
 import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
@@ -212,6 +212,9 @@ function MembersTab({ project }: { project: Project }) {
 // ---------------------------------------------------------------- leads
 
 function LeadsTab({ project }: { project: Project }) {
+  const qc = useQueryClient()
+  // Only the sales head deletes leads; managers can still select to assign.
+  const canDelete = useMe().role === 'super_admin'
   const members = useProjectMembers(project.id)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<LeadStatus | 'all'>('all')
@@ -219,6 +222,8 @@ function LeadsTab({ project }: { project: Project }) {
   const [selecting, setSelecting] = useState(false)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [reassigning, setReassigning] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [busy, setBusy] = useState(false)
   const q = useDebounced(search.trim(), 300)
   const closed = project.status === 'closed'
 
@@ -231,6 +236,23 @@ function LeadsTab({ project }: { project: Project }) {
   const leads = list.data?.pages.flatMap((pg) => pg.items) ?? []
   const toggle = (id: string) => setPicked((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)))
   const exit = () => (setSelecting(false), setPicked(new Set()))
+  const n = picked.size
+  const deleteSelected = async () => {
+    setBusy(true)
+    try {
+      const { message } = await apiWithMessage(`/projects/${project.id}/leads/delete`, { method: 'POST', body: { leadIds: [...picked] } })
+      toast.success(message)
+      invalidateLeadData(qc)
+      invalidateProjects(qc)
+      void qc.invalidateQueries({ queryKey: ['transfers'] })
+      setDeleting(false)
+      exit()
+    } catch (err) {
+      handleFormError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
   const filtered = !!search.trim() || status !== 'all' || owner !== 'all'
   const empty = !filtered && !list.isLoading && !list.isError && leads.length === 0
   // Only filter by owner when there is more than one to choose between.
@@ -254,7 +276,7 @@ function LeadsTab({ project }: { project: Project }) {
             <div className="flex gap-2">
               {leads.length > 0 && (
                 <Button variant="secondary" icon={selecting ? 'multiply' : 'checkmark'} onClick={() => (selecting ? exit() : setSelecting(true))}>
-                  {selecting ? 'Cancel' : 'Assign'}
+                  {selecting ? 'Cancel' : 'Select'}
                 </Button>
               )}
               {!selecting && importButton}
@@ -317,11 +339,26 @@ function LeadsTab({ project }: { project: Project }) {
           <span className="flex-1 text-body-sm" aria-live="polite">
             {picked.size} selected
           </span>
-          <Button disabled={picked.size === 0} onClick={() => setReassigning(true)}>
-            Assign {picked.size || ''}
+          {canDelete && (
+            <Button variant="danger-soft" icon="trash" disabled={n === 0} onClick={() => setDeleting(true)}>
+              Delete {n || ''}
+            </Button>
+          )}
+          <Button disabled={n === 0} onClick={() => setReassigning(true)}>
+            Assign {n || ''}
           </Button>
         </div>
       )}
+      <Confirm
+        open={deleting}
+        onOpenChange={(o) => !busy && setDeleting(o)}
+        title={`Delete ${n} ${n === 1 ? 'lead' : 'leads'}?`}
+        body="They disappear from every list, report and target, and any handover request for them is rejected. Their numbers can be added again as new leads. This can't be undone from the app."
+        confirmLabel={`Delete ${n} ${n === 1 ? 'lead' : 'leads'}`}
+        onConfirm={deleteSelected}
+        loading={busy}
+        danger
+      />
       <ReassignForm projectId={project.id} leadIds={[...picked]} members={members.data ?? []} open={reassigning} onOpenChange={setReassigning} onDone={exit} />
     </section>
   )

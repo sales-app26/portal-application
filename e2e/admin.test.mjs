@@ -232,11 +232,43 @@ describe('projects', () => {
     await page.close()
   })
 
+  test('sales head deletes a selection of leads after confirming', async () => {
+    const { page, go, api, errors } = await app.open(PHONE, { role: 'super_admin' })
+    await go(`/projects/${ids.online}?tab=leads`)
+    await waitForText(page, 'Asha Patil')
+    await click(page, 'Select')
+    const rows = await page.$$('[role=checkbox]')
+    await rows[0].evaluate((r) => r.click())
+    await rows[2].evaluate((r) => r.click())
+    await waitForText(page, '2 selected')
+    await click(page, 'Delete 2')
+    await waitForText(page, 'Delete 2 leads?')
+    assert.equal(api.writes.filter((w) => w.path.endsWith('/leads/delete')).length, 0, 'nothing sent before confirming')
+    await click(page, 'Delete 2 leads', '[role=dialog] button')
+    await waitForText(page, 'Leads deleted.')
+    const b = bodyOf(api, `/projects/${ids.online}/leads/delete`)
+    assert.equal(b.leadIds.length, 2)
+    assert.ok(!(await page.evaluate(() => document.body.innerText.includes('2 selected'))), 'selection closed')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('a sales manager can select to assign but not delete', async () => {
+    const { page, go } = await app.open(PHONE, { role: 'moderator' })
+    await go(`/projects/${ids.online}?tab=leads`)
+    await waitForText(page, 'Asha Patil')
+    await click(page, 'Select')
+    await waitForText(page, '0 selected')
+    const deleteButtons = await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => /^Delete/.test(b.textContent.trim())).length)
+    assert.equal(deleteButtons, 0)
+    await page.close()
+  })
+
   test('select leads and reassign them in one action', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
     await go(`/projects/${ids.online}?tab=leads`)
     await waitForText(page, 'Asha Patil')
-    await click(page, 'Assign') // enters selection mode
+    await click(page, 'Select') // enters selection mode
     const rows = await page.$$('[role=checkbox]')
     assert.equal(rows.length, 4)
     await rows[0].evaluate((r) => r.click())
