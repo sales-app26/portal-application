@@ -5,12 +5,7 @@ import puppeteer from 'puppeteer-core'
 import { createServer } from 'vite'
 import { createMockApi, ids } from './mock-api.mjs'
 
-export const CHROME_PATHS = [
-  process.env.CHROME_PATH,
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-].filter(Boolean)
+export const CHROME_PATHS = [process.env.CHROME_PATH, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean)
 
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
@@ -32,7 +27,10 @@ export async function startApp() {
   })
   await browser.defaultBrowserContext().overridePermissions(base, ['geolocation', 'camera'])
 
-  async function open(viewport = PHONE, { signedIn = true, projectId, role = 'sales_person', unreadRelease = false, gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {}) {
+  async function open(
+    viewport = PHONE,
+    { signedIn = true, projectId, role = 'sales_person', unreadRelease = false, gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {},
+  ) {
     const api = createMockApi({ role, unreadRelease })
     const page = await browser.newPage()
     const errors = []
@@ -100,7 +98,9 @@ export async function click(page, text, selector = 'button, a, [role=option], li
   )
   await page.evaluate(
     (text, selector) => {
-      const el = [...document.querySelectorAll(selector)].reverse().find((e) => (e.textContent.trim() === text || e.getAttribute('aria-label') === text) && e.getClientRects().length)
+      const el = [...document.querySelectorAll(selector)]
+        .reverse()
+        .find((e) => (e.textContent.trim() === text || e.getAttribute('aria-label') === text) && e.getClientRects().length)
       el.click()
     },
     text,
@@ -111,7 +111,15 @@ export async function click(page, text, selector = 'button, a, [role=option], li
 /** Clicks the last visible element of `selector` whose text contains `text` (rows with avatars or a second line). */
 export async function clickContaining(page, text, selector) {
   await page.waitForFunction((t, s) => [...document.querySelectorAll(s)].some((e) => e.textContent.includes(t) && e.getClientRects().length), { timeout: 5000 }, text, selector)
-  await page.evaluate((t, s) => [...document.querySelectorAll(s)].reverse().find((e) => e.textContent.includes(t) && e.getClientRects().length).click(), text, selector)
+  await page.evaluate(
+    (t, s) =>
+      [...document.querySelectorAll(s)]
+        .reverse()
+        .find((e) => e.textContent.includes(t) && e.getClientRects().length)
+        .click(),
+    text,
+    selector,
+  )
 }
 
 export const waitForText = (page, text, timeout = 5000) => page.waitForFunction((t) => document.body.innerText.includes(t), { timeout }, text)
@@ -119,7 +127,10 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /** Types into the input or textarea labelled `label`. */
 export async function fill(page, label, value) {
-  const id = await page.evaluate((label) => [...document.querySelectorAll('label')].find((l) => l.textContent.replace('(optional)', '').trim() === label && l.getClientRects().length)?.htmlFor, label)
+  const id = await page.evaluate(
+    (label) => [...document.querySelectorAll('label')].find((l) => l.textContent.replace('(optional)', '').trim() === label && l.getClientRects().length)?.htmlFor,
+    label,
+  )
   if (!id) throw new Error(`no field labelled "${label}"`)
   await page.type(`[id="${id}"]`, value)
 }
@@ -134,8 +145,18 @@ export async function mouseClick(page, selector, index = 0) {
 
 /** Click the nth visible button/link with this exact text or aria-label (default: the first). */
 export async function clickNth(page, text, index = 0, selector = 'button, a') {
-  await page.waitForFunction((t, s) => [...document.querySelectorAll(s)].some((e) => (e.textContent.trim() === t || e.getAttribute('aria-label') === t) && e.getClientRects().length), { timeout: 5000 }, text, selector)
-  await page.evaluate((t, s, i) => [...document.querySelectorAll(s)].filter((e) => (e.textContent.trim() === t || e.getAttribute('aria-label') === t) && e.getClientRects().length)[i].click(), text, selector, index)
+  await page.waitForFunction(
+    (t, s) => [...document.querySelectorAll(s)].some((e) => (e.textContent.trim() === t || e.getAttribute('aria-label') === t) && e.getClientRects().length),
+    { timeout: 5000 },
+    text,
+    selector,
+  )
+  await page.evaluate(
+    (t, s, i) => [...document.querySelectorAll(s)].filter((e) => (e.textContent.trim() === t || e.getAttribute('aria-label') === t) && e.getClientRects().length)[i].click(),
+    text,
+    selector,
+    index,
+  )
 }
 
 /** Runs axe-core (WCAG 2.0/2.1 A and AA) on the current page; returns a short list of violations. */
@@ -146,4 +167,44 @@ export async function axeViolations(page) {
   await page.evaluate(src)
   const results = await page.evaluate(() => window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }))
   return results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.length}× e.g. ${v.nodes[0].target.join(' ')} — ${v.help}`)
+}
+
+/**
+ * A real finger tap at the centre of the last visible element matching `selector` (and `text`, if
+ * given). Unlike `click`, it goes through hit-testing, so it fails when something covers the
+ * element or taps are switched off there (e.g. a layer outside an open sheet).
+ */
+export async function tap(page, selector, text) {
+  const handle = await page.waitForFunction(
+    (s, t) =>
+      [...document.querySelectorAll(s)].reverse().find((e) => (!t || e.textContent.trim() === t || e.getAttribute('aria-label') === t) && e.getClientRects().length && !e.disabled),
+    { timeout: 10000 },
+    selector,
+    text ?? null,
+  )
+  const el = handle.asElement()
+  // Like a person, wait for a sheet to finish sliding in before putting a finger down.
+  let point = null
+  for (let i = 0; i < 30 && !point; i++) {
+    await el.evaluate((e) => e.scrollIntoView({ block: 'center' }))
+    const box = await el.boundingBox()
+    if (box) {
+      const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+      const reachable = await el.evaluate(
+        (e, x, y) => {
+          const hit = document.elementFromPoint(x, y)
+          return !!hit && (e === hit || e.contains(hit))
+        },
+        x,
+        y,
+      )
+      await new Promise((r) => setTimeout(r, 150))
+      const settled = reachable && JSON.stringify(await el.boundingBox()) === JSON.stringify(box)
+      if (settled) point = [x, y]
+    }
+    if (!point) await new Promise((r) => setTimeout(r, 100))
+  }
+  if (!point) throw new Error(`"${text ?? selector}" can't be tapped: something else is under the finger`)
+  const [x, y] = point
+  await page.touchscreen.tap(x, y)
 }

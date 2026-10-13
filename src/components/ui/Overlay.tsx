@@ -27,6 +27,12 @@ interface ResponsiveOverlayProps {
  * One component, three presentations (UX-COMPONENTS.md §3):
  * bottom sheet below 840px, side panel (form) or centred dialog at 840px and up.
  */
+/**
+ * Full-screen layers opened from inside a sheet (the visit camera) are portaled to <body>, outside
+ * the sheet. Taps and focus there are not "outside" the sheet: it must stay open and quiet.
+ */
+const isOverlayLayer = (target: EventTarget | null) => target instanceof Element && !!target.closest('[data-overlay-layer]')
+
 export function ResponsiveOverlay({ open, onOpenChange, title, description, variant = 'short', footer, dirty, dismissible = true, children }: ResponsiveOverlayProps) {
   const sheet = useIsSheetLayout()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -87,9 +93,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
     <>
       {header}
       {discardBar}
-      <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 expanded:px-6', variant === 'choice' ? 'px-0 expanded:px-0' : 'pb-4')}>
-        {children}
-      </div>
+      <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 expanded:px-6', variant === 'choice' ? 'px-0 expanded:px-0' : 'pb-4')}>{children}</div>
       {footer && <div className="border-t border-separator bg-overlay px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] expanded:px-6 expanded:pb-4">{footer}</div>}
     </>
   )
@@ -100,6 +104,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-backdrop backdrop-blur-[2px]" />
           <Drawer.Content
+            onInteractOutside={(e) => isOverlayLayer(e.target) && e.preventDefault()}
             className={cn(
               'fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[28px] bg-overlay text-overlay-foreground shadow-overlay outline-none',
               variant === 'form' ? 'h-[92dvh]' : 'max-h-[92dvh]',
@@ -120,6 +125,7 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
         <Dialog.Overlay className="overlay-scrim fixed inset-0 z-40 bg-backdrop backdrop-blur-[2px]" />
         <Dialog.Content
           onPointerDownOutside={(e) => !dismissible && e.preventDefault()}
+          onInteractOutside={(e) => isOverlayLayer(e.target) && e.preventDefault()}
           onEscapeKeyDown={(e) => {
             if (!dismissible) e.preventDefault()
             else if (dirty) {
@@ -146,11 +152,7 @@ function Title({ sheet, className, children }: { sheet: boolean; className?: str
 }
 
 function Description({ sheet, className, children }: { sheet: boolean; className?: string; children: ReactNode }) {
-  return sheet ? (
-    <Drawer.Description className={className}>{children}</Drawer.Description>
-  ) : (
-    <Dialog.Description className={className}>{children}</Dialog.Description>
-  )
+  return sheet ? <Drawer.Description className={className}>{children}</Drawer.Description> : <Dialog.Description className={className}>{children}</Dialog.Description>
 }
 
 // ---------------------------------------------------------------- confirmation

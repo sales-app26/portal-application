@@ -11,6 +11,8 @@ export const ids = {
   d2d: '44444444-4444-4444-8444-444444444444',
   other: '66666666-6666-4666-8666-666666666666',
   lead: '22222220-2222-4222-8222-222222222222',
+  /** A lead in the door-to-door campaign: its follow-ups need a visit photo. */
+  d2dLead: '22222225-2222-4222-8222-222222222222',
   transfer: '77777777-7777-4777-8777-777777777777',
 }
 
@@ -763,7 +765,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       }
       return ok({ entry: entry(8), lead: { ...lead(0), ...(status ? { status } : {}) } }, 'Follow-up saved.', 201)
     }
-    if ((m = p.match(/^\/leads\/([^/]+)$/))) return ok(detail({ ...lead(Number(m[1][7])), id: m[1] }))
+    if ((m = p.match(/^\/leads\/([^/]+)$/))) return ok(detail({ ...lead(Number(m[1][7]), m[1] === ids.d2dLead ? ids.d2d : ids.online), id: m[1] }))
     // ---- release notes
     if (p === '/versions/latest') {
       const live = versions.find((v) => v.isPublished)

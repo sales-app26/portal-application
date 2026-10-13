@@ -1,7 +1,7 @@
 // Browser tests against a fake API: node --test e2e/   (or npm run test:e2e)
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
+import { tap, click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -142,15 +142,50 @@ describe('deals, reasons and the agenda', () => {
 })
 
 describe('visit proof (door-to-door)', () => {
+  test('log follow-up with a live photo, tapped like a finger, saves photo and location', async () => {
+    const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.d2d })
+    await go(`/leads/${ids.d2dLead}`)
+    await tap(page, 'button', 'Log follow-up')
+    await waitForText(page, 'Save follow-up')
+    await tap(page, 'button > span > span.text-title-sm', 'Take photo')
+    await tap(page, 'button[aria-label="Take photo"]')
+    await tap(page, 'button', 'Use photo')
+    await waitForText(page, 'Photo taken')
+    assert.ok(!(await page.evaluate(() => document.body.innerText.includes('Discard what you typed?'))), 'the sheet stayed quiet')
+    await fill(page, 'Note', 'Met the owner at the counter, wants pricing.')
+    await tap(page, 'button', 'Save follow-up')
+    await waitForText(page, 'Follow-up saved.')
+    const w = api.writes.find((x) => x.path === `/leads/${ids.d2dLead}/follow-ups`)
+    assert.ok(w, 'follow-up was posted')
+    assert.match(w.contentType, /multipart\/form-data/)
+    for (const field of ['photo', 'latitude', 'longitude', 'gpsAccuracyM', 'captureToken', 'note']) assert.ok(w.body.includes(`name="${field}"`), `multipart has ${field}`)
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('closing the camera with a tap leaves the follow-up form open', async () => {
+    const { page, go } = await app.open(PHONE, { projectId: ids.d2d })
+    await go(`/leads/${ids.d2dLead}`)
+    await tap(page, 'button', 'Log follow-up')
+    await tap(page, 'button > span > span.text-title-sm', 'Take photo')
+    await tap(page, 'button[aria-label="Close camera"]')
+    await page.waitForFunction(() => !document.querySelector('[aria-label="Visit photo"]'), { timeout: 3000 })
+    await sleep(400)
+    const text = await page.evaluate(() => document.body.innerText)
+    assert.ok(text.includes('Save follow-up'), 'form still open')
+    assert.ok(!text.includes('Discard what you typed?'), 'no discard prompt')
+    await page.close()
+  })
+
   test('add lead with a live photo sends multipart with photo, GPS and capture token', async () => {
     const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
-    await click(page, 'Take photo', 'button > span > span.text-title-sm')
+    // Real taps: the camera sits outside the sheet, and must still take a finger.
+    await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     // Shutter enables once the fake camera and the fixed GPS position are ready.
-    await page.waitForSelector('button[aria-label="Take photo"]:not([disabled])', { timeout: 10000 })
-    await click(page, 'Take photo', 'button[aria-label="Take photo"]')
-    await click(page, 'Use photo')
+    await tap(page, 'button[aria-label="Take photo"]')
+    await tap(page, 'button', 'Use photo')
     await waitForText(page, 'Photo taken')
     await waitForText(page, '± 12 m')
     await fill(page, 'Contact person', 'New Client')
@@ -167,7 +202,10 @@ describe('visit proof (door-to-door)', () => {
       assert.ok(w.body.includes(`name="${field}"`), `multipart has ${field}`)
     assert.match(w.body, /name="phone"\r\n\r\n9876543210/)
     assert.match(w.body, /name="photo"; filename="visit.jpg"\r\nContent-Type: image\/jpeg/)
-    assert.ok(api.writes.some((x) => x.path === '/visits/capture-token'), 'capture token requested')
+    assert.ok(
+      api.writes.some((x) => x.path === '/visits/capture-token'),
+      'capture token requested',
+    )
     assert.deepEqual(errors, [])
     await page.close()
   })
@@ -363,6 +401,52 @@ describe('timelines and maps', () => {
     await page.waitForSelector('.leaflet-container .map-pin', { timeout: 8000 })
     assert.ok(await page.$('[aria-label="Open visit photo"]'))
     assert.deepEqual(errors, [])
+    await page.close()
+  })
+})
+
+describe('speaking a note', () => {
+  // Like iPhone: words come through as "not final yet", and Stop never gets an "ended" back.
+  const fakeIphoneMic = () => {
+    window.SpeechRecognition = window.webkitSpeechRecognition = class {
+      start() {
+        window.__mic = this
+        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: 'owner wants a demo on friday' }], { isFinal: false })] }), 50)
+      }
+      stop() {}
+      abort() {}
+    }
+  }
+
+  test('tap to stop always stops, and keeps the words heard', async () => {
+    const { page, go, errors } = await app.open(PHONE)
+    await page.evaluateOnNewDocument(fakeIphoneMic)
+    await go(`/leads/${ids.lead}`)
+    await click(page, 'Log follow-up')
+    await click(page, 'Speak')
+    await waitForText(page, '“owner wants a demo on friday”')
+    await click(page, 'Listening… tap to stop')
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Speak'), { timeout: 2000 })
+    assert.ok((await page.$eval('textarea[name=note]', (t) => t.value)).includes('owner wants a demo on friday'))
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('a blocked microphone says what to do', async () => {
+    const { page, go } = await app.open(PHONE)
+    await page.evaluateOnNewDocument(() => {
+      window.SpeechRecognition = window.webkitSpeechRecognition = class {
+        start() {
+          setTimeout(() => this.onerror?.({ error: 'not-allowed' }), 50)
+        }
+        stop() {}
+      }
+    })
+    await go(`/leads/${ids.lead}`)
+    await click(page, 'Log follow-up')
+    await click(page, 'Speak')
+    await waitForText(page, 'Allow the microphone for Pronttera')
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Speak'), { timeout: 2000 })
     await page.close()
   })
 })

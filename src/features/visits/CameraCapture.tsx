@@ -140,7 +140,15 @@ export function CameraCapture({ open, onClose, onCapture }: Props) {
     }
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Visit photo" className="fixed inset-0 z-[70] flex flex-col bg-surface-dark text-on-dark select-none">
+    // pointer-events-auto: a sheet underneath turns taps off on <body>; data-overlay-layer keeps
+    // that sheet from treating taps here as "outside" and closing.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Visit photo"
+      data-overlay-layer
+      className="pointer-events-auto fixed inset-0 z-[70] flex flex-col bg-surface-dark text-on-dark select-none"
+    >
       <div className="flex items-center gap-2 px-2 pt-[max(8px,env(safe-area-inset-top))] pb-2">
         <IconButton icon="multiply" label="Close camera" tone="dark" onClick={onClose} />
         <div className="flex-1" />

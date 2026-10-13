@@ -26,7 +26,16 @@ interface Props<T extends FieldValues> {
 const n = <T extends FieldValues>(name: keyof FollowUpValues) => name as Path<T>
 
 /** What reps write most. A tap fills the note; each is long enough to pass the 5-character rule. */
-const QUICK_NOTES = ['No answer', 'Busy, call back later', 'Spoke to the owner', 'Interested, wants details', 'Sent pricing on WhatsApp', 'Demo given', 'Shop was closed', 'Not the decision maker']
+const QUICK_NOTES = [
+  'No answer',
+  'Busy, call back later',
+  'Spoke to the owner',
+  'Interested, wants details',
+  'Sent pricing on WhatsApp',
+  'Demo given',
+  'Shop was closed',
+  'Not the decision maker',
+]
 
 const QUICK_DATES = [
   { label: 'Tomorrow', days: 1 },
@@ -51,11 +60,7 @@ export function FollowUpFields<T extends FieldValues>({ projectId, statuses, con
         render={({ field }) => <StatusChoice statuses={statuses} value={field.value as LeadStatus | null} onChange={field.onChange} error={errors.status?.message} />}
       />
       {status && REASON_STATUSES.includes(status) && (
-        <Controller
-          control={control}
-          name={n<T>('reason')}
-          render={({ field }) => <ReasonChoice value={(field.value as LostReason | null) ?? null} onChange={field.onChange} />}
-        />
+        <Controller control={control} name={n<T>('reason')} render={({ field }) => <ReasonChoice value={(field.value as LostReason | null) ?? null} onChange={field.onChange} />} />
       )}
       {(status === 'converted' || dealAlways) && (
         <div className={cn('flex flex-col gap-4 rounded-2xl p-4', status === 'converted' ? 'bg-success-soft' : 'bg-surface-secondary')}>
@@ -110,7 +115,13 @@ export function FollowUpFields<T extends FieldValues>({ projectId, statuses, con
                   const ymd = addDays(todayIST(), q.days)
                   const on = field.value === ymd
                   return (
-                    <button key={q.label} type="button" aria-pressed={on} onClick={() => field.onChange(on ? '' : ymd)} className={cn(chip, on ? 'bg-ink text-on-ink' : 'bg-surface-strong text-ink')}>
+                    <button
+                      key={q.label}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => field.onChange(on ? '' : ymd)}
+                      className={cn(chip, on ? 'bg-ink text-on-ink' : 'bg-surface-strong text-ink')}
+                    >
                       {q.label}
                     </button>
                   )
@@ -124,7 +135,9 @@ export function FollowUpFields<T extends FieldValues>({ projectId, statuses, con
         <Controller
           control={control}
           name={n<T>('location')}
-          render={({ field }) => <LocationField projectId={projectId} value={(field.value as string) ?? ''} onChange={field.onChange} onBlur={field.onBlur} error={errors.location?.message} />}
+          render={({ field }) => (
+            <LocationField projectId={projectId} value={(field.value as string) ?? ''} onChange={field.onChange} onBlur={field.onBlur} error={errors.location?.message} />
+          )}
         />
       )}
     </>
@@ -186,6 +199,11 @@ function NoteField({
           </button>
         ))}
       </div>
+      {speech.listening && (
+        <p aria-live="polite" className="text-body-sm text-body">
+          {speech.heard ? <>“{speech.heard}”</> : 'Speak now. Your words appear in the note.'}
+        </p>
+      )}
     </div>
   )
 }
