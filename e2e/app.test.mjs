@@ -347,9 +347,10 @@ describe('timelines and maps', () => {
     await go('/day')
     await click(page, 'Open visit photo')
     await waitForText(page, '18.50000, 73.90000') // the last visit of the day was opened
-    await waitForText(page, 'Open in Maps')
+    await waitForText(page, 'Taken at 18.50000, 73.90000') // no place name known: the position itself
+    await waitForText(page, 'Open map')
     await page.evaluate(() => history.back())
-    await page.waitForFunction(() => !document.querySelector('[aria-label="Visit photo"]') && !document.body.innerText.includes('Open in Maps'), { timeout: 3000 })
+    await page.waitForFunction(() => !document.querySelector('[aria-label="Visit photo"]'), { timeout: 3000 })
     assert.equal(await page.evaluate(() => location.pathname), '/day')
     assert.deepEqual(errors, [])
     await page.close()
@@ -447,6 +448,51 @@ describe('speaking a note', () => {
     await click(page, 'Speak')
     await waitForText(page, 'Allow the microphone for Pronttera')
     await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Speak'), { timeout: 2000 })
+    await page.close()
+  })
+})
+
+describe('iPad', () => {
+  const IPAD = { width: 820, height: 1180, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+  const IPAD_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15'
+  const drag = async (page, x, from, to) => {
+    await page.touchscreen.touchStart(x, from)
+    for (let y = from; y <= to; y += 25) await page.touchscreen.touchMove(x, y)
+    await page.touchscreen.touchEnd()
+  }
+
+  test('the Add lead sheet stays put when dragged', async () => {
+    const { page, go } = await app.open(IPAD)
+    await page.setUserAgent(IPAD_UA)
+    await go('/home')
+    await click(page, 'Add lead')
+    await waitForText(page, 'Save lead')
+    await sleep(600)
+    const title = await page.$$eval('[role=dialog] h2', (h) =>
+      h
+        .map((e) => e.getBoundingClientRect())
+        .find((r) => r.height)
+        ?.toJSON(),
+    )
+    await drag(page, 410, title.y + 10, title.y + 600)
+    await sleep(800)
+    const text = await page.evaluate(() => document.body.innerText)
+    assert.ok(text.includes('Save lead'), 'sheet still open')
+    assert.ok(!text.includes('Discard what you typed?'), 'no discard prompt')
+    await page.close()
+  })
+
+  test('Speak opens the keyboard on the note and points at its mic', async () => {
+    const { page, go } = await app.open(IPAD)
+    await page.setUserAgent(IPAD_UA)
+    // iPadOS says "Macintosh"; a real iPad reports 5 touch points (the emulator says 1).
+    await page.evaluateOnNewDocument(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }))
+    await go(`/leads/${ids.lead}`)
+    await click(page, 'Log follow-up')
+    await waitForText(page, 'Save follow-up')
+    await tap(page, 'button', 'Speak')
+    await waitForText(page, 'Tap the 🎤 on your keyboard and speak.')
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'note')
     await page.close()
   })
 })

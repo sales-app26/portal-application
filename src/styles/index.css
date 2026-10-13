@@ -284,6 +284,11 @@
 }
 
 @layer base {
+  /* Browsers let a fieldset grow to its widest content; a row of chips would push the form off screen. */
+  fieldset {
+    min-width: 0;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     background: var(--color-canvas);

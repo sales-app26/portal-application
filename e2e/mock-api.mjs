@@ -85,7 +85,16 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   const day = () => [
     { ...entry(1, { note: 'Phone call, asked for a quote.' }), lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' }, project: projectRef(0) },
     {
-      ...entry(2, { note: 'Visited the shop, owner present.', hasPhoto: true, photoUrl: PIXEL, latitude: 18.4966, longitude: 73.8993, gpsAccuracyM: 12, projectId: ids.d2d }),
+      ...entry(2, {
+        note: 'Visited the shop, owner present.',
+        hasPhoto: true,
+        photoUrl: PIXEL,
+        latitude: 18.4966,
+        longitude: 73.8993,
+        gpsAccuracyM: 12,
+        placeName: 'Wanowrie Road, Wanowrie, Pune 411040',
+        projectId: ids.d2d,
+      }),
       lead: { id: '22222221-2222-4222-8222-222222222222', name: 'Imran Shaikh', businessName: null },
       project: projectRef(1),
     },
@@ -498,6 +507,14 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       })
     if (p === '/me/agenda') return ok({ overdue: 1, today: 3, tomorrow: 2, thisWeek: 5, cold: 3, untouched: 4 })
     if (p === '/me/due-today') return ok(page([0, 1, 2, 3].map((i) => lead(i))))
+    // The area a position is in (the API asks OpenStreetMap). Out at sea: no name known.
+    if (p === '/geo/reverse') {
+      const lat = Number(query.get('lat'))
+      const lng = Number(query.get('lng'))
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { status: 400, body: { success: false, errorCode: 'VALIDATION_FAILED', message: 'Some details need a fix.' } }
+      if (Math.abs(lat) < 1 && Math.abs(lng) < 1) return ok(null)
+      return ok({ area: 'Wanowrie', label: 'Wanowrie Road, Wanowrie, Pune 411040' })
+    }
     if (p === '/visits/capture-token') return ok({ captureToken: 'v1.test.sig', issuedAt: iso(), expiresAt: new Date(Date.now() + 600_000).toISOString() }, 'Saved.')
     if (p === '/timeline') return ok({ date: today, user: { id: me.id, name: me.name }, entries: day(), followUps: 3, visits: 2, statusChanges: 1, message: null })
     if (p === '/dashboard') return ok(dashboard())

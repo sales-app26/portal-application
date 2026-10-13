@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { FeedbackButton, FeedbackList } from '@/features/team/EntryFeedback'
+import { VisitPlace } from '@/features/visits/VisitPlace'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/Choice'
 import { Tag } from '@/components/ui/Display'
@@ -66,7 +67,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
         )}
 
         {isVisit && (
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex items-start gap-3">
             <button
               type="button"
               onClick={onOpenPhoto}
@@ -75,12 +76,8 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
             >
               {entry.photoUrl ? <img src={entry.photoUrl} alt="" loading="lazy" className="size-full object-cover" /> : <Icon name="image" className="text-muted" />}
             </button>
-            <div className="flex min-w-0 flex-col items-start gap-1.5">
-              {entry.gpsAccuracyM !== null && (
-                <span className="flex items-center gap-2 tabular-nums text-caption text-body">
-                  ± {Math.round(entry.gpsAccuracyM)} m{entry.lowAccuracy && <Tag className="font-sans">Location is approximate</Tag>}
-                </span>
-              )}
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+              <VisitPlace entry={entry} />
               {hasGps && (
                 <Button variant="secondary" size="sm" icon="marker" onClick={onOpenMap}>
                   Map

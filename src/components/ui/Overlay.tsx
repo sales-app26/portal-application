@@ -100,18 +100,26 @@ export function ResponsiveOverlay({ open, onOpenChange, title, description, vari
 
   if (sheet) {
     return (
-      <Drawer.Root open={open} onOpenChange={(o) => (o ? onOpenChange(true) : requestClose())} repositionInputs dismissible={dismissible && !confirmDiscard}>
+      // Forms stay put: no drag-to-close (handleOnly with no handle), so scrolling or a stray swipe
+      // on a phone or iPad never moves the sheet. They close with ✕ or Back. Pickers still swipe away.
+      <Drawer.Root
+        open={open}
+        onOpenChange={(o) => (o ? onOpenChange(true) : requestClose())}
+        repositionInputs
+        dismissible={dismissible && !confirmDiscard}
+        handleOnly={variant === 'form'}
+      >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-backdrop backdrop-blur-[2px]" />
           <Drawer.Content
             onInteractOutside={(e) => isOverlayLayer(e.target) && e.preventDefault()}
             className={cn(
               'fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[28px] bg-overlay text-overlay-foreground shadow-overlay outline-none',
-              variant === 'form' ? 'h-[92dvh]' : 'max-h-[92dvh]',
+              variant === 'form' ? 'h-[92dvh] pt-2' : 'max-h-[92dvh]',
               !footer && 'pb-safe',
             )}
           >
-            <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 flex-none rounded-pill bg-border" />
+            {variant !== 'form' && <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 flex-none rounded-pill bg-border" />}
             {body}
           </Drawer.Content>
         </Drawer.Portal>

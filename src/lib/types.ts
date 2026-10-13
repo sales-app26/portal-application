@@ -148,6 +148,8 @@ export interface Entry {
   longitude: number | null
   gpsAccuracyM: number | null
   lowAccuracy: boolean
+  /** Where a visit photo was taken, from OpenStreetMap, e.g. "Wanowrie Road, Wanowrie, Pune 411040". */
+  placeName?: string | null
   user: PersonRef
   createdAt: string
   updatedAt: string
@@ -159,6 +161,12 @@ export interface Entry {
   coveringFor?: PersonRef | null
   /** A manager's notes on this entry. */
   feedback?: { id: string; body: string; user: PersonRef; createdAt: string }[]
+}
+
+/** GET /geo/reverse: the area a position is in (OpenStreetMap). */
+export interface PlaceName {
+  area: string | null
+  label: string
 }
 
 export interface TimelineEntry extends Entry {

@@ -8,9 +8,12 @@ import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import type { VisitProof } from '@/features/leads/VisitProof'
+import type { PlaceName } from '@/lib/types'
 import { fetchCaptureToken, type IssuedToken } from './captureToken'
+import { shortPlace, usePlaceNear } from './place'
 import { captureFrame, useCamera } from './useCamera'
 import { useGps, type GpsFix } from './useGps'
+import { OsmCredit } from './VisitPlace'
 
 const LOW_ACCURACY_M = 100
 
@@ -38,6 +41,8 @@ export function CameraCapture({ open, onClose, onCapture }: Props) {
   const viewing = open && !shot
   const camera = useCamera(viewing)
   const gps = useGps(viewing)
+  // "Near Wanowrie": where the photo's stamp will say the rep was.
+  const near = usePlaceNear(open ? (shot?.fix ?? gps.fix) : null)
 
   useOverlayHistory(open, onClose)
 
@@ -152,7 +157,7 @@ export function CameraCapture({ open, onClose, onCapture }: Props) {
       <div className="flex items-center gap-2 px-2 pt-[max(8px,env(safe-area-inset-top))] pb-2">
         <IconButton icon="multiply" label="Close camera" tone="dark" onClick={onClose} />
         <div className="flex-1" />
-        {!blocker && <GpsPill state={gps.state} fix={shot?.fix ?? gps.fix} />}
+        {!blocker && <GpsPill state={gps.state} fix={shot?.fix ?? gps.fix} place={near} />}
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -228,7 +233,7 @@ export function CameraCapture({ open, onClose, onCapture }: Props) {
   )
 }
 
-function GpsPill({ state, fix }: { state: string; fix: GpsFix | null }) {
+function GpsPill({ state, fix, place }: { state: string; fix: GpsFix | null; place: PlaceName | null }) {
   if (!fix)
     return (
       <span className="flex h-9 items-center gap-2 rounded-pill bg-surface-dark-elevated px-3 text-caption-strong" aria-live="polite">
@@ -237,13 +242,20 @@ function GpsPill({ state, fix }: { state: string; fix: GpsFix | null }) {
       </span>
     )
   const low = fix.accuracy > LOW_ACCURACY_M
+  const area = place ? shortPlace(place) : null
   return (
-    <span
-      className={cn('flex h-9 items-center gap-1.5 rounded-pill bg-surface-dark-elevated px-3 tabular-nums text-caption-strong', low ? 'text-accent-yellow' : 'text-on-dark')}
-      aria-live="polite"
-      aria-label={`Location found, within about ${Math.round(fix.accuracy)} metres${low ? ', location is approximate' : ''}`}
-    >
-      <Icon name={low ? 'high-priority' : 'near-me'} size={16} />± {Math.round(fix.accuracy)} m{low && <span className="font-sans">· Approximate</span>}
+    <span className="flex min-w-0 flex-col items-end gap-0.5">
+      <span
+        className={cn('flex h-9 max-w-[70vw] items-center gap-1.5 rounded-pill bg-surface-dark-elevated px-3 tabular-nums text-caption-strong', low ? 'text-accent-yellow' : 'text-on-dark')}
+        aria-live="polite"
+        aria-label={`Location found, within about ${Math.round(fix.accuracy)} metres${low ? ', location is approximate' : ''}${area ? `, near ${area}` : ''}`}
+      >
+        <Icon name={low ? 'high-priority' : 'near-me'} size={16} className="flex-none" />
+        <span className="flex-none">± {Math.round(fix.accuracy)} m</span>
+        {low && <span className="flex-none font-sans">· Approximate</span>}
+        {area && <span className="min-w-0 truncate font-sans">· Near {area}</span>}
+      </span>
+      {area && <OsmCredit dark className="self-end pr-3" />}
     </span>
   )
 }

@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Controller, useWatch, type Control, type FieldErrors, type FieldValues, type Path, type UseFormRegister } from 'react-hook-form'
 import { StatusChoice } from '@/components/ui/Choice'
 import { DatePicker } from '@/components/ui/DatePicker'
@@ -9,7 +10,7 @@ import type { LeadStatus, LostReason } from '@/lib/types'
 import { REASON_STATUSES, type FollowUpValues } from './entrySchema'
 import { LocationField } from './LocationField'
 import { NEXT_DATE_MAX, NEXT_DATE_MIN, NOTE_MIN, nextDateRule } from './rules'
-import { useSpeech } from './useSpeech'
+import { isAppleTouch, useSpeech } from './useSpeech'
 
 interface Props<T extends FieldValues> {
   projectId: string
@@ -167,11 +168,29 @@ function NoteField({
     onChange(base ? `${base.replace(/[.\s]*$/, '')}. ${text}` : text)
   }
   const speech = useSpeech(append)
+  // On iPhone and iPad, Speak opens the keyboard on the note and points at its mic instead.
+  const keyboardMic = isAppleTouch()
+  const [dictating, setDictating] = useState(false)
+  const textarea = useRef<HTMLTextAreaElement | null>(null)
+  const setRef = (el: HTMLTextAreaElement | null) => {
+    textarea.current = el
+    if (typeof inputRef === 'function') inputRef(el)
+    else if (inputRef) (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
+  }
+  const speak = () => {
+    if (!keyboardMic) return speech.listening ? speech.stop() : speech.start()
+    const el = textarea.current
+    if (!el) return
+    // Focus inside the tap itself, or iOS won't open the keyboard.
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+    setDictating(true)
+  }
 
   return (
     <div className="flex flex-col gap-2">
       <TextAreaField
-        ref={inputRef}
+        ref={setRef}
         name={name}
         label="Note"
         placeholder="What happened? What did the client say?"
@@ -179,13 +198,17 @@ function NoteField({
         hint={hint}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
+        onBlur={() => {
+          setDictating(false)
+          onBlur()
+        }}
       />
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] expanded:-mx-6 expanded:px-6">
-        {speech.supported && (
+        {(speech.supported || keyboardMic) && (
           <button
             type="button"
-            onClick={speech.listening ? speech.stop : speech.start}
+            onPointerDown={(e) => keyboardMic && e.preventDefault() /* keep the keyboard up */}
+            onClick={speak}
             aria-pressed={speech.listening}
             className={cn(chip, 'inline-flex items-center gap-1.5 font-semibold', speech.listening ? 'animate-pulse bg-down text-on-primary' : 'bg-primary/10 text-primary')}
           >
@@ -199,6 +222,11 @@ function NoteField({
           </button>
         ))}
       </div>
+      {dictating && (
+        <p aria-live="polite" className="text-body-sm text-body">
+          Tap the 🎤 on your keyboard and speak. Your words go into the note.
+        </p>
+      )}
       {speech.listening && (
         <p aria-live="polite" className="text-body-sm text-body">
           {speech.heard ? <>“{speech.heard}”</> : 'Speak now. Your words appear in the note.'}

@@ -21,6 +21,13 @@ const Ctor = (): RecognitionCtor | undefined =>
     : ((window as unknown as Record<string, RecognitionCtor | undefined>).SpeechRecognition ??
       (window as unknown as Record<string, RecognitionCtor | undefined>).webkitSpeechRecognition)
 
+/**
+ * iPhone and iPad (iPadOS says "Macintosh", but has touch). Their browser speech recognition fails
+ * silently in many setups, home-screen apps above all, while the keyboard's own mic always works.
+ */
+export const isAppleTouch = () =>
+  typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1))
+
 /** Long enough for a note, short enough that a forgotten mic stops itself. */
 const MAX_LISTEN_MS = 20_000
 

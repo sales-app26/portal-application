@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { StatusChip } from '@/components/ui/Choice'
 import { FeedbackButton, FeedbackList } from '@/features/team/EntryFeedback'
+import { VisitPlace } from '@/features/visits/VisitPlace'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
@@ -41,7 +42,7 @@ export function EntryItem({
             </span>
           )}
           {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
-          {entry.lowAccuracy && <Tag>Location is approximate</Tag>}
+          {entry.lowAccuracy && !isVisit && <Tag>Location is approximate</Tag>}
           {entry.entryType === 'status_change' && <Tag>Changed by hand</Tag>}
         </div>
         {entry.note && <p className="mt-2 text-body-md whitespace-pre-line text-ink">{entry.note}</p>}
@@ -52,10 +53,10 @@ export function EntryItem({
               {entry.location.name}
             </span>
           )}
-          {isVisit && entry.gpsAccuracyM !== null && <span className="tabular-nums">± {Math.round(entry.gpsAccuracyM)} m</span>}
           {!mine && <span>by {entry.user.name}</span>}
           {entry.edited && <span>Edited {formatTime(entry.updatedAt)}</span>}
         </p>
+        {isVisit && <VisitPlace entry={entry} className="mt-2" />}
         {entry.coveringFor && (
           <p className="mt-1 text-caption text-muted">
             Logged by {entry.user.name}, covering for {entry.coveringFor.name}

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
 import { CameraCapture } from '@/features/visits/CameraCapture'
+import { shortPlace, usePlaceNear } from '@/features/visits/place'
+import { OsmCredit } from '@/features/visits/VisitPlace'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
 
@@ -24,6 +26,8 @@ const SAFETY_MS = 15_000
 export function VisitProofField({ value, onChange, error }: { value: VisitProof | null; onChange: (p: VisitProof | null) => void; error?: string }) {
   const [cameraOpen, setCameraOpen] = useState(false)
   const remaining = useRemaining(value ? value.deadline - SAFETY_MS : null)
+  // Where the photo's stamp will say the visit was (already known if the camera showed it).
+  const near = usePlaceNear(value)
   const [expired, setExpired] = useState(false)
 
   // Past the window the photo is discarded and must be retaken (PRD §5.7).
@@ -95,6 +99,12 @@ export function VisitProofField({ value, onChange, error }: { value: VisitProof 
           <p className="mt-1 flex flex-wrap items-center gap-2 tabular-nums text-caption text-body">
             ± {Math.round(value.gpsAccuracyM)} m{low && <Tag className="font-sans">Location is approximate</Tag>}
           </p>
+          {near && (
+            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-caption text-body">
+              <span className="min-w-0 truncate">Near {shortPlace(near)}</span>
+              <OsmCredit />
+            </p>
+          )}
           <p className={cn('mt-1 text-caption', (remaining ?? 0) < 120_000 ? 'text-down' : 'text-muted')} aria-live="off">
             Save within {mins}:{String(secs).padStart(2, '0')}
           </p>

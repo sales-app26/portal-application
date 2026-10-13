@@ -74,7 +74,7 @@ describe('axe: open overlays', () => {
     const { page, go } = await app.open(PHONE)
     await go('/day')
     await click(page, 'Open visit photo')
-    await waitForText(page, 'Open in Maps')
+    await waitForText(page, 'Open map')
     await sleep(400)
     assert.deepEqual(await axeViolations(page), [])
     await page.close()

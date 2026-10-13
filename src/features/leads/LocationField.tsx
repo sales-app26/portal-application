@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId, useRef, useState } from 'react'
 import { FieldShell, inputBox } from '@/components/ui/Field'
+import { Spinner } from '@/components/ui/Spinner'
+import { fetchPlace, shortPlace } from '@/features/visits/place'
+import { OsmCredit } from '@/features/visits/VisitPlace'
 import { useDebounced } from '@/hooks/useDebounced'
 import { Icon } from '@/icons'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { LocationSuggestion } from '@/lib/types'
 
@@ -19,7 +22,8 @@ interface LocationFieldProps {
 /**
  * Free text with suggestions from the project's own locations (PRD §5.8,
  * UX-COMPONENTS.md §4.3). Suggestions render inline under the field on phones so
- * the keyboard can't cover them, and as a dropdown on laptops.
+ * the keyboard can't cover them, and as a dropdown on laptops. "Use my location" fills
+ * in the area the phone is in (looked up on OpenStreetMap by the API).
  */
 export function LocationField({ projectId, value, onChange, onBlur, error, label = 'Location' }: LocationFieldProps) {
   const id = useId()
@@ -28,6 +32,10 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
   const [active, setActive] = useState(-1)
   const blurTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const q = useDebounced(value.trim(), 200)
+  const here = useMyLocation((name) => {
+    onChange(name)
+    onBlur?.()
+  })
 
   const { data = [] } = useQuery({
     queryKey: ['locations', projectId, q],
@@ -73,6 +81,7 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
             onChange={(e) => {
               onChange(e.target.value)
               setActive(-1)
+              here.clear()
             }}
             onFocus={() => {
               clearTimeout(blurTimer.current)
@@ -123,6 +132,73 @@ export function LocationField({ projectId, value, onChange, onBlur, error, label
           </ul>
         )}
       </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          onClick={() => void here.locate()}
+          disabled={here.busy}
+          className="pressable -ml-1 inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-body-sm font-semibold text-primary active:opacity-70 disabled:opacity-60"
+        >
+          {here.busy ? <Spinner size={16} /> : <Icon name="near-me" size={18} />}
+          {here.busy ? 'Finding your area…' : 'Use my location'}
+        </button>
+        {here.filled && (
+          <span className="inline-flex items-center gap-2 text-caption text-muted" role="status">
+            Filled in from your location <OsmCredit />
+          </span>
+        )}
+      </div>
+      {here.problem && (
+        <p role="alert" className="text-caption text-body">
+          {here.problem}
+        </p>
+      )}
     </FieldShell>
   )
+}
+
+/** Phone location → the area it is in → the field. Every failure ends in "type it instead". */
+function useMyLocation(fill: (name: string) => void) {
+  const [busy, setBusy] = useState(false)
+  const [filled, setFilled] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const locate = async () => {
+    setProblem(null)
+    setFilled(false)
+    if (!navigator.geolocation) {
+      setProblem('This phone can’t share its location here. Type the area instead.')
+      return
+    }
+    setBusy(true)
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 }),
+      )
+      const place = await fetchPlace(pos.coords.latitude, pos.coords.longitude)
+      if (!place) {
+        setProblem('We couldn’t find the area name here. Type it instead.')
+        return
+      }
+      fill(shortPlace(place).slice(0, 100))
+      setFilled(true)
+    } catch (e) {
+      setProblem(locationProblem(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return { busy, filled, problem, locate, clear: () => (setFilled(false), setProblem(null)) }
+}
+
+function locationProblem(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.code === 'RATE_LIMITED') return 'Too many tries. Wait a minute, or type the area.'
+    return e.isNetwork ? 'No internet right now. Type the area instead.' : 'We couldn’t look up your area. Type it instead.'
+  }
+  const code = (e as { code?: number } | null)?.code
+  if (code === 1) return 'Allow location for this app to use this, or type the area.'
+  if (code === 3) return 'Finding your location took too long. Step outside or near a window and try again, or type the area.'
+  return 'We couldn’t find your location. Turn on location and try again, or type the area.'
 }

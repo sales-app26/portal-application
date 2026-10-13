@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, IconButton } from '@/components/ui/Button'
-import { Skeleton, Tag } from '@/components/ui/Display'
+import { Skeleton } from '@/components/ui/Display'
+import { VisitPlace } from '@/features/visits/VisitPlace'
 import { useOverlayHistory } from '@/hooks/useOverlayHistory'
 import { formatDateTime } from '@/lib/format'
 import type { Entry } from '@/lib/types'
-import { openInMapsUrl } from './maps'
 import { fetchPhotoUrl } from './queries'
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * Full-screen photo (UX-COMPONENTS.md §3, §4.6): fresh signed URL, double-tap or
- * double-click to zoom, drag down to close, details panel with "Open in Maps".
+ * double-click to zoom, drag down to close, details panel with where it was taken and "Open map".
  */
 export function PhotoViewer({ entry, title, onClose }: Props) {
   useOverlayHistory(!!entry, onClose)
@@ -86,19 +86,7 @@ export function PhotoViewer({ entry, title, onClose }: Props) {
         <p className="text-body-sm">
           {entry.user.name} · {formatDateTime(entry.createdAt)}
         </p>
-        {hasGps && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="tabular-nums text-caption text-on-dark-soft">
-              {entry.latitude!.toFixed(5)}, {entry.longitude!.toFixed(5)} · ± {Math.round(entry.gpsAccuracyM ?? 0)} m
-            </span>
-            {entry.lowAccuracy && <Tag>Location is approximate</Tag>}
-            <Button asChild variant="outline-dark" size="sm" className="ml-auto">
-              <a href={openInMapsUrl(entry.latitude!, entry.longitude!)} target="_blank" rel="noreferrer">
-                Open in Maps
-              </a>
-            </Button>
-          </div>
-        )}
+        {hasGps && <VisitPlace entry={entry} tone="dark" mapButton />}
       </div>
     </div>,
     document.body,

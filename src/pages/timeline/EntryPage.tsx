@@ -4,13 +4,13 @@ import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/Choice'
-import { EmptyState, ErrorState, Skeleton, Tag } from '@/components/ui/Display'
+import { EmptyState, ErrorState, Skeleton } from '@/components/ui/Display'
 import { ListGroup, ListRow } from '@/components/ui/ListRow'
 import { EditEntryForm } from '@/features/timeline/EditEntryForm'
 import { LazyMap } from '@/features/timeline/LazyMap'
-import { openInMapsUrl } from '@/features/timeline/maps'
 import { PhotoViewer } from '@/features/timeline/PhotoViewer'
 import { useEntry } from '@/features/timeline/queries'
+import { VisitPlace } from '@/features/visits/VisitPlace'
 import { Icon } from '@/icons'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -74,17 +74,7 @@ export function EntryPage() {
                 interactive={false}
                 className="h-48 rounded-xl border border-hairline"
               />
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="tabular-nums text-caption text-body">
-                  {e.latitude!.toFixed(5)}, {e.longitude!.toFixed(5)} · ± {Math.round(e.gpsAccuracyM ?? 0)} m
-                </span>
-                {e.lowAccuracy && <Tag>Location is approximate</Tag>}
-                <Button asChild variant="secondary" size="sm" className="ml-auto">
-                  <a href={openInMapsUrl(e.latitude!, e.longitude!)} target="_blank" rel="noreferrer">
-                    Open in Maps
-                  </a>
-                </Button>
-              </div>
+              <VisitPlace entry={e} mapButton />
             </section>
           )}
 
