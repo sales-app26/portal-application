@@ -6,7 +6,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
   interested: 'Interested',
   follow_up_scheduled: 'Follow-up scheduled',
   not_interested: 'Not interested',
-  converted: 'Converted',
+  converted: 'Won',
   lost: 'Lost',
 }
 
@@ -41,7 +41,7 @@ export const SOURCE_LABEL: Record<LeadSource, string> = {
   whatsapp: 'WhatsApp',
   social: 'Social media',
   event: 'Event',
-  import: 'Imported',
+  import: 'From a sheet',
   other: 'Other',
 }
 /** What a rep can pick (imports set their own source). */
@@ -60,9 +60,9 @@ export const REASON_LABEL: Record<LostReason, string> = {
 export const REASONS = Object.keys(REASON_LABEL) as LostReason[]
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  super_admin: 'Super Admin',
-  moderator: 'Moderator',
-  sales_person: 'Sales Person',
+  super_admin: 'Sales head',
+  moderator: 'Sales manager',
+  sales_person: 'Sales rep',
 }
 
 // ---------------------------------------------------------------- India time
@@ -103,9 +103,7 @@ export function relativeDay(ymd: string): string {
 
 /** "3:42 pm" in India time for an ISO timestamp. */
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
-    .format(new Date(iso))
-    .toLowerCase()
+  return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ }).format(new Date(iso)).toLowerCase()
 }
 
 /** "today", "yesterday", "3 days ago", then a short date, in India time. */

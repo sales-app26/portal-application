@@ -1,3 +1,4 @@
+import { useMe } from '@/auth/AuthProvider'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { FilterChips } from '@/components/ui/Choice'
@@ -18,6 +19,9 @@ const validDate = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && s
 
 /** A person's day: date strip, project filter, entries oldest first, map (UX-COMPONENTS.md §9). */
 export function TimelineView({ userId }: { userId?: string }) {
+  const me = useMe()
+  // A manager viewing someone else's day can coach on each entry.
+  const canFeedback = !!userId && userId !== me.id && me.role !== 'sales_person'
   const [params, setParams] = useSearchParams()
   const date = validDate(params.get('date'))
   const [projectId, setProjectId] = useState('all')
@@ -35,7 +39,10 @@ export function TimelineView({ userId }: { userId?: string }) {
   const activeFilter = projects.some(([id]) => id === projectId) ? projectId : 'all'
 
   const points: MapPoint[] = useMemo(
-    () => entries.filter((e) => e.latitude !== null && e.longitude !== null).map((e, i) => ({ id: e.id, latitude: e.latitude!, longitude: e.longitude!, accuracy: e.gpsAccuracyM, label: String(i + 1) })),
+    () =>
+      entries
+        .filter((e) => e.latitude !== null && e.longitude !== null)
+        .map((e, i) => ({ id: e.id, latitude: e.latitude!, longitude: e.longitude!, accuracy: e.gpsAccuracyM, label: String(i + 1) })),
     [entries],
   )
   const numberOf = (id: string) => points.findIndex((p) => p.id === id) + 1 || undefined
@@ -62,6 +69,7 @@ export function TimelineView({ userId }: { userId?: string }) {
         <TimelineEntryCard
           key={e.id}
           entry={e}
+          canFeedback={canFeedback}
           number={numberOf(e.id)}
           selected={split && selectedId === e.id}
           showProject={projects.length > 1}
@@ -80,10 +88,19 @@ export function TimelineView({ userId }: { userId?: string }) {
       <DateStrip value={date} onChange={setDate} />
       {q.data && all.length > 0 && (
         <p className="text-body-sm text-body" aria-live="polite">
-          {[plural(q.data.followUps, 'follow-up'), plural(q.data.visits, 'visit'), q.data.statusChanges ? plural(q.data.statusChanges, 'status change') : null].filter(Boolean).join(' · ')}
+          {[plural(q.data.followUps, 'follow-up'), plural(q.data.visits, 'visit'), q.data.statusChanges ? plural(q.data.statusChanges, 'status change') : null]
+            .filter(Boolean)
+            .join(' · ')}
         </p>
       )}
-      {projects.length > 1 && <FilterChips label="Project" value={activeFilter} onChange={setProjectId} options={[{ value: 'all', label: 'All projects' }, ...projects.map(([id, name]) => ({ value: id, label: name }))]} />}
+      {projects.length > 1 && (
+        <FilterChips
+          label="Campaign"
+          value={activeFilter}
+          onChange={setProjectId}
+          options={[{ value: 'all', label: 'All campaigns' }, ...projects.map(([id, name]) => ({ value: id, label: name }))]}
+        />
+      )}
     </div>
   )
 
@@ -96,7 +113,13 @@ export function TimelineView({ userId }: { userId?: string }) {
             {list}
           </div>
           <div className="card card--default sticky top-20 h-[calc(100dvh-176px)] overflow-hidden rounded-2xl p-0">
-            {q.isLoading ? <Skeleton className="size-full rounded-none" /> : points.length ? <LazyMap points={points} selectedId={selectedId} onSelect={setSelectedId} className="size-full" /> : <EmptyState icon="marker" title="No visits with a location" body="Door-to-door visits appear here as numbered pins." className="pt-24" />}
+            {q.isLoading ? (
+              <Skeleton className="size-full rounded-none" />
+            ) : points.length ? (
+              <LazyMap points={points} selectedId={selectedId} onSelect={setSelectedId} className="size-full" />
+            ) : (
+              <EmptyState icon="marker" title="No visits with a location" body="Door-to-door visits appear here as numbered pins." className="pt-24" />
+            )}
           </div>
         </div>
       ) : (

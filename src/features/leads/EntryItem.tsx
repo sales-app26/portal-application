@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { StatusChip } from '@/components/ui/Choice'
+import { FeedbackButton, FeedbackList } from '@/features/team/EntryFeedback'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
@@ -7,7 +8,17 @@ import { formatDateTime, formatTime, REASON_LABEL, relativeDay } from '@/lib/for
 import type { Entry } from '@/lib/types'
 
 /** One row in a lead's history (PRD §5.11). A visit's photo opens the entry: full photo and map pin. */
-export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boolean; onDelete?: () => void }) {
+export function EntryItem({
+  entry,
+  mine,
+  onDelete,
+  canFeedback,
+}: {
+  entry: Entry
+  mine: boolean
+  onDelete?: () => void
+  /** A project admin, on someone else's entry. */ canFeedback?: boolean
+}) {
   const isVisit = entry.hasPhoto
   return (
     <li className="group relative flex gap-3 pb-6 last:pb-0">
@@ -30,8 +41,8 @@ export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boole
             </span>
           )}
           {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
-          {entry.lowAccuracy && <Tag>Low accuracy</Tag>}
-          {entry.entryType === 'status_change' && <Tag>Manual change</Tag>}
+          {entry.lowAccuracy && <Tag>Location is approximate</Tag>}
+          {entry.entryType === 'status_change' && <Tag>Changed by hand</Tag>}
         </div>
         {entry.note && <p className="mt-2 text-body-md whitespace-pre-line text-ink">{entry.note}</p>}
         <p className="mt-1 flex flex-wrap gap-x-2 text-caption text-muted">
@@ -45,9 +56,16 @@ export function EntryItem({ entry, mine, onDelete }: { entry: Entry; mine: boole
           {!mine && <span>by {entry.user.name}</span>}
           {entry.edited && <span>Edited {formatTime(entry.updatedAt)}</span>}
         </p>
+        {entry.coveringFor && (
+          <p className="mt-1 text-caption text-muted">
+            Logged by {entry.user.name}, covering for {entry.coveringFor.name}
+          </p>
+        )}
+        <FeedbackList entry={entry} />
+        {canFeedback && !mine && <FeedbackButton entry={entry} leadId={entry.leadId} />}
         {onDelete && (
           <Button variant="tertiary" size="sm" icon="trash" className="mt-1 -ml-2 text-down" onClick={onDelete}>
-            Delete entry
+            Delete follow-up
           </Button>
         )}
         {isVisit && entry.photoUrl && (

@@ -44,7 +44,11 @@ export function PhotoViewer({ entry, title, onClose }: Props) {
 
       <div
         className={zoomed ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 items-center justify-center overflow-hidden'}
-        style={{ transform: dragY ? `translateY(${dragY}px)` : undefined, opacity: dragY ? Math.max(0.4, 1 - dragY / 400) : 1, transition: dragY ? 'none' : 'transform 200ms, opacity 200ms' }}
+        style={{
+          transform: dragY ? `translateY(${dragY}px)` : undefined,
+          opacity: dragY ? Math.max(0.4, 1 - dragY / 400) : 1,
+          transition: dragY ? 'none' : 'transform 200ms, opacity 200ms',
+        }}
         onTouchStart={(e) => {
           if (!zoomed && e.touches.length === 1) touchStart.current = e.touches[0].clientY
         }}
@@ -87,7 +91,7 @@ export function PhotoViewer({ entry, title, onClose }: Props) {
             <span className="tabular-nums text-caption text-on-dark-soft">
               {entry.latitude!.toFixed(5)}, {entry.longitude!.toFixed(5)} · ± {Math.round(entry.gpsAccuracyM ?? 0)} m
             </span>
-            {entry.lowAccuracy && <Tag>Low accuracy</Tag>}
+            {entry.lowAccuracy && <Tag>Location is approximate</Tag>}
             <Button asChild variant="outline-dark" size="sm" className="ml-auto">
               <a href={openInMapsUrl(entry.latitude!, entry.longitude!)} target="_blank" rel="noreferrer">
                 Open in Maps

@@ -32,9 +32,14 @@ export function DateStrip({ value, onChange }: { value: string; onChange: (ymd: 
               aria-checked={on}
               aria-label={new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(date)}
               onClick={() => onChange(d)}
-              className={cn('pressable flex h-16 w-12 flex-none flex-col items-center justify-center rounded-lg', on ? 'bg-primary text-on-primary shadow-[0_6px_16px_-6px_var(--fab-glow)]' : 'bg-surface text-ink shadow-surface hover:bg-surface-secondary')}
+              className={cn(
+                'pressable flex h-16 w-12 flex-none flex-col items-center justify-center rounded-lg',
+                on ? 'bg-primary text-on-primary shadow-[0_6px_16px_-6px_var(--fab-glow)]' : 'bg-surface text-ink shadow-surface hover:bg-surface-secondary',
+              )}
             >
-              <span className={cn('text-caption-strong uppercase', on ? 'text-on-primary/80' : 'text-muted')}>{new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' }).format(date)}</span>
+              <span className={cn('text-caption-strong uppercase', on ? 'text-on-primary' : 'text-muted')}>
+                {new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' }).format(date)}
+              </span>
               <span className="tabular-nums text-number">{date.getUTCDate()}</span>
             </button>
           )
@@ -49,7 +54,10 @@ export function DateStrip({ value, onChange }: { value: string; onChange: (ymd: 
           <button
             type="button"
             onClick={open}
-            className={cn('pressable flex size-12 flex-none items-center justify-center rounded-full', inStrip ? 'bg-surface text-ink shadow-surface' : 'bg-primary text-on-primary')}
+            className={cn(
+              'pressable flex size-12 flex-none items-center justify-center rounded-full',
+              inStrip ? 'bg-surface text-ink shadow-surface' : 'bg-primary text-on-primary',
+            )}
           >
             <Icon name="calendar" />
             <span className="sr-only">Pick another date</span>

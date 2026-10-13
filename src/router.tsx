@@ -34,7 +34,7 @@ function RouteError() {
       <p className="max-w-sm text-body-sm text-body">
         {chunk
           ? 'The signal may be weak, or the app was just updated. Reloading usually fixes it.'
-          : 'Reload to try again. If it keeps happening, tell your admin what you were doing.'}
+          : 'Reload to try again. If it keeps happening, tell your manager what you were doing.'}
       </p>
       <Button icon="refresh" onClick={() => window.location.reload()}>
         Reload
@@ -92,6 +92,9 @@ export const router = createBrowserRouter([
               { index: true, element: <RoleHome /> },
               { path: 'profile', lazy: async () => ({ Component: (await import('@/pages/profile/ProfilePage')).ProfilePage }) },
               { path: 'more', lazy: async () => ({ Component: (await import('@/pages/misc/MorePage')).MorePage }) },
+              // Admins decide transfers; sales persons follow their own requests (the API scopes the list).
+              { path: 'transfers', lazy: async () => ({ Component: (await import('@/pages/admin/TransfersPage')).TransfersPage }) },
+              { path: 'notifications', lazy: async () => ({ Component: (await import('@/pages/team/NotificationsPage')).NotificationsPage }) },
               { path: 'whats-new', lazy: async () => ({ Component: (await import('@/pages/misc/WhatsNewPage')).WhatsNewPage }) },
 
               { path: 'day', lazy: async () => ({ Component: (await import('@/pages/timeline/MyDayPage')).MyDayPage }) },
@@ -118,7 +121,6 @@ export const router = createBrowserRouter([
                 element: <RequireRole roles={ADMIN} />,
                 children: [
                   { path: 'dashboard', lazy: async () => ({ Component: (await import('@/pages/admin/DashboardPage')).DashboardPage }) },
-                  { path: 'transfers', lazy: async () => ({ Component: (await import('@/pages/admin/TransfersPage')).TransfersPage }) },
                   { path: 'people', lazy: async () => ({ Component: (await import('@/pages/admin/PeoplePage')).PeoplePage }) },
                   { path: 'people/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonSummaryPage')).PersonSummaryPage }) },
                   { path: 'people/:id/day', lazy: async () => ({ Component: (await import('@/pages/timeline/PersonTimelinePage')).PersonTimelinePage }) },

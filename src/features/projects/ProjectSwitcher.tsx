@@ -6,12 +6,11 @@ import { useProject } from './ProjectContext'
 export function ProjectSwitcher() {
   const { projects, project, setProjectId } = useProject()
   if (!project) return null
-  if (projects.length < 2)
-    return <span className="block truncate text-title-sm">{project.name}</span>
+  if (projects.length < 2) return <span className="block truncate text-title-sm">{project.name}</span>
 
   return (
     <Picker
-      label="Project"
+      label="Campaign"
       value={project.id}
       onChange={setProjectId}
       options={projects.map((p) => ({
@@ -20,7 +19,12 @@ export function ProjectSwitcher() {
         description: [p.type === 'door_to_door' ? 'Door-to-door' : 'Online', p.status === 'closed' ? 'Closed' : null].filter(Boolean).join(' · '),
       }))}
       trigger={({ open }) => (
-        <button type="button" onClick={open} className="pressable flex h-11 max-w-[60vw] items-center gap-1 rounded-pill px-2 -ml-2 active:bg-surface-strong medium:max-w-xs" aria-label={`Project: ${project.name}. Change project`}>
+        <button
+          type="button"
+          onClick={open}
+          className="pressable flex h-11 max-w-[60vw] items-center gap-1 rounded-pill px-2 -ml-2 active:bg-surface-strong medium:max-w-xs"
+          aria-label={`Campaign: ${project.name}. Change campaign`}
+        >
           <span className="truncate text-title-sm">{project.name}</span>
           <Icon name="expand-arrow" size={16} className="flex-none text-muted" />
         </button>

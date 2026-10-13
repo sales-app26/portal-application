@@ -62,6 +62,16 @@ export const ICONS = {
   share: ['arrow-up-from-square'],
   'add-square': ['square-plus'],
   smartphone: ['smartphone'],
+  bell: ['bell', 'bell-fill'],
+  comment: ['comment', 'comment-fill'],
+  help: ['circle-question', 'circle-question-fill'],
+  leave: ['plane', 'plane-fill'],
+  pin: ['pin', 'pin-fill'],
+  send: ['paper-plane'],
+  'thumbs-up': ['thumbs-up', 'thumbs-up-fill'],
+  mention: ['at'],
+  templates: ['comments'],
+  shield: ['shield-check'],
 }
 
 const symbol = (id, file) => {

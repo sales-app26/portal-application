@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
+import { useProject } from '@/features/projects/ProjectContext'
+import { TeamLeaderboard } from '@/features/team/TeamLeaderboard'
 import { Page } from '@/components/layout/Page'
 import { IconButton } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Choice'
@@ -20,7 +22,13 @@ const dayNumber = (d: string) => Number(d.slice(8))
 
 /** What one day amounts to, for the tooltip and the screen reader. */
 const describeDay = (d: DaySummary) => {
-  const bits = [plural(d.followUps, 'follow-up'), d.visits ? plural(d.visits, 'visit') : null, d.newLeads ? `${d.newLeads} added` : null, d.conversions ? plural(d.conversions, 'conversion') : null, d.statusChanges ? plural(d.statusChanges, 'status change') : null].filter(Boolean)
+  const bits = [
+    plural(d.followUps, 'follow-up'),
+    d.visits ? plural(d.visits, 'visit') : null,
+    d.newLeads ? `${d.newLeads} added` : null,
+    d.conversions ? plural(d.conversions, 'conversion') : null,
+    d.statusChanges ? plural(d.statusChanges, 'status change') : null,
+  ].filter(Boolean)
   return d.followUps + d.statusChanges === 0 ? 'nothing logged' : bits.join(', ')
 }
 
@@ -30,6 +38,7 @@ const describeDay = (d: DaySummary) => {
  */
 export function PersonSummaryPage({ self = false }: { self?: boolean }) {
   const me = useMe()
+  const { project } = useProject()
   const params0 = useParams()
   const id = self ? me.id : (params0.id ?? '')
   const dayHref = (date?: string) => (self ? `/day${date ? `?date=${date}` : ''}` : `/people/${id}/day${date ? `?date=${date}` : ''}`)
@@ -66,7 +75,13 @@ export function PersonSummaryPage({ self = false }: { self?: boolean }) {
               <p className="min-w-40 text-center text-title-sm" aria-live="polite">
                 {periodLabel(period)}
               </p>
-              <IconButton icon="forward" label={kind === 'week' ? 'Next week' : 'Next month'} disabled={!hasNext} className="disabled:opacity-30" onClick={() => go(shiftPeriod(period, 1))} />
+              <IconButton
+                icon="forward"
+                label={kind === 'week' ? 'Next week' : 'Next month'}
+                disabled={!hasNext}
+                className="disabled:opacity-30"
+                onClick={() => go(shiftPeriod(period, 1))}
+              />
             </div>
           </div>
         </div>
@@ -88,7 +103,7 @@ export function PersonSummaryPage({ self = false }: { self?: boolean }) {
               <StatTile label="Follow-ups" value={s.totals.followUps} />
               <StatTile label="Visits with photo" value={s.totals.visits} />
               <StatTile label="Leads added" value={s.totals.newLeads} />
-              <StatTile label="Conversions" value={s.totals.conversions} />
+              <StatTile label="Deals won" value={s.totals.conversions} />
             </div>
             <SummaryChart days={s.days} today={today} kind={kind} />
             <p className="text-body-sm text-body" aria-live="polite">
@@ -97,15 +112,22 @@ export function PersonSummaryPage({ self = false }: { self?: boolean }) {
             </p>
 
             {s.totals.followUps + s.totals.statusChanges === 0 ? (
-              <EmptyState icon="timeline" title={kind === 'week' ? 'Nothing logged this week' : 'Nothing logged this month'} body="Days with entries show up here as soon as there are some." className="card card--default rounded-2xl" />
+              <EmptyState
+                icon="timeline"
+                title={kind === 'week' ? 'Nothing logged this week' : 'Nothing logged this month'}
+                body="Days with follow-ups show up here as soon as there are some."
+                className="card card--default rounded-2xl"
+              />
             ) : kind === 'week' ? (
               <WeekRows dayHref={dayHref} days={s.days} today={today} />
             ) : (
               <MonthGrid dayHref={dayHref} days={s.days} today={today} />
             )}
 
+            {self && project && <TeamLeaderboard projectId={project.id} projectName={project.name} />}
+
             <Button asChild variant="secondary" className="self-start">
-              <Link to={dayHref()}>Open today's timeline</Link>
+              <Link to={dayHref()}>Open today's activity</Link>
             </Button>
           </>
         ) : null}
@@ -116,7 +138,7 @@ export function PersonSummaryPage({ self = false }: { self?: boolean }) {
 
 type Measure = 'followUps' | 'visits' | 'newLeads' | 'conversions'
 const MEASURE_LABEL: Record<Measure, string> = { followUps: 'Follow-ups', visits: 'Visits', newLeads: 'New', conversions: 'Won' }
-const MEASURE_DESC: Record<Measure, string> = { followUps: 'Follow-ups', visits: 'Visits with photo', newLeads: 'Leads added', conversions: 'Conversions' }
+const MEASURE_DESC: Record<Measure, string> = { followUps: 'Follow-ups', visits: 'Visits with photo', newLeads: 'Leads added', conversions: 'Deals won' }
 
 /** Day by day for the week or month: one measure at a time, so the chart keeps one axis. */
 function SummaryChart({ days, today, kind }: { days: DaySummary[]; today: string; kind: PeriodKind }) {
@@ -131,10 +153,22 @@ function SummaryChart({ days, today, kind }: { days: DaySummary[]; today: string
         <div>
           <h2 className="text-title-md">Activity</h2>
           <p className="mt-0.5 text-body-sm text-muted">
-            {MEASURE_DESC[measure]} per day{best > 0 && <> · best day <span className="font-semibold text-ink">{best}</span></>}
+            {MEASURE_DESC[measure]} per day
+            {best > 0 && (
+              <>
+                {' '}
+                · best day <span className="font-semibold text-ink">{best}</span>
+              </>
+            )}
           </p>
         </div>
-        <Segmented<Measure> label="Measure" value={measure} onChange={setMeasure} options={(Object.keys(MEASURE_LABEL) as Measure[]).map((k) => ({ value: k, label: MEASURE_LABEL[k] }))} className="h-10 max-w-full overflow-x-auto [&>button]:px-3" />
+        <Segmented<Measure>
+          label="Measure"
+          value={measure}
+          onChange={setMeasure}
+          options={(Object.keys(MEASURE_LABEL) as Measure[]).map((k) => ({ value: k, label: MEASURE_LABEL[k] }))}
+          className="h-10 max-w-full overflow-x-auto [&>button]:px-3"
+        />
       </div>
       <ColumnChart title={MEASURE_DESC[measure]} data={days.map((d) => ({ key: d.date, label: label(d.date), value: d.date <= today ? d[measure] : 0 }))} />
     </Card>
@@ -152,7 +186,9 @@ function WeekRows({ dayHref, days, today }: { dayHref: (date: string) => string;
           <Link to={dayHref(d.date)} className="flex min-h-16 items-center gap-3 px-4 py-2 active:bg-surface-soft expanded:hover:bg-surface-soft">
             <span className="w-24 flex-none">
               <span className={cn('block text-title-sm', d.date === today && 'text-primary')}>{WEEKDAYS[weekdayIndex(d.date)]}</span>
-              <span className="block text-caption text-muted">{new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${d.date}T00:00:00Z`))}</span>
+              <span className="block text-caption text-muted">
+                {new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${d.date}T00:00:00Z`))}
+              </span>
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span aria-hidden className="h-2 overflow-hidden rounded-pill bg-surface-strong">
@@ -210,7 +246,7 @@ function MonthGrid({ dayHref, days, today }: { dayHref: (date: string) => string
           )
         })}
       </div>
-      <p className="mt-3 text-caption text-muted">Numbers are follow-ups logged that day. Tap a day to see its timeline.</p>
+      <p className="mt-3 text-caption text-muted">Numbers are follow-ups logged that day. Tap a day to see its activity.</p>
     </div>
   )
 }

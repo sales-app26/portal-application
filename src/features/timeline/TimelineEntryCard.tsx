@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { FeedbackButton, FeedbackList } from '@/features/team/EntryFeedback'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/Choice'
 import { Tag } from '@/components/ui/Display'
@@ -17,18 +18,16 @@ interface Props {
   onOpenPhoto: () => void
   onOpenMap: () => void
   onEdit: () => void
+  /** A manager looking at someone's day may leave feedback on an entry. */
+  canFeedback?: boolean
 }
 
 /** One entry in a day (PRD §5.11): time, lead, status, note, typed location and visit proof. */
-export function TimelineEntryCard({ entry, number, selected, showProject, onSelect, onOpenPhoto, onOpenMap, onEdit }: Props) {
+export function TimelineEntryCard({ entry, number, selected, showProject, onSelect, onOpenPhoto, onOpenMap, onEdit, canFeedback }: Props) {
   const isVisit = entry.hasPhoto
   const hasGps = entry.latitude !== null && entry.longitude !== null
   return (
-    <li
-      data-entry-id={entry.id}
-      onMouseEnter={onSelect}
-      className={cn('group relative flex gap-3 rounded-xl px-1 py-3 transition-colors', selected && 'bg-accent-soft')}
-    >
+    <li data-entry-id={entry.id} onMouseEnter={onSelect} className={cn('group relative flex gap-3 rounded-xl px-1 py-3 transition-colors', selected && 'bg-accent-soft')}>
       <span aria-hidden className="absolute top-12 bottom-0 left-[16px] w-px bg-hairline group-last:hidden" />
       <span className="relative z-[1] flex size-8 flex-none items-center justify-center rounded-full bg-surface-strong">
         {number ? <span className="tabular-nums text-caption-strong">{number}</span> : <Icon name={entry.entryType === 'status_change' ? 'synchronize' : 'checkmark'} size={16} />}
@@ -49,7 +48,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusChip status={entry.status} />
-          {entry.entryType === 'status_change' && <Tag>Manual change</Tag>}
+          {entry.entryType === 'status_change' && <Tag>Changed by hand</Tag>}
           {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
           {entry.nextFollowUpDate && (
             <span className="inline-flex items-center gap-1 text-caption text-body">
@@ -79,7 +78,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
             <div className="flex min-w-0 flex-col items-start gap-1.5">
               {entry.gpsAccuracyM !== null && (
                 <span className="flex items-center gap-2 tabular-nums text-caption text-body">
-                  ± {Math.round(entry.gpsAccuracyM)} m{entry.lowAccuracy && <Tag className="font-sans">Low accuracy</Tag>}
+                  ± {Math.round(entry.gpsAccuracyM)} m{entry.lowAccuracy && <Tag className="font-sans">Location is approximate</Tag>}
                 </span>
               )}
               {hasGps && (
@@ -91,6 +90,9 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
           </div>
         )}
 
+        {entry.coveringFor && <p className="mt-1 text-caption text-muted">Covering for {entry.coveringFor.name}</p>}
+        <FeedbackList entry={entry} />
+        {canFeedback && <FeedbackButton entry={entry} leadId={entry.lead.id} />}
         {entry.editable && (
           <Button variant="tertiary" size="sm" icon="edit" className="mt-1 -ml-2" onClick={onEdit}>
             Edit

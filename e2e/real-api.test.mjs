@@ -8,21 +8,24 @@ import { click, clickNth, fill, LAPTOP, PHONE, sleep, startApp, waitForText, cli
 const SERVICE = new URL('../../service-application/', import.meta.url).pathname
 let server, info, app
 
-before(async () => {
-  server = spawn('npx', ['ts-node', '-r', 'tsconfig-paths/register', 'test/support/dev-server.ts'], { cwd: SERVICE, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
-  info = await new Promise((resolve, reject) => {
-    let out = ''
-    server.stdout.on('data', (d) => {
-      out += d
-      const m = /READY (\{.*\})/.exec(out)
-      if (m) resolve(JSON.parse(m[1]))
+before(
+  async () => {
+    server = spawn('npx', ['ts-node', '-r', 'tsconfig-paths/register', 'test/support/dev-server.ts'], { cwd: SERVICE, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+    info = await new Promise((resolve, reject) => {
+      let out = ''
+      server.stdout.on('data', (d) => {
+        out += d
+        const m = /READY (\{.*\})/.exec(out)
+        if (m) resolve(JSON.parse(m[1]))
+      })
+      server.on('exit', (c) => reject(new Error(`API dev server exited early (${c})`)))
+      setTimeout(() => reject(new Error('API dev server did not start in 90 s')), 90_000)
     })
-    server.on('exit', (c) => reject(new Error(`API dev server exited early (${c})`)))
-    setTimeout(() => reject(new Error('API dev server did not start in 90 s')), 90_000)
-  })
-  process.env.VITE_API_PROXY = info.baseUrl // read by vite.config.ts when the app starts
-  app = await startApp()
-}, { timeout: 120_000 })
+    process.env.VITE_API_PROXY = info.baseUrl // read by vite.config.ts when the app starts
+    app = await startApp()
+  },
+  { timeout: 120_000 },
+)
 
 after(async () => {
   await app?.close()
@@ -80,7 +83,7 @@ describe('sales person, online project', () => {
     await click(page, 'Sign in', 'button[type=submit]')
     await page.waitForFunction(() => location.pathname === '/home', { timeout: 10000 })
     await waitForText(page, 'Pune Retail Drive')
-    await waitForText(page, 'converted')
+    await waitForText(page, 'won') // the target card: "/ N won" or "won this week"
     assert.deepEqual(errors, [])
     await page.close()
   })
@@ -197,19 +200,45 @@ describe('sales person, door-to-door project', () => {
   })
 })
 
+describe('team notes', () => {
+  test('a rep @mentions the moderator; she gets a notification that opens the lead', async () => {
+    const ravi = await as(info.sales)
+    const d = (label, fn) => describeFailure(ravi.page, label, fn)
+    await ravi.go(`/leads/${shared.onlineLead}`)
+    await d('composer', () => ravi.page.waitForSelector('#team-note'))
+    await ravi.page.focus('#team-note')
+    await ravi.page.type('#team-note', 'Can you join the demo on Friday?')
+    await d('mention chip', () => click(ravi.page, 'Meera Nair', 'button[aria-pressed]'))
+    await d('send', () => click(ravi.page, 'Send'))
+    await d('posted', () => waitForText(ravi.page, '@Meera Nair'))
+    assert.deepEqual(ravi.errors, [])
+    await ravi.page.close()
+
+    const { page, errors } = await as(info.moderator)
+    await page.goto(`${app.base}/dashboard`, { waitUntil: 'networkidle0' })
+    await describeFailure(page, 'bell', () => page.waitForSelector('a[aria-label^="Notifications, "]', { timeout: 10000 }))
+    await page.goto(`${app.base}/notifications`, { waitUntil: 'networkidle0' })
+    await describeFailure(page, 'inbox', () => waitForText(page, 'Can you join the demo on Friday?'))
+    await clickContaining(page, 'Can you join the demo on Friday?', 'button')
+    await page.waitForFunction((id) => location.pathname === `/leads/${id}`, { timeout: 10000 }, shared.onlineLead)
+    await waitForText(page, 'Team notes')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+})
+
 describe('transfers and admin', () => {
   test('sales person requests a transfer; the moderator approves it; the lead moves', async () => {
     const ravi = await as(info.sales)
     const d = (label, fn) => describeFailure(ravi.page, label, fn)
     await ravi.go(`/leads/${shared.onlineLead}`)
     await d('open menu', () => clickNth(ravi.page, 'More actions', 0))
-    await d('menu item', () => click(ravi.page, 'Request transfer', 'button'))
+    await d('menu item', () => click(ravi.page, 'Ask for handover', 'button'))
     await d('open picker', () => click(ravi.page, 'Choose a person', 'button[aria-haspopup=listbox]'))
     await d('pick Karan', () => click(ravi.page, 'KMKaran Mehta', '[role=option]'))
-    await ravi.page.waitForSelector('textarea')
-    await ravi.page.type('textarea', 'Karan covers Wanowrie.')
-    await d('submit', () => click(ravi.page, 'Request transfer', 'button'))
-    await d('toast', () => waitForText(ravi.page, 'Transfer requested.'))
+    await d('reason', () => fill(ravi.page, 'Reason', 'Karan covers Wanowrie.')) // the lead page also has the team-notes box
+    await d('submit', () => click(ravi.page, 'Ask for handover', 'button'))
+    await d('toast', () => waitForText(ravi.page, 'Handover requested.'))
     await ravi.page.close()
 
     const meera = await as(info.moderator)
@@ -217,8 +246,8 @@ describe('transfers and admin', () => {
     await meera.go('/transfers')
     await m('reason shown', () => waitForText(meera.page, 'Karan covers Wanowrie.'))
     await m('approve', () => click(meera.page, 'Approve'))
-    await m('approved toast', () => waitForText(meera.page, 'Transfer approved.'))
-    await m('list empty', () => waitForText(meera.page, 'No transfers waiting'))
+    await m('approved toast', () => waitForText(meera.page, 'Handover approved.'))
+    await m('list empty', () => waitForText(meera.page, 'No handover requests'))
     await meera.page.close()
 
     const ravi2 = await as(info.sales)
@@ -235,8 +264,8 @@ describe('transfers and admin', () => {
     await waitForText(page, 'Target vs achieved')
     const text = await page.evaluate(() => document.body.innerText)
     for (const t of ['Ravi Kumar', 'Logged nothing today', 'Priya Desai']) assert.ok(text.includes(t), `shows ${t}`)
-    await page.click('button[aria-label="Export CSV"]')
-    await click(page, 'Export leads (CSV)', 'button')
+    await page.click('button[aria-label="Download report"]')
+    await click(page, 'Leads report', 'button')
     await waitForText(page, 'Saved leads_')
     assert.deepEqual(errors, [])
     await page.close()
@@ -246,15 +275,15 @@ describe('transfers and admin', () => {
     const { page, errors } = await as(info.moderator)
     await page.goto(`${app.base}/projects/${info.projects.online}?tab=leads`, { waitUntil: 'networkidle0' })
     await waitForText(page, 'Asha Patil')
-    await click(page, 'Reassign') // enters selection mode
+    await click(page, 'Assign') // enters selection mode
     await page.$$eval('[role=checkbox]', (rows) => rows[0].click())
-    await click(page, 'Reassign 1')
+    await click(page, 'Assign 1')
     await click(page, 'Choose a person', 'button[aria-haspopup=listbox]')
-    await click(page, 'PDPriya DesaiSales Person', '[role=option]')
+    await click(page, 'PDPriya DesaiSales rep', '[role=option]')
     await page.waitForSelector('textarea')
     await page.type('textarea', 'Priya now covers this area.')
-    await click(page, 'Reassign', 'button')
-    await waitForText(page, '1 lead reassigned.')
+    await click(page, 'Assign', 'button')
+    await waitForText(page, '1 lead assigned.')
     await waitForText(page, 'Priya Desai')
     assert.deepEqual(errors, [])
     await page.close()
@@ -285,7 +314,12 @@ describe('transfers and admin', () => {
 
 describe('summary and bulk import on real data', () => {
   const tile = (page, label) =>
-    page.evaluate((l) => [...document.querySelectorAll('div, button')].find((e) => e.children.length === 2 && e.children[1].textContent === l && e.children[1].tagName === 'SPAN')?.children[0].textContent, label)
+    page.evaluate(
+      (l) =>
+        [...document.querySelectorAll('div, button')].find((e) => e.children.length === 2 && e.children[1].textContent === l && e.children[1].tagName === 'SPAN')?.children[0]
+          .textContent,
+      label,
+    )
 
   test('the summary counts what Ravi really did today, the same as the dashboard says', async () => {
     const { page, errors } = await as(info.moderator)
@@ -320,7 +354,10 @@ describe('summary and bulk import on real data', () => {
       'Ghost Owner,9000000104,,Baner,,nobody@pronttera.in',
       '',
     ].join('\n')
-    const path = (await import('node:path')).join((await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'st-real-')), 'import.csv')
+    const path = (await import('node:path')).join(
+      (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'st-real-')),
+      'import.csv',
+    )
     ;(await import('node:fs')).writeFileSync(path, csv)
 
     const { page, errors } = await as(info.moderator)
@@ -328,15 +365,15 @@ describe('summary and bulk import on real data', () => {
     await describeFailure(page, 'form', () => waitForText(page, 'Who gets the leads'))
     await (await page.$('#import-file')).uploadFile(path)
     await waitForText(page, 'import.csv')
-    await fill(page, 'Location for rows that have none', 'Pune')
-    await click(page, 'Check file', 'button')
+    await fill(page, 'Location for leads that have none', 'Pune')
+    await click(page, 'Check sheet', 'button')
 
     // Review: Deepak comes with Karan from his owner_email; an unknown owner_email (Ghost) just
     // leaves the row unassigned, like the two without one. Those three are assigned on screen.
     await describeFailure(page, 'report', () => waitForText(page, '4 leads ready · 3 not assigned yet'))
     await waitForText(page, '1 duplicate')
     await waitForText(page, 'Phone must be a 10-digit Indian mobile number.')
-    await waitForText(page, 'Already a lead in this project, owned by Priya Desai.') // reassigned to Priya in an earlier test
+    await waitForText(page, 'Already a lead in this campaign, owned by Priya Desai.') // reassigned to Priya in an earlier test
 
     await clickNth(page, 'Assign', 0, 'li button') // Vikram Rao, first in the file
     await clickContaining(page, 'Karan Mehta', '[role=option]')
@@ -349,8 +386,8 @@ describe('summary and bulk import on real data', () => {
     await waitForText(page, 'all assigned')
 
     // Checking changed nothing: Priya has only the lead she was reassigned.
-    await click(page, 'Import 4 leads', 'button')
-    await describeFailure(page, 'result', () => waitForText(page, '4 leads imported'))
+    await click(page, 'Add 4 leads', 'button')
+    await describeFailure(page, 'result', () => waitForText(page, '4 leads added'))
     await waitForText(page, 'Who got them')
     assert.deepEqual(errors, [])
     await page.close()
@@ -384,9 +421,9 @@ describe('summary and bulk import on real data', () => {
     await clickContaining(page, 'All to one person', '[role=radio]')
     await (await page.$('#import-file')).uploadFile(path)
     await clickContaining(page, 'Priya Desai', '[role=checkbox]')
-    await click(page, 'Check file', 'button')
-    await describeFailure(page, 'second report', () => waitForText(page, 'Nothing in this file can be imported'))
-    await waitForText(page, 'Already a lead in this project')
+    await click(page, 'Check sheet', 'button')
+    await describeFailure(page, 'second report', () => waitForText(page, 'Nothing in this sheet can be added'))
+    await waitForText(page, 'Already a lead in this campaign')
     await page.close()
   })
 })

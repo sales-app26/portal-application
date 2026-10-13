@@ -6,7 +6,7 @@ import { TimelineView } from '@/features/timeline/TimelineView'
 export function PersonTimelinePage() {
   const { id } = useParams()
   return (
-    <Page title="Timeline" back={`/people/${id}`} wide>
+    <Page title="Activity" back={`/people/${id}`} wide>
       <TimelineView userId={id} />
     </Page>
   )

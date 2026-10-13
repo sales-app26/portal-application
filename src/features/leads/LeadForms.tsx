@@ -39,7 +39,7 @@ function useSaveHelpers(lead: LeadDetail, onOpenChange: (o: boolean) => void) {
       // A new conversion is the moment the whole job is about: say so.
       if (result?.lead.status === 'converted' && lead.status !== 'converted') {
         haptic.celebrate()
-        toast.success('Converted! 🎉 Great work, it counts toward your target.', { duration: 6000 })
+        toast.success('Won! 🎉 Great work, it counts toward your target.', { duration: 6000 })
       } else {
         haptic.success()
         toast.success(message)
@@ -82,7 +82,11 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
     dealValue: lead.dealValue ? String(lead.dealValue) : '',
     plan: lead.plan ?? '',
   })
-  const { register, control, handleSubmit, formState, reset, setError } = useForm<FollowUpValues>({ resolver: zodResolver(followUpSchema), mode: 'onBlur', defaultValues: defaults() })
+  const { register, control, handleSubmit, formState, reset, setError } = useForm<FollowUpValues>({
+    resolver: zodResolver(followUpSchema),
+    mode: 'onBlur',
+    defaultValues: defaults(),
+  })
 
   useEffect(() => {
     if (!open) return
@@ -143,7 +147,9 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
             {proofError && <p className="text-caption text-down">{proofError}</p>}
           </div>
         )}
-        {lead.status === 'converted' && <p className="rounded-md bg-surface-strong px-4 py-3 text-body-sm">This lead is converted. The status stays Converted unless your moderator changes it.</p>}
+        {lead.status === 'converted' && (
+          <p className="rounded-md bg-surface-strong px-4 py-3 text-body-sm">This lead is won. The status stays Won unless your sales manager changes it.</p>
+        )}
         <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} />
       </form>
     </ResponsiveOverlay>
@@ -153,7 +159,14 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
 // ---------------------------------------------------------------- change status
 
 const changeSchema = z
-  .object({ status: followUpShape.status, note: followUpShape.note, nextFollowUpDate: z.string(), reason: followUpShape.reason, dealValue: followUpShape.dealValue, plan: followUpShape.plan })
+  .object({
+    status: followUpShape.status,
+    note: followUpShape.note,
+    nextFollowUpDate: z.string(),
+    reason: followUpShape.reason,
+    dealValue: followUpShape.dealValue,
+    plan: followUpShape.plan,
+  })
   .superRefine(checkNextDate)
 type ChangeValues = z.input<typeof changeSchema>
 
@@ -207,7 +220,7 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
       }
     >
       {statuses.length === 0 ? (
-        <p className="text-body-md text-body">Ask your moderator to change this.</p>
+        <p className="text-body-md text-body">Ask your sales manager to change this.</p>
       ) : (
         <form id="change-status" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-1">
           <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} showLocation={false} />
@@ -222,7 +235,10 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
 const editSchema = z.object({
   name: z.string().trim().min(1, 'Enter the client name.').max(120),
   businessName: z.string().trim().max(160),
-  phone: z.string().trim().refine((v) => normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
+  phone: z
+    .string()
+    .trim()
+    .refine((v) => normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
   notes: z.string().trim().max(2000),
   location: followUpShape.location,
   dealValue: followUpShape.dealValue,
@@ -303,7 +319,9 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
         <Controller
           control={control}
           name="location"
-          render={({ field }) => <LocationField projectId={lead.projectId} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />}
+          render={({ field }) => (
+            <LocationField projectId={lead.projectId} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />
+          )}
         />
         <TextAreaField label="About the client" optional error={formState.errors.notes?.message} {...register('notes')} />
         <Controller control={control} name="source" render={({ field }) => <SourceChoice value={(field.value as LeadSource | null) ?? null} onChange={field.onChange} />} />
@@ -319,8 +337,12 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
 // ---------------------------------------------------------------- request transfer
 
 const transferSchema = z.object({
-  toUserId: z.string().nullable().refine((v) => !!v, 'Choose who should get this lead.'),
+  toUserId: z
+    .string()
+    .nullable()
+    .refine((v) => !!v, 'Choose who should get this lead.'),
   reason: z.string().trim().min(1, 'Give a reason.').max(500),
+  handoverNote: z.string().trim().max(500),
 })
 type TransferValues = z.input<typeof transferSchema>
 
@@ -333,16 +355,19 @@ export function RequestTransferForm({ open, onOpenChange, lead }: FormProps) {
   const { register, control, handleSubmit, formState, reset, setError } = useForm<TransferValues>({
     resolver: zodResolver(transferSchema),
     mode: 'onBlur',
-    defaultValues: { toUserId: null, reason: '' },
+    defaultValues: { toUserId: null, reason: '', handoverNote: '' },
   })
 
   useEffect(() => {
-    if (open) reset({ toUserId: null, reason: '' })
+    if (open) reset({ toUserId: null, reason: '', handoverNote: '' })
   }, [open, reset])
 
   const onSubmit = handleSubmit(async (v) => {
     try {
-      const { message } = await apiWithMessage(`/leads/${lead.id}/transfers`, { method: 'POST', body: { toUserId: v.toUserId, reason: v.reason.trim() } })
+      const { message } = await apiWithMessage(`/leads/${lead.id}/transfers`, {
+        method: 'POST',
+        body: { toUserId: v.toUserId, reason: v.reason.trim(), ...(v.handoverNote.trim() ? { handoverNote: v.handoverNote.trim() } : {}) },
+      })
       helpers.done(message)
     } catch (err) {
       if (helpers.stale(err)) return
@@ -354,29 +379,29 @@ export function RequestTransferForm({ open, onOpenChange, lead }: FormProps) {
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title="Request transfer"
-      description="The lead moves once an admin approves."
+      title="Ask for handover"
+      description="The lead moves once a manager approves."
       variant="short"
       dirty={formState.isDirty && !formState.isSubmitting}
       footer={
         <Button type="submit" form="request-transfer" size="lg" block loading={formState.isSubmitting} disabled={!members.isLoading && candidates.length === 0}>
-          Request transfer
+          Ask for handover
         </Button>
       }
     >
       <form id="request-transfer" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-1">
         {!members.isLoading && candidates.length === 0 ? (
-          <p className="text-body-md text-body">There's no one else in this project to transfer to.</p>
+          <p className="text-body-md text-body">There's no one else in this campaign to hand it to.</p>
         ) : (
           <Controller
             control={control}
             name="toUserId"
             render={({ field }) => (
               <Picker
-                label="Transfer to"
+                label="Hand over to"
                 value={field.value}
                 onChange={field.onChange}
-                placeholder={members.isLoading ? 'Loading members…' : 'Choose a person'}
+                placeholder={members.isLoading ? 'Loading team…' : 'Choose a person'}
                 error={formState.errors.toUserId?.message}
                 options={candidates.map((m) => ({ value: m.userId, label: m.name, leading: <Avatar name={m.name} size={32} /> }))}
               />
@@ -384,6 +409,14 @@ export function RequestTransferForm({ open, onOpenChange, lead }: FormProps) {
           />
         )}
         <TextAreaField label="Reason" placeholder="Why should this lead move?" error={formState.errors.reason?.message} {...register('reason')} />
+        <TextAreaField
+          label="Handover note"
+          optional
+          hint="Pinned on the lead for whoever takes it over."
+          placeholder="e.g. Owner prefers calls after 4 pm; sent pricing last week."
+          error={formState.errors.handoverNote?.message}
+          {...register('handoverNote')}
+        />
       </form>
     </ResponsiveOverlay>
   )

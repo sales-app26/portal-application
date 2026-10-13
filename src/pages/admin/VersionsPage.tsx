@@ -49,7 +49,7 @@ export function VersionsPage() {
     setBusy(true)
     try {
       await api(`/versions/${deleting.id}`, { method: 'DELETE' })
-      toast.success(`Version ${deleting.version} deleted.`)
+      toast.success(`Update ${deleting.version} deleted.`)
       setDeleting(null)
       await invalidateVersions(qc)
     } catch (err) {
@@ -60,17 +60,17 @@ export function VersionsPage() {
   }
 
   return (
-    <Page title="Versions" cta={{ label: 'New release', icon: 'plus-math', onClick: () => openForm() }}>
+    <Page title="What’s new" cta={{ label: 'New update', icon: 'plus-math', onClick: () => openForm() }}>
       <p className="mb-4 max-w-2xl text-body-sm text-body">
-        Every release and the note that goes with it. The newest live release is shown to each person once, the next time they open the app.
+        Every update and the note that goes with it. The newest live update is shown to each person once, the next time they open the app.
       </p>
 
       {isLoading ? (
         <ListSkeleton rows={4} />
       ) : isError ? (
-        <ErrorState message="Could not load the releases." onRetry={() => void refetch()} />
+        <ErrorState message="Could not load the updates." onRetry={() => void refetch()} />
       ) : !versions || versions.length === 0 ? (
-        <EmptyState icon="timeline" title="No releases yet" body="Add one and upload its .md note to start the log." />
+        <EmptyState icon="timeline" title="No updates yet" body="Add one with its note to get started." />
       ) : (
         <ul className="grid gap-3 medium:grid-cols-2">
           {versions.map((v) => (
@@ -96,7 +96,7 @@ export function VersionsPage() {
                 </div>
 
                 <div className="min-w-0">
-                  <p className="text-title-sm">{v.title ?? 'Untitled release'}</p>
+                  <p className="text-title-sm">{v.title ?? 'Untitled update'}</p>
                   <p className="line-clamp-2 text-body-sm text-body">{summarise(v.notes)}</p>
                 </div>
 
@@ -110,7 +110,11 @@ export function VersionsPage() {
 
                 <div className="mt-auto flex items-center justify-between gap-2 border-t border-hairline-soft pt-3 text-caption text-muted">
                   <span>{formatReleaseDate(v.releasedAt)}</span>
-                  <button type="button" className="inline-flex items-center gap-1 rounded-xs px-1 py-0.5 underline-offset-2 hover:text-ink hover:underline" onClick={() => setReaders(v)}>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-xs px-1 py-0.5 underline-offset-2 hover:text-ink hover:underline"
+                    onClick={() => setReaders(v)}
+                  >
                     {v.seenCount} read
                   </button>
                 </div>
@@ -136,9 +140,9 @@ export function VersionsPage() {
       <Confirm
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Delete version ${deleting?.version ?? ''}?`}
-        body="The note and the record of who read it both go with it. If this release is live, the previous one becomes the newest again — anyone who had already read that one will not be shown it twice."
-        confirmLabel="Delete release"
+        title={`Delete update ${deleting?.version ?? ''}?`}
+        body="The note and the list of who read it both go with it. If this update is live, the previous one becomes the newest again — anyone who had already read that one will not be shown it twice."
+        confirmLabel="Delete update"
         loading={busy}
         onConfirm={confirmDelete}
       />
@@ -154,7 +158,7 @@ function ReadersSheet({ version, onClose }: { version: AppVersion | null; onClos
       open={!!version}
       onOpenChange={(o) => !o && onClose()}
       title={version ? `Who has read ${version.version}` : ''}
-      description={data ? `${plural(data.seen.length, 'person', 'people')} read it, ${data.pending} still to see it.` : 'Loading the read log…'}
+      description={data ? `${plural(data.seen.length, 'person', 'people')} read it, ${data.pending} still to see it.` : 'Loading who read it…'}
       variant="form"
     >
       {isLoading ? (

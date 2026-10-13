@@ -21,9 +21,9 @@ export function ProjectsPage() {
 
   return (
     <Page
-      title="Projects"
+      title="Campaigns"
       wide
-      cta={isSuper ? { label: 'New project', icon: 'plus-math', onClick: () => setCreating(true) } : undefined}
+      cta={isSuper ? { label: 'New campaign', icon: 'plus-math', onClick: () => setCreating(true) } : undefined}
       header={
         <FilterChips
           label="Status"
@@ -44,11 +44,9 @@ export function ProjectsPage() {
       ) : items.length === 0 ? (
         <EmptyState
           icon="briefcase"
-          title={status === 'closed' ? 'No closed projects' : 'No projects yet'}
-          body={isSuper ? 'Create a project, then add people and targets.' : 'The Super Admin adds you to projects. Yours will show here.'}
-          action={
-            isSuper && status !== 'closed' && <Button onClick={() => setCreating(true)}>New project</Button>
-          }
+          title={status === 'closed' ? 'No closed campaigns' : 'No campaigns yet'}
+          body={isSuper ? 'Create a campaign, then add people and targets.' : 'The sales head adds you to campaigns. Yours will show here.'}
+          action={isSuper && status !== 'closed' && <Button onClick={() => setCreating(true)}>New campaign</Button>}
         />
       ) : (
         <>

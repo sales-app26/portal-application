@@ -9,7 +9,7 @@ export function NotFound() {
       <EmptyState
         icon="search"
         title="This page doesn't exist"
-        body="It may have moved, or you may not have access to it."
+        body="It may have moved, or it may not be open to you."
         action={
           <Button asChild variant="secondary">
             <Link to="/">Go home</Link>

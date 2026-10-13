@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { Button, IconButton } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { NotificationBell } from '@/features/team/NotificationBell'
 import type { IconName } from '@/icons'
 import { cn } from '@/lib/cn'
 
@@ -115,6 +116,7 @@ export function Page({ title, back, actions, leading, cta, header, wide, subtitl
           <div className="hidden flex-1 medium:block" />
           <div className="flex items-center gap-1">
             {actions}
+            {!back && <NotificationBell />}
             {cta && (
               <Button className="ml-2 hidden medium:inline-flex" icon={cta.icon} onClick={cta.onClick} disabled={cta.disabled} loading={cta.loading}>
                 {cta.label}

@@ -20,7 +20,7 @@ import { invalidateProjects } from './queries'
 
 const schema = z
   .object({
-    name: z.string().trim().min(1, 'Enter a project name.').max(120),
+    name: z.string().trim().min(1, 'Enter a campaign name.').max(120),
     description: z.string().trim().max(2000),
     type: z.enum(['online', 'door_to_door']),
     startDate: z.string().min(1, 'Choose a start date.'),
@@ -41,7 +41,13 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
   const editing = !!project
   const typeLocked = !!project?.typeLocked
 
-  const defaults = (): Values => ({ name: project?.name ?? '', description: project?.description ?? '', type: project?.type ?? 'online', startDate: project?.startDate ?? todayIST(), endDate: project?.endDate ?? '' })
+  const defaults = (): Values => ({
+    name: project?.name ?? '',
+    description: project?.description ?? '',
+    type: project?.type ?? 'online',
+    startDate: project?.startDate ?? todayIST(),
+    endDate: project?.endDate ?? '',
+  })
   const { register, control, handleSubmit, formState, reset, setError } = useForm<Values>({ resolver: zodResolver(schema), mode: 'onBlur', defaultValues: defaults() })
 
   useEffect(() => {
@@ -55,8 +61,8 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
   const pickImage = (f: File | undefined) => {
     setImageError(undefined)
     if (!f) return setImage(null)
-    if (!/^image\/(jpeg|png)$/.test(f.type)) return setImageError('The project image must be a JPG or PNG.')
-    if (f.size > MAX_IMAGE) return setImageError('The project image must be 2 MB or smaller.')
+    if (!/^image\/(jpeg|png)$/.test(f.type)) return setImageError('The campaign picture must be a JPG or PNG photo.')
+    if (f.size > MAX_IMAGE) return setImageError('The campaign picture must be 2 MB or smaller.')
     setImage(f)
   }
 
@@ -91,7 +97,7 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
         saved = (await apiWithMessage<Project>('/projects', { method: 'POST', body })).data
       }
       haptic.success()
-      toast.success(editing ? 'Project updated.' : 'Project created.')
+      toast.success(editing ? 'Campaign updated.' : 'Campaign created.')
       // Another project already has this name: allowed, but say so (PRD §5.3).
       saved.warnings?.forEach((w) => toast.message(w))
       invalidateProjects(qc)
@@ -109,12 +115,12 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={editing ? 'Edit project' : 'New project'}
+      title={editing ? 'Edit campaign' : 'New campaign'}
       variant="form"
       dirty={(formState.isDirty || !!image) && !formState.isSubmitting}
       footer={
         <Button type="submit" form="project-form" size="lg" block loading={formState.isSubmitting}>
-          {editing ? 'Save changes' : 'Create project'}
+          {editing ? 'Save changes' : 'Create campaign'}
         </Button>
       }
     >
@@ -125,10 +131,14 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
           control={control}
           name="type"
           render={({ field }) => (
-            <FieldShell label="Type" htmlFor="project-type" hint={typeLocked ? 'Locked: this project already has leads.' : 'Door-to-door visits need a live photo and GPS.'}>
+            <FieldShell
+              label="Type"
+              htmlFor="project-type"
+              hint={typeLocked ? "Can't change: this campaign already has leads." : 'Door-to-door visits need a live photo and your location.'}
+            >
               <div id="project-type" className={typeLocked ? 'pointer-events-none opacity-50' : ''}>
                 <Segmented<ProjectType>
-                  label="Project type"
+                  label="Campaign type"
                   value={field.value}
                   onChange={field.onChange}
                   options={[
@@ -153,11 +163,11 @@ export function ProjectForm({ open, onOpenChange, project }: { open: boolean; on
             render={({ field }) => <DatePicker label="End date" optional value={field.value} onChange={field.onChange} error={formState.errors.endDate?.message} />}
           />
         </div>
-        <FieldShell label="Image" htmlFor="project-image" optional error={imageError} hint="JPG or PNG, up to 2 MB.">
+        <FieldShell label="Picture" htmlFor="project-image" optional error={imageError} hint="A JPG or PNG photo, up to 2 MB.">
           <div className="flex items-center gap-3">
             <input id="project-image" ref={fileRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => pickImage(e.target.files?.[0])} />
             <Button type="button" variant="secondary" size="sm" icon="image" onClick={() => fileRef.current?.click()}>
-              {image ? 'Change image' : project?.imageUrl ? 'Replace image' : 'Choose image'}
+              {image ? 'Change picture' : project?.imageUrl ? 'Replace picture' : 'Choose picture'}
             </Button>
             {image && <span className="min-w-0 truncate text-body-sm text-body">{image.name}</span>}
           </div>

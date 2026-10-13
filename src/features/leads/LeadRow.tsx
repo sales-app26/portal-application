@@ -9,10 +9,10 @@ import { ContactButtons } from './ContactActions'
 
 /** "Overdue 2 days", "Next: Tomorrow", "Owner inactive"… the one thing to know about when. */
 export function LeadWhen({ lead }: { lead: LeadSummary }) {
-  if (lead.ownerTag) return <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner inactive' : 'Owner removed'}</Tag>
+  if (lead.ownerTag) return <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner left the team' : 'Owner removed'}</Tag>
   if (lead.overdueDays) return <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag>
   if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDay(lead.nextFollowUpDate)}</span>
-  if (lead.hasPendingTransfer) return <span className="text-caption whitespace-nowrap text-muted">Transfer pending</span>
+  if (lead.hasPendingTransfer) return <span className="text-caption whitespace-nowrap text-muted">Handover pending</span>
   return null
 }
 
@@ -30,7 +30,19 @@ const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [lead.business
  *    job (reach the client) is one tap from Home or My leads.
  *  - otherwise: admin lists, with an avatar and the owner.
  */
-export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead: LeadSummary; showOwner?: boolean; selected?: boolean; onToggle?: () => void; contact?: boolean }) {
+export function LeadRow({
+  lead,
+  showOwner,
+  selected,
+  onToggle,
+  contact,
+}: {
+  lead: LeadSummary
+  showOwner?: boolean
+  selected?: boolean
+  onToggle?: () => void
+  contact?: boolean
+}) {
   const secondary = secondaryLine(lead, showOwner)
 
   // Selection mode (bulk reassign): the whole row toggles instead of navigating.
@@ -41,7 +53,10 @@ export function LeadRow({ lead, showOwner, selected, onToggle, contact }: { lead
         role="checkbox"
         aria-checked={!!selected}
         onClick={onToggle}
-        className={cn('flex min-h-[72px] w-full items-center gap-3 border-b border-separator px-4 py-3 text-left transition-colors', selected ? 'bg-accent-soft' : 'active:bg-surface-secondary')}
+        className={cn(
+          'flex min-h-[72px] w-full items-center gap-3 border-b border-separator px-4 py-3 text-left transition-colors',
+          selected ? 'bg-accent-soft' : 'active:bg-surface-secondary',
+        )}
       >
         <span className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>
           {selected && <Icon name="checkmark" size={16} />}

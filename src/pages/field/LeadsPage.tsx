@@ -109,8 +109,8 @@ function LeadList() {
       <Page title="My leads">
         <EmptyState
           icon="briefcase"
-          title="You're not in a project yet"
-          body="Every lead belongs to a project. Once your admin adds you to one, you can add your leads here."
+          title="You're not on a campaign yet"
+          body="Every lead belongs to a campaign. Once your sales manager adds you to one, you can add your leads here."
         />
       </Page>
     )
@@ -127,7 +127,12 @@ function LeadList() {
       header={
         <div className="flex flex-col gap-3">
           <SearchInput label="Search leads" placeholder="Name, business or phone" value={search} onChange={setSearch} />
-          <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]} />
+          <FilterChips
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]}
+          />
         </div>
       }
     >
@@ -135,7 +140,11 @@ function LeadList() {
         <p className="text-caption text-muted" aria-live="polite">
           {total === undefined ? '' : total === 1 ? '1 lead' : `${total} leads`}
         </p>
-        <button type="button" onClick={() => setSorting(true)} className="pressable -mr-2 flex h-9 items-center gap-1.5 rounded-pill px-3 text-body-sm font-semibold text-ink active:bg-surface-strong">
+        <button
+          type="button"
+          onClick={() => setSorting(true)}
+          className="pressable -mr-2 flex h-9 items-center gap-1.5 rounded-pill px-3 text-body-sm font-semibold text-ink active:bg-surface-strong"
+        >
           <Icon name="sort" size={18} />
           {SORTS.find((s) => s.value === sort)?.short}
         </button>
@@ -162,8 +171,14 @@ function LeadList() {
           <EmptyState
             icon="contacts"
             title="No leads yet"
-            body={closed ? 'This project is closed.' : 'Add your first lead to start tracking follow-ups.'}
-            action={!closed && <Button icon="plus-math" onClick={() => setAdding(true)}>Add lead</Button>}
+            body={closed ? 'This campaign is closed.' : 'Add your first lead to start tracking follow-ups.'}
+            action={
+              !closed && (
+                <Button icon="plus-math" onClick={() => setAdding(true)}>
+                  Add lead
+                </Button>
+              )
+            }
           />
         )
       ) : (

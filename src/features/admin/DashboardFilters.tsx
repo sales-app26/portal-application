@@ -48,20 +48,15 @@ export function DashboardFilters({ value, onChange }: { value: DashboardFilter; 
         })}
       </div>
       <div className="grid grid-cols-2 gap-4 large:grid-cols-4">
-        <DatePicker
-          label="From"
-          max={todayIST()}
-          value={value.from}
-          onChange={(from) => from && onChange({ ...value, from, to: value.to < from ? from : value.to })}
-        />
+        <DatePicker label="From" max={todayIST()} value={value.from} onChange={(from) => from && onChange({ ...value, from, to: value.to < from ? from : value.to })} />
         <DatePicker label="To" min={value.from} max={todayIST()} value={value.to} onChange={(to) => to && onChange({ ...value, to })} />
         <div className="col-span-2 large:col-span-1">
           <Picker
-            label="Project"
+            label="Campaign"
             value={value.projectId ?? ALL}
             onChange={(v) => onChange({ ...value, projectId: v === ALL ? undefined : v })}
             options={[
-              { value: ALL, label: 'All my projects' },
+              { value: ALL, label: 'All my campaigns' },
               ...(projects.data ?? []).map((p) => ({
                 value: p.id,
                 label: p.name,

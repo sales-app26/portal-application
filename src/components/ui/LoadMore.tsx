@@ -16,7 +16,13 @@ export function LoadMore({ hasNext, loading, onLoad }: { hasNext: boolean; loadi
   if (!hasNext) return null
   return (
     <div ref={ref} className="flex justify-center py-4">
-      {loading ? <Spinner className="text-muted" /> : <Button variant="secondary" size="sm" onClick={onLoad}>Load more</Button>}
+      {loading ? (
+        <Spinner className="text-muted" />
+      ) : (
+        <Button variant="secondary" size="sm" onClick={onLoad}>
+          Show more
+        </Button>
+      )}
     </div>
   )
 }

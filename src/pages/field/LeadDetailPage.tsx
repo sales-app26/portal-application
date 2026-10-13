@@ -27,6 +27,7 @@ import { haptic } from '@/lib/haptics'
 import { ago, formatDateTime, formatPhone, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { ChatIcon } from '@/features/leads/ContactActions'
+import { LeadComments, PinnedNote } from '@/features/team/LeadComments'
 import { telHref } from '@/lib/contact'
 import { rememberContact } from '@/lib/contactPrompt'
 import { WhatsAppSheet } from '@/features/leads/WhatsAppSheet'
@@ -63,8 +64,8 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
       items={[
         { label: 'Change status', icon: 'synchronize', onSelect: () => setForm('status'), hidden: !p.canChangeStatus },
         { label: 'Edit lead', icon: 'edit', onSelect: () => setForm('edit'), hidden: !p.canEdit },
-        { label: 'Request transfer', icon: 'swap', onSelect: () => setForm('transfer'), hidden: !p.canRequestTransfer },
-        { label: 'Reassign', icon: 'swap', onSelect: () => setForm('reassign'), hidden: !p.canReassign },
+        { label: 'Ask for handover', icon: 'swap', onSelect: () => setForm('transfer'), hidden: !p.canRequestTransfer },
+        { label: 'Assign to…', icon: 'swap', onSelect: () => setForm('reassign'), hidden: !p.canReassign },
         { label: 'Delete lead', icon: 'trash', onSelect: () => setForm('delete'), hidden: !p.canDelete },
       ]}
     />
@@ -74,7 +75,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   const body = lead.isLoading ? (
     <DetailSkeleton />
   ) : notFound ? (
-    <EmptyState icon="search" title="Lead not found" body="It may have been transferred to someone else or removed." />
+    <EmptyState icon="search" title="Lead not found" body="It may have been handed over to someone else or deleted." />
   ) : lead.isError ? (
     <ErrorState message={lead.error.message} onRetry={() => void lead.refetch()} />
   ) : d ? (
@@ -92,7 +93,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
         open={form === 'delete'}
         onOpenChange={(o) => setForm(o ? 'delete' : null)}
         title={`Delete ${d.name}?`}
-        body="The lead disappears everywhere, its phone number can be added again, and a conversion no longer counts toward the target. This can't be undone from the app."
+        body="The lead disappears everywhere, its phone number can be added again, and a win no longer counts toward the target. This can't be undone from the app."
         confirmLabel="Delete lead"
         loading={deleting}
         onConfirm={async () => {
@@ -168,15 +169,20 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
           {lead.businessName && <p className="text-body-md text-body">{lead.businessName}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {lead.permissions.canChangeStatus ? (
-              <button type="button" onClick={() => onOpenForm('status')} aria-label={`Status: ${STATUS_LABEL[lead.status]}. Change status`} className="pressable inline-flex items-center rounded-pill">
+              <button
+                type="button"
+                onClick={() => onOpenForm('status')}
+                aria-label={`Status: ${STATUS_LABEL[lead.status]}. Change status`}
+                className="pressable inline-flex items-center rounded-pill"
+              >
                 <StatusChip status={lead.status} className="h-8 pr-2.5" trailing={<Icon name="expand-arrow" size={14} className="text-body" />} />
               </button>
             ) : (
               <StatusChip status={lead.status} />
             )}
             {lead.overdueDays ? <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag> : null}
-            {lead.ownerTag && <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner inactive' : 'Owner removed'}</Tag>}
-            {lead.project.status === 'closed' && <Tag>Closed project</Tag>}
+            {lead.ownerTag && <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner left the team' : 'Owner removed'}</Tag>}
+            {lead.project.status === 'closed' && <Tag>Closed campaign</Tag>}
           </div>
           {lastEntry && (
             <p className="mt-2 text-caption text-muted">
@@ -208,13 +214,23 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
         )}
       </div>
 
+      {lead.coveringFor && (
+        <div className="flex items-center gap-3 rounded-2xl bg-accent-soft px-4 py-3 text-accent-soft-foreground">
+          <Icon name="leave" size={20} className="flex-none" />
+          <p className="text-body-sm">
+            <strong>{lead.coveringFor.name}</strong> is on leave, and you're covering. What you log is credited to them, with your name on it.
+          </p>
+        </div>
+      )}
+      <PinnedNote lead={lead} />
+
       {lead.pendingTransfer && (
-        <Notice icon="swap" title={`Transfer to ${lead.pendingTransfer.toUser.name} is waiting for approval`}>
+        <Notice icon="swap" title={`Handover to ${lead.pendingTransfer.toUser.name} is waiting for approval`}>
           {lead.pendingTransfer.reason}
         </Notice>
       )}
       {!lead.pendingTransfer && lead.lastDecidedTransfer?.status === 'rejected' && (
-        <Notice icon="cancel" title={`Transfer to ${lead.lastDecidedTransfer.toUser.name} was rejected`}>
+        <Notice icon="cancel" title={`Handover to ${lead.lastDecidedTransfer.toUser.name} was rejected`}>
           {lead.lastDecidedTransfer.decidedBy ? `By ${lead.lastDecidedTransfer.decidedBy.name}` : 'Rejected automatically'}
           {lead.lastDecidedTransfer.decisionNote ? `: ${lead.lastDecidedTransfer.decisionNote}` : '.'}
         </Notice>
@@ -239,11 +255,13 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
           />
         )}
         {!mine && <ListRow icon="user-male-circle" title={lead.owner.name} subtitle="Owner" />}
-        {lead.convertedAt && <ListRow icon="ok" title={formatDateTime(lead.convertedAt)} subtitle={lead.convertedBy ? `Converted by ${lead.convertedBy.name}` : 'Converted'} />}
+        {lead.convertedAt && <ListRow icon="ok" title={formatDateTime(lead.convertedAt)} subtitle={lead.convertedBy ? `Won by ${lead.convertedBy.name}` : 'Won'} />}
         <ListRow
           icon="briefcase"
           title={lead.project.name}
-          subtitle={[lead.project.type === 'door_to_door' ? 'Door-to-door project' : 'Online project', lead.source ? `Source: ${SOURCE_LABEL[lead.source]}` : null].filter(Boolean).join(' · ')}
+          subtitle={[lead.project.type === 'door_to_door' ? 'Door-to-door campaign' : 'Online campaign', lead.source ? `Source: ${SOURCE_LABEL[lead.source]}` : null]
+            .filter(Boolean)
+            .join(' · ')}
         />
       </ListGroup>
 
@@ -254,18 +272,26 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
         </Card>
       )}
 
+      <LeadComments lead={lead} />
+
       <section aria-labelledby="history-title" className="card card--default gap-0 rounded-2xl p-5 expanded:p-6">
         <SectionTitle>
           <span id="history-title">History · {lead.entryCount}</span>
         </SectionTitle>
         <ol>
           {[...lead.recentEntries, ...olderEntries].map((e) => (
-            <EntryItem key={e.id} entry={e} mine={e.user.id === me.id} onDelete={lead.permissions.canDelete ? () => setEntryToDelete(e.id) : undefined} />
+            <EntryItem
+              key={e.id}
+              entry={e}
+              mine={e.user.id === me.id}
+              canFeedback={lead.permissions.canReassign}
+              onDelete={lead.permissions.canDelete ? () => setEntryToDelete(e.id) : undefined}
+            />
           ))}
         </ol>
         {hasMore && !showOlder && (
           <Button variant="secondary" size="sm" className="mt-4" onClick={() => setShowOlder(true)}>
-            Show older entries
+            Show older activity
           </Button>
         )}
         {showOlder && <LoadMore hasNext={!!older.hasNextPage} loading={older.isFetching} onLoad={() => void older.fetchNextPage()} />}
@@ -273,9 +299,9 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       <Confirm
         open={!!entryToDelete}
         onOpenChange={(o) => !o && setEntryToDelete(null)}
-        title="Delete this entry?"
-        body="It's hidden from timelines and counts. If it was the lead's latest entry, the lead's status and next date fall back to the entry before it. A correct entry has to be logged again."
-        confirmLabel="Delete entry"
+        title="Delete this follow-up?"
+        body="It's hidden from activity and counts. If it was the lead's latest follow-up, the lead's status and next date go back to the one before it. A correct follow-up has to be logged again."
+        confirmLabel="Delete follow-up"
         loading={deletingEntry}
         onConfirm={async () => {
           if (!entryToDelete) return
@@ -371,5 +397,15 @@ function DetailSkeleton() {
 /** Admin moves one lead to another active member (PRD §5.10). */
 function ReassignLead({ lead, open, onOpenChange }: { lead: LeadDetail; open: boolean; onOpenChange: (o: boolean) => void }) {
   const members = useProjectMembers(lead.projectId)
-  return <ReassignForm projectId={lead.projectId} leadIds={[lead.id]} members={members.data ?? []} excludeUserId={lead.owner.id} open={open} onOpenChange={onOpenChange} onDone={() => {}} />
+  return (
+    <ReassignForm
+      projectId={lead.projectId}
+      leadIds={[lead.id]}
+      members={members.data ?? []}
+      excludeUserId={lead.owner.id}
+      open={open}
+      onOpenChange={onOpenChange}
+      onDone={() => {}}
+    />
+  )
 }

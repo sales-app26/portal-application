@@ -44,7 +44,7 @@ export function DashboardPage() {
   }
   const setFilter = (f: DashboardFilter) => {
     const next: Record<string, string> = {}
-    if (f.from !== today || f.to !== today) (next.from = f.from), (next.to = f.to)
+    if (f.from !== today || f.to !== today) ((next.from = f.from), (next.to = f.to))
     if (f.projectId) next.projectId = f.projectId
     if (f.userId) next.userId = f.userId
     setParams(next, { replace: true })
@@ -59,34 +59,40 @@ export function DashboardPage() {
   const exportCsv = async (kind: 'leads' | 'follow-ups') => {
     if (daysBetween(filter.from, filter.to) > EXPORT_MAX_DAYS) {
       haptic.error()
-      return toast.error('An export can cover at most 92 days.')
+      return toast.error('A report can cover at most 92 days.')
     }
-    const t = toast.loading('Preparing export…')
+    const t = toast.loading('Preparing your report…')
     try {
       const name = await downloadCsv(`/exports/${kind}`, { from: filter.from, to: filter.to, projectId: filter.projectId, userId: filter.userId })
       toast.success(`Saved ${name}`, { id: t })
     } catch (err) {
       haptic.error()
-      toast.error(err instanceof ApiError ? err.message : 'The export failed. Please try again.', { id: t })
+      toast.error(err instanceof ApiError ? err.message : "Couldn't prepare the report. Please try again.", { id: t })
     }
   }
 
-  const filterSummary = [rangeText(filter), filter.projectId ? projects.data?.find((p) => p.id === filter.projectId)?.name : null, filter.userId ? people.data?.find((u) => u.id === filter.userId)?.name : null].filter(Boolean).join(' · ')
+  const filterSummary = [
+    rangeText(filter),
+    filter.projectId ? projects.data?.find((p) => p.id === filter.projectId)?.name : null,
+    filter.userId ? people.data?.find((u) => u.id === filter.userId)?.name : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <Page
-      title="Dashboard"
+      title="Sales overview"
       wide
       actions={
         <>
           {!split && <IconButton icon="filter" label={activeCount ? `Filters, ${activeCount} active` : 'Filters'} onClick={openFilters} />}
           <ActionMenu
-            title="Export CSV"
-            label="Export"
-            trigger={<IconButton icon="download" label="Export CSV" />}
+            title="Download report"
+            label="Download report"
+            trigger={<IconButton icon="download" label="Download report" />}
             items={[
-              { label: 'Export leads (CSV)', icon: 'csv', onSelect: () => void exportCsv('leads') },
-              { label: 'Export follow-ups (CSV)', icon: 'csv', onSelect: () => void exportCsv('follow-ups') },
+              { label: 'Leads report', icon: 'csv', onSelect: () => void exportCsv('leads') },
+              { label: 'Follow-ups report', icon: 'csv', onSelect: () => void exportCsv('follow-ups') },
             ]}
           />
         </>
@@ -154,9 +160,16 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
       <div className="grid grid-cols-2 gap-3 medium:grid-cols-3 expanded:grid-cols-5">
         <StatTile icon="contacts" tone="accent" label="New leads" value={d.newLeads} />
         <StatTile icon="timeline" tone="accent" label={filter.from === filter.to ? 'Follow-ups' : 'Follow-ups in range'} value={d.followUps} />
-        <StatTile icon="ok" tone="up" label="Converted" value={d.conversions} />
+        <StatTile icon="ok" tone="up" label="Deals won" value={d.conversions} />
         <StatTile icon="goal" tone="up" label="Monthly revenue won" hint={range === 'today' ? 'today' : 'in these dates'} value={d.revenue ? rupeesShort(d.revenue) : '₹0'} />
-        <StatTile icon="swap" tone={d.pendingTransfers ? 'warning' : 'ink'} label="Pending transfers" value={d.pendingTransfers} onClick={() => navigate('/transfers')} className="col-span-2 medium:col-span-1" />
+        <StatTile
+          icon="swap"
+          tone={d.pendingTransfers ? 'warning' : 'ink'}
+          label="Handover requests"
+          value={d.pendingTransfers}
+          onClick={() => navigate('/transfers')}
+          className="col-span-2 medium:col-span-1"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 expanded:grid-cols-3 expanded:items-start">
@@ -171,7 +184,7 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
           <Card>
             <SectionTitle description="Current period for each person.">Target vs achieved</SectionTitle>
             {d.targets.length === 0 ? (
-              <p className="text-body-sm text-body">No one has a target in these projects.</p>
+              <p className="text-body-sm text-body">No one has a target in these campaigns.</p>
             ) : (
               <ul className="grid grid-cols-1 gap-4 medium:grid-cols-2">
                 {d.targets.map((t) => (
@@ -224,10 +237,17 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
         </div>
 
         <Card>
-          <SectionTitle description="Every lead in these projects, now.">Leads by status</SectionTitle>
+          <SectionTitle description="Every lead in these campaigns, now.">Leads by status</SectionTitle>
           <BarList
             title="Leads by status"
-            items={d.leadsByStatus.map((s) => ({ key: s.status, name: STATUS_LABEL[s.status], label: STATUS_LABEL[s.status], value: s.count, color: STATUS_DOT[s.status], dot: STATUS_DOT[s.status] }))}
+            items={d.leadsByStatus.map((s) => ({
+              key: s.status,
+              name: STATUS_LABEL[s.status],
+              label: STATUS_LABEL[s.status],
+              value: s.count,
+              color: STATUS_DOT[s.status],
+              dot: STATUS_DOT[s.status],
+            }))}
           />
         </Card>
         <Card>
@@ -260,9 +280,9 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
         </Card>
 
         <Card className="expanded:col-span-3">
-          <SectionTitle description="Call a few clients to spot-check. Undo a wrong one from its lead page.">Conversions this week</SectionTitle>
+          <SectionTitle description="Call a few clients to spot-check. Undo a wrong one from its lead page.">Deals won this week</SectionTitle>
           {d.conversionsThisWeek.length === 0 ? (
-            <EmptyState icon="ok" title="No conversions yet this week" className="py-6" />
+            <EmptyState icon="ok" title="No deals won yet this week" className="py-6" />
           ) : (
             <ul className="-mx-2 grid grid-cols-1 expanded:grid-cols-2">
               {d.conversionsThisWeek.map((c) => (
@@ -290,7 +310,7 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
 }
 
 type TrendMeasure = 'followUps' | 'newLeads' | 'conversions' | 'revenue'
-const TREND_LABEL: Record<TrendMeasure, string> = { followUps: 'Follow-ups', newLeads: 'New leads', conversions: 'Conversions', revenue: 'Revenue' }
+const TREND_LABEL: Record<TrendMeasure, string> = { followUps: 'Follow-ups', newLeads: 'New leads', conversions: 'Deals won', revenue: 'Revenue' }
 
 /** Activity over the chosen dates: one measure at a time, so the chart has one axis. */
 function TrendCard({ d, className }: { d: Dashboard; className?: string }) {
@@ -309,11 +329,17 @@ function TrendCard({ d, className }: { d: Dashboard; className?: string }) {
         <div>
           <h2 className="text-title-md">Activity</h2>
           <p className="mt-0.5 text-body-sm text-muted">
-            {TREND_LABEL[measure]} per {d.trendBucket === 'week' ? 'week' : 'day'} ·{' '}
-            <span className="font-semibold text-ink">{measure === 'revenue' ? rupees(total) : total}</span> in total
+            {TREND_LABEL[measure]} per {d.trendBucket === 'week' ? 'week' : 'day'} · <span className="font-semibold text-ink">{measure === 'revenue' ? rupees(total) : total}</span>{' '}
+            in total
           </p>
         </div>
-        <Segmented<TrendMeasure> label="Measure" value={measure} onChange={setMeasure} options={(Object.keys(TREND_LABEL) as TrendMeasure[]).map((k) => ({ value: k, label: TREND_LABEL[k] }))} className="h-10 max-w-full overflow-x-auto [&>button]:px-3" />
+        <Segmented<TrendMeasure>
+          label="Measure"
+          value={measure}
+          onChange={setMeasure}
+          options={(Object.keys(TREND_LABEL) as TrendMeasure[]).map((k) => ({ value: k, label: TREND_LABEL[k] }))}
+          className="h-10 max-w-full overflow-x-auto [&>button]:px-3"
+        />
       </div>
       {d.trend.length <= 1 ? (
         <p className="py-8 text-center text-body-sm text-muted">Pick a range of a few days or more to see a trend.</p>
@@ -324,7 +350,7 @@ function TrendCard({ d, className }: { d: Dashboard; className?: string }) {
   )
 }
 
-const FUNNEL_LABEL: Record<FunnelStage, string> = { created: 'Added', contacted: 'Contacted', interested: 'Interested', converted: 'Converted' }
+const FUNNEL_LABEL: Record<FunnelStage, string> = { created: 'Added', contacted: 'Contacted', interested: 'Interested', converted: 'Won' }
 
 function Funnel({ funnel }: { funnel: Dashboard['funnel'] }) {
   const first = funnel[0]?.count ?? 0
@@ -348,7 +374,8 @@ const ATTENTION: Record<AttentionKind, { icon: IconName; tone: string; title: st
   behind_target: { icon: 'goal', tone: 'bg-warning-soft text-warning', title: 'Behind target pace' },
   overdue_pile: { icon: 'high-priority', tone: 'bg-danger-soft text-down', title: 'Overdue piling up' },
   idle: { icon: 'clock', tone: 'bg-default text-ink', title: 'Quiet for a while' },
-  stale_transfer: { icon: 'swap', tone: 'bg-accent-soft text-primary', title: 'Transfer waiting' },
+  stale_transfer: { icon: 'swap', tone: 'bg-accent-soft text-primary', title: 'Handover waiting' },
+  help_request: { icon: 'help', tone: 'bg-danger-soft text-down', title: 'Asked for help' },
 }
 
 /** Who needs a nudge or a hand right now (not the date range): the list a manager acts on. */
@@ -364,7 +391,7 @@ function NeedsAttention({ items }: { items: Dashboard['needsAttention'] }) {
         <ul className="-mx-2 flex flex-col">
           {items.map((a, i) => {
             const k = ATTENTION[a.kind]
-            const to = a.kind === 'stale_transfer' ? '/transfers' : a.user ? `/people/${a.user.id}` : undefined
+            const to = a.leadId ? `/leads/${a.leadId}` : a.kind === 'stale_transfer' ? '/transfers' : a.user ? `/people/${a.user.id}` : undefined
             const body = (
               <>
                 <span className={cn('flex size-9 flex-none items-center justify-center rounded-full', k.tone)}>
@@ -396,7 +423,7 @@ function NeedsAttention({ items }: { items: Dashboard['needsAttention'] }) {
 }
 
 type RankBy = 'conversions' | 'revenue' | 'followUps' | 'newLeads'
-const RANK_LABEL: Record<RankBy, string> = { conversions: 'Converted', revenue: 'Revenue', followUps: 'Follow-ups', newLeads: 'New leads' }
+const RANK_LABEL: Record<RankBy, string> = { conversions: 'Won', revenue: 'Revenue', followUps: 'Follow-ups', newLeads: 'New leads' }
 const rankValue = (by: RankBy, n: number) => (by === 'revenue' ? rupeesShort(n) : String(n))
 
 /**
@@ -413,7 +440,13 @@ function Leaderboard({ people, date }: { people: Dashboard['people']; date: stri
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 expanded:px-6 expanded:pt-6">
         <h2 className="text-title-md">Leaderboard · {plural(people.length, 'person', 'people')}</h2>
         {people.length > 1 && (
-          <Segmented label="Rank by" value={by} onChange={setBy} options={(Object.keys(RANK_LABEL) as RankBy[]).map((k) => ({ value: k, label: RANK_LABEL[k] }))} className="h-10 max-w-full overflow-x-auto [&>button]:px-3" />
+          <Segmented
+            label="Rank by"
+            value={by}
+            onChange={setBy}
+            options={(Object.keys(RANK_LABEL) as RankBy[]).map((k) => ({ value: k, label: RANK_LABEL[k] }))}
+            className="h-10 max-w-full overflow-x-auto [&>button]:px-3"
+          />
         )}
       </div>
       {people.length === 0 ? (
@@ -423,7 +456,14 @@ function Leaderboard({ people, date }: { people: Dashboard['people']; date: stri
           {ranked.map((p, i) => (
             <li key={p.user.id} className="border-t border-separator">
               <Link to={`/people/${p.user.id}?date=${date}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-secondary expanded:px-6">
-                <span className={cn('flex size-7 flex-none items-center justify-center rounded-full text-caption-strong tabular-nums', i === 0 && p[by] > 0 ? 'bg-warning-soft text-ink' : 'text-muted')}>{i + 1}</span>
+                <span
+                  className={cn(
+                    'flex size-7 flex-none items-center justify-center rounded-full text-caption-strong tabular-nums',
+                    i === 0 && p[by] > 0 ? 'bg-warning-soft text-ink' : 'text-muted',
+                  )}
+                >
+                  {i + 1}
+                </span>
                 <Avatar name={p.user.name} size={36} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title-sm">{p.user.name}</span>

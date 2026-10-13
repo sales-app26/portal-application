@@ -87,13 +87,13 @@ export function TransferCard({ t }: { t: Transfer }) {
             </Button>
           </div>
         ) : (
-          <p className="mt-3 text-caption-strong text-muted">Needs another admin</p>
+          <p className="mt-3 text-caption-strong text-muted">Needs another manager</p>
         ))}
 
       <ResponsiveOverlay
         open={rejecting}
         onOpenChange={setRejecting}
-        title="Reject transfer"
+        title="Reject handover"
         description={`${t.lead.name}: ${t.fromUser.name} → ${t.toUser.name}`}
         variant="short"
         dirty={note.length > 0 && !rejectBusy}
@@ -112,7 +112,7 @@ export function TransferCard({ t }: { t: Transfer }) {
               }
             }}
           >
-            Reject transfer
+            Reject handover
           </Button>
         }
       >

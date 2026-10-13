@@ -64,7 +64,7 @@ export function WhatsNewPage() {
                         {!v.seen && <Tag>New</Tag>}
                         <span className="text-caption text-muted">{formatReleaseDate(v.releasedAt)}</span>
                       </span>
-                      <span className="truncate text-body-sm text-body">{v.title ?? 'Release'}</span>
+                      <span className="truncate text-body-sm text-body">{v.title ?? 'Update'}</span>
                     </span>
                     <Icon name="expand-arrow" size={20} className={cn('shrink-0 text-muted-soft transition-transform', isOpen && 'rotate-180')} />
                   </button>

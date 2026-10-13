@@ -104,7 +104,7 @@ const expiresSoon = () => !!tokens?.expiresAt && tokens.expiresAt * 1000 - Date.
 // ---------------------------------------------------------------- request
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   query?: Record<string, string | number | boolean | null | undefined>
   body?: unknown
   /** Skip the bearer header (login, forgot password…). */
@@ -136,7 +136,7 @@ async function send(path: string, opts: RequestOptions): Promise<Response> {
     return await fetch(buildUrl(path, opts.query), { method: opts.method ?? 'GET', headers, body, signal: opts.signal })
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw err
-    throw new ApiError(0, 'NETWORK', navigator.onLine ? 'Could not reach the server. Please retry.' : 'No internet. Nothing was saved.')
+    throw new ApiError(0, 'NETWORK', navigator.onLine ? "Couldn't reach Pronttera. Try again." : "No internet. Nothing was saved, so try again when you're back online.")
   }
 }
 

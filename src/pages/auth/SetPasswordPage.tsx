@@ -52,7 +52,7 @@ export function SetPasswordPage() {
           <EmptyState
             icon="error"
             title="This link has expired or was already used"
-            body='Ask your admin for a new invite, or use "Forgot password?" on the sign-in screen.'
+            body='Ask your manager for a new invite, or use "Forgot password?" on the sign-in screen.'
             action={
               <Button asChild>
                 <Link to="/login">Go to sign in</Link>
@@ -76,8 +76,22 @@ export function SetPasswordPage() {
           <>
             <h1 className="mt-6 mb-8 text-title-lg">{title}</h1>
             <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-              <TextField label="New password" type="password" autoComplete="new-password" hint="At least 8 characters." error={formState.errors.password?.message} {...register('password')} />
-              <TextField label="Confirm password" type="password" autoComplete="new-password" enterKeyHint="done" error={formState.errors.confirm?.message} {...register('confirm')} />
+              <TextField
+                label="New password"
+                type="password"
+                autoComplete="new-password"
+                hint="At least 8 characters."
+                error={formState.errors.password?.message}
+                {...register('password')}
+              />
+              <TextField
+                label="Confirm password"
+                type="password"
+                autoComplete="new-password"
+                enterKeyHint="done"
+                error={formState.errors.confirm?.message}
+                {...register('confirm')}
+              />
               <Button type="submit" size="lg" block loading={formState.isSubmitting}>
                 Save password
               </Button>

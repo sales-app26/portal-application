@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { Button } from '@/components/ui/Button'
@@ -8,12 +8,15 @@ import { LoadMore } from '@/components/ui/LoadMore'
 import { AddLeadForm } from '@/features/leads/AddLeadForm'
 import { LeadRow } from '@/features/leads/LeadRow'
 import { useAgenda, useDueToday, useHome, useLeadList } from '@/features/leads/queries'
+import { useCovering } from '@/features/team/queries'
+import { Icon } from '@/icons'
+import { formatDate } from '@/lib/format'
 import { TargetCard } from '@/features/leads/TargetCard'
 import { useProject } from '@/features/projects/ProjectContext'
 import { ProjectSwitcher } from '@/features/projects/ProjectSwitcher'
 import { ProntteraMark } from '@/components/brand/Logo'
 import { cn } from '@/lib/cn'
-import type { Agenda, LeadSummary } from '@/lib/types'
+import type { Agenda, Covering, LeadSummary } from '@/lib/types'
 
 /** "Good morning, Ravi · Tue, 13 Oct" in India time. */
 function greeting(name: string): string {
@@ -44,12 +47,17 @@ export function HomePage() {
   const home = useHome(project?.id)
   const due = useDueToday(project?.id)
   const agenda = useAgenda(project?.id)
+  const covering = useCovering(project?.id, !!project)
   const [view, setView] = useState<AgendaView>('now')
 
   if (!project) {
     return (
       <Page title="Today" subtitle={greeting(me.name)}>
-        <EmptyState icon="briefcase" title={me.notice ?? 'You are not assigned to any project yet.'} body="Your admin adds you to a project. It will show up here when you sign in next." />
+        <EmptyState
+          icon="briefcase"
+          title={me.notice ?? "You're not on any campaign yet."}
+          body="Your sales manager adds you to a campaign. It will show up here when you sign in next."
+        />
       </Page>
     )
   }
@@ -63,19 +71,50 @@ export function HomePage() {
   const dueToday = home.data ? home.data.dueToday - home.data.overdue : null
 
   return (
-    <Page title="Today" subtitle={greeting(me.name)} leading={<BrandedSwitcher />} cta={closed ? undefined : { label: 'Add lead', icon: 'plus-math', onClick: () => setAdding(true) }}>
+    <Page
+      title="Today"
+      subtitle={greeting(me.name)}
+      leading={<BrandedSwitcher />}
+      cta={closed ? undefined : { label: 'Add lead', icon: 'plus-math', onClick: () => setAdding(true) }}
+    >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 expanded:grid-cols-[minmax(280px,380px)_minmax(0,1fr)] expanded:items-start expanded:gap-8">
         <div className="flex flex-col gap-3">
-          {closed && <p className="rounded-md bg-surface-strong px-4 py-3 text-body-sm">This project is closed. It's read-only.</p>}
+          {closed && <p className="rounded-md bg-surface-strong px-4 py-3 text-body-sm">This campaign is closed. You can look, but not add or change anything.</p>}
           {home.isLoading ? <Skeleton className="h-36 rounded-xl" /> : target ? <TargetCard t={target} to="/performance" revenue={home.data?.revenueThisMonth} /> : null}
           <div className="grid grid-cols-3 gap-3">
-            <StatTile icon="high-priority" label="Overdue" value={home.data ? overdue : '–'} tone={overdue > 0 ? 'down' : 'ink'} onClick={overdue > 0 ? () => (setView('now'), setTimeout(() => scrollTo('due-overdue'), 50)) : undefined} />
-            <StatTile icon="calendar" label="Due today" value={dueToday ?? '–'} tone="accent" onClick={dueToday ? () => (setView('now'), setTimeout(() => scrollTo('due-today'), 50)) : undefined} />
+            <StatTile
+              icon="high-priority"
+              label="Overdue"
+              value={home.data ? overdue : '–'}
+              tone={overdue > 0 ? 'down' : 'ink'}
+              onClick={overdue > 0 ? () => (setView('now'), setTimeout(() => scrollTo('due-overdue'), 50)) : undefined}
+            />
+            <StatTile
+              icon="calendar"
+              label="Due today"
+              value={dueToday ?? '–'}
+              tone="accent"
+              onClick={dueToday ? () => (setView('now'), setTimeout(() => scrollTo('due-today'), 50)) : undefined}
+            />
             <StatTile icon="checkmark" label="Done today" value={home.data ? home.data.followUpsToday : '–'} tone="up" onClick={() => navigate('/day')} />
           </div>
         </div>
 
         <div className="flex flex-col gap-4">
+          {me.onLeave && (
+            <div className="flex items-start gap-3 rounded-2xl bg-accent-soft px-4 py-3 text-accent-soft-foreground">
+              <Icon name="leave" size={20} className="mt-0.5 flex-none" />
+              <p className="text-body-sm">
+                You're on leave until <strong>{formatDate(me.onLeave.endsOn)}</strong>. Your backup covers your follow-ups; anything they log still counts for you.{' '}
+                <Link to="/profile" className="font-semibold underline underline-offset-2">
+                  Change
+                </Link>
+              </p>
+            </div>
+          )}
+          {(covering.data ?? []).map((c) => (
+            <CoverCard key={`${c.projectId}-${c.user.id}`} c={c} mine={me.role === 'moderator'} />
+          ))}
           <AgendaChips value={view} onChange={setView} agenda={agenda.data} dueNow={home.data?.dueToday} />
           {view !== 'now' ? (
             <AgendaList view={view} projectId={project.id} mine={me.role === 'moderator'} />
@@ -126,7 +165,11 @@ const AGENDA: { value: AgendaView; label: string; empty: { title: string; body: 
   { value: 'tomorrow', label: 'Tomorrow', empty: { title: 'Nothing due tomorrow', body: 'Follow-ups you schedule for tomorrow show up here, so you can plan the route tonight.' } },
   { value: 'week', label: 'This week', empty: { title: 'A free week ahead', body: 'Follow-ups due in the next 7 days show up here.' } },
   { value: 'cold', label: 'Going cold', empty: { title: 'Nothing is going cold', body: 'Open leads with no follow-up for 14 days show up here, before they are forgotten.' } },
-  { value: 'untouched', label: 'Not contacted', empty: { title: 'Everyone has been contacted', body: 'New leads, including imported ones, wait here until you log the first follow-up.' } },
+  {
+    value: 'untouched',
+    label: 'Not contacted',
+    empty: { title: 'Everyone has been contacted', body: 'New leads, including ones added from a sheet, wait here until you log the first follow-up.' },
+  },
 ]
 
 /** The rep's lists for today and the days ahead, with counts from /me/agenda. */
@@ -151,7 +194,14 @@ function AgendaChips({ value, onChange, agenda, dueNow }: { value: AgendaView; o
           >
             {a.label}
             {n !== undefined && (
-              <span className={cn('min-w-5 rounded-pill px-1.5 text-center text-caption-strong tabular-nums', on ? 'bg-white/20' : a.value === 'cold' && n > 0 ? 'bg-warning-soft text-ink' : 'bg-default text-body')}>{n}</span>
+              <span
+                className={cn(
+                  'min-w-5 rounded-pill px-1.5 text-center text-caption-strong tabular-nums',
+                  on ? 'bg-white/20' : a.value === 'cold' && n > 0 ? 'bg-warning-soft text-ink' : 'bg-default text-body',
+                )}
+              >
+                {n}
+              </span>
             )}
           </button>
         )
@@ -162,7 +212,14 @@ function AgendaChips({ value, onChange, agenda, dueNow }: { value: AgendaView; o
 
 /** One agenda list, from the leads list with the matching filter. */
 function AgendaList({ view, projectId, mine }: { view: Exclude<AgendaView, 'now'>; projectId: string; mine: boolean }) {
-  const filter = view === 'tomorrow' ? { due: 'tomorrow' as const } : view === 'week' ? { due: 'week' as const } : view === 'cold' ? { cold: true, sort: 'activity' as const } : { status: 'new' as const, sort: 'created' as const }
+  const filter =
+    view === 'tomorrow'
+      ? { due: 'tomorrow' as const }
+      : view === 'week'
+        ? { due: 'week' as const }
+        : view === 'cold'
+          ? { cold: true, sort: 'activity' as const }
+          : { status: 'new' as const, sort: 'created' as const }
   const list = useLeadList(projectId, { ...filter, mine, ...(view === 'tomorrow' || view === 'week' ? { sort: 'next_follow_up' as const } : {}) })
   const leads = list.data?.pages.flatMap((p) => p.items) ?? []
   const empty = AGENDA.find((a) => a.value === view)!.empty
@@ -179,13 +236,64 @@ function AgendaList({ view, projectId, mine }: { view: Exclude<AgendaView, 'now'
   )
 }
 
+/** One teammate on leave whose follow-ups the rep covers today. Opens their leads in place. */
+function CoverCard({ c }: { c: Covering; mine: boolean }) {
+  const [open, setOpen] = useState(false)
+  const list = useLeadList(open ? c.projectId : undefined, { coveringFor: c.user.id, sort: 'next_follow_up' })
+  const leads = list.data?.pages.flatMap((p) => p.items) ?? []
+  return (
+    <section className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-secondary"
+      >
+        <span className="flex size-10 flex-none items-center justify-center rounded-full bg-accent-soft text-primary">
+          <Icon name="shield" size={20} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-title-sm">Covering for {c.user.name}</span>
+          <span className="block text-caption text-body">
+            On leave until {formatDate(c.leave.endsOn)} · {c.dueToday} due{c.overdue ? `, ${c.overdue} overdue` : ''}
+          </span>
+        </span>
+        <Icon name={open ? 'collapse-arrow' : 'expand-arrow'} size={20} className="text-muted" />
+      </button>
+      {open &&
+        (list.isLoading ? (
+          <div className="px-4 pb-4">
+            <ListSkeleton rows={2} />
+          </div>
+        ) : leads.length === 0 ? (
+          <p className="border-t border-separator px-4 py-4 text-body-sm text-muted">Nothing of theirs needs you right now.</p>
+        ) : (
+          <div className="border-t border-separator">
+            {leads.map((l) => (
+              <LeadRow key={l.id} lead={l} contact />
+            ))}
+            <LoadMore hasNext={!!list.hasNextPage} loading={list.isFetchingNextPage} onLoad={() => void list.fetchNextPage()} />
+          </div>
+        ))}
+    </section>
+  )
+}
+
 function DueSection({ id, title, count, leads, tone }: { id: string; title: string; count: number; leads: LeadSummary[]; tone?: 'down' }) {
   if (leads.length === 0) return null
   return (
     <section aria-labelledby={`${id}-title`} id={id} className="scroll-mt-20">
       <h2 id={`${id}-title`} className="mb-2.5 flex items-center gap-2 px-1 text-title-md">
         {title}
-        <span className={tone === 'down' ? 'chip chip--soft chip--danger chip--sm px-2 text-caption-strong tabular-nums' : 'chip chip--sm bg-default px-2 text-caption-strong text-body tabular-nums'}>{count}</span>
+        <span
+          className={
+            tone === 'down'
+              ? 'chip chip--soft chip--danger chip--sm px-2 text-caption-strong tabular-nums'
+              : 'chip chip--sm bg-default px-2 text-caption-strong text-body tabular-nums'
+          }
+        >
+          {count}
+        </span>
       </h2>
       <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
         {leads.map((l) => (

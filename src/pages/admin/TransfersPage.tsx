@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { Segmented } from '@/components/ui/Choice'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Display'
@@ -8,20 +9,23 @@ import { useTransferList } from '@/features/admin/queries'
 import type { TransferStatus } from '@/lib/types'
 
 const COPY: Record<TransferStatus, { title: string; body: string }> = {
-  pending: { title: 'No transfers waiting', body: 'When someone asks to move a lead, it shows up here for approval.' },
-  approved: { title: 'No approved transfers yet', body: '' },
-  rejected: { title: 'No rejected transfers', body: '' },
+  pending: { title: 'No handover requests', body: 'Requests to move a lead show up here until a sales manager decides.' },
+  approved: { title: 'No approved handovers yet', body: '' },
+  rejected: { title: 'No rejected handovers', body: '' },
 }
 
 /** Pending requests to approve or reject, and past decisions (PRD §6). */
 export function TransfersPage() {
+  const me = useMe()
+  const rep = me.role === 'sales_person'
   const [status, setStatus] = useState<TransferStatus>('pending')
   const q = useTransferList(status)
   const items = q.data?.pages.flatMap((p) => p.items) ?? []
 
   return (
     <Page
-      title="Transfers"
+      title={rep ? 'My handovers' : 'Handovers'}
+      back={rep ? '/profile' : undefined}
       header={
         <Segmented
           label="Status"

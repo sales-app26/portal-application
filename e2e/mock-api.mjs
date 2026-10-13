@@ -24,92 +24,435 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     { id: ids.online, name: 'Pune Retail Drive', type: 'online', status: 'active', targetCount: 20, targetPeriod: 'weekly' },
     { id: ids.d2d, name: 'Kondhwa Door-to-door', type: 'door_to_door', status: 'active', targetCount: null, targetPeriod: null },
   ]
-  const me = { id: ids.me, name: role === 'sales_person' ? 'Ravi Kumar' : role === 'moderator' ? 'Meera Nair' : 'Adeeb Shah', email: 'user@example.test', phone: '9876543210', role, projects: role === 'super_admin' ? [] : projects, notice: null }
+  const me = {
+    id: ids.me,
+    name: role === 'sales_person' ? 'Ravi Kumar' : role === 'moderator' ? 'Meera Nair' : 'Adeeb Shah',
+    email: 'user@example.test',
+    phone: '9876543210',
+    role,
+    projects: role === 'super_admin' ? [] : projects,
+    notice: null,
+  }
   const names = ['Asha Patil', 'Imran Shaikh', 'Neha Joshi', 'Suresh Rao']
   const lead = (i, projectId = ids.online) => ({
-    id: `2222222${i}-2222-4222-8222-222222222222`, projectId, name: names[i % 4], businessName: ['Patil General Store', null, 'Joshi Medicals', 'Rao Hardware'][i % 4],
-    phone: `98100000${String(i).padStart(2, '0')}`, status: ['contacted', 'interested', 'follow_up_scheduled', 'new'][i % 4], nextFollowUpDate: today, overdueDays: i === 1 ? 2 : null,
-    location: { id: 'loc', name: 'Wanowrie' }, owner: { id: i === 3 ? ids.priya : me.id, name: i === 3 ? 'Priya Desai' : me.name, isActive: true }, ownerTag: null, convertedAt: null,
-    hasPendingTransfer: false, createdAt: iso(), updatedAt: iso(),
-    dealValue: i === 0 ? 2499 : null, plan: i === 0 ? 'Growth' : null, source: ['walk_in', 'referral', null, 'import'][i % 4], lastActivityAt: iso(), createdBy: { id: me.id, name: me.name },
+    id: `2222222${i}-2222-4222-8222-222222222222`,
+    projectId,
+    name: names[i % 4],
+    businessName: ['Patil General Store', null, 'Joshi Medicals', 'Rao Hardware'][i % 4],
+    phone: `98100000${String(i).padStart(2, '0')}`,
+    status: ['contacted', 'interested', 'follow_up_scheduled', 'new'][i % 4],
+    nextFollowUpDate: today,
+    overdueDays: i === 1 ? 2 : null,
+    location: { id: 'loc', name: 'Wanowrie' },
+    owner: { id: i === 3 ? ids.priya : me.id, name: i === 3 ? 'Priya Desai' : me.name, isActive: true },
+    ownerTag: null,
+    convertedAt: null,
+    hasPendingTransfer: false,
+    createdAt: iso(),
+    updatedAt: iso(),
+    dealValue: i === 0 ? 2499 : null,
+    plan: i === 0 ? 'Growth' : null,
+    source: ['walk_in', 'referral', null, 'import'][i % 4],
+    lastActivityAt: iso(),
+    createdBy: { id: me.id, name: me.name },
   })
   const entry = (i, extra = {}) => ({
-    id: `3333333${i}-3333-4333-8333-333333333333`, leadId: ids.lead, projectId: ids.online, entryType: 'follow_up', status: 'contacted', note: 'Met the owner, interested in the monthly plan.', nextFollowUpDate: today,
-    location: { id: 'loc', name: 'Wanowrie' }, hasPhoto: false, photoUrl: null, latitude: null, longitude: null, gpsAccuracyM: null, lowAccuracy: false,
-    user: { id: me.id, name: me.name }, createdAt: iso(), updatedAt: iso(), edited: false, editable: true, reason: null, ...extra,
+    id: `3333333${i}-3333-4333-8333-333333333333`,
+    leadId: ids.lead,
+    projectId: ids.online,
+    entryType: 'follow_up',
+    status: 'contacted',
+    note: 'Met the owner, interested in the monthly plan.',
+    nextFollowUpDate: today,
+    location: { id: 'loc', name: 'Wanowrie' },
+    hasPhoto: false,
+    photoUrl: null,
+    latitude: null,
+    longitude: null,
+    gpsAccuracyM: null,
+    lowAccuracy: false,
+    user: { id: me.id, name: me.name },
+    createdAt: iso(),
+    updatedAt: iso(),
+    edited: false,
+    editable: true,
+    reason: null,
+    ...extra,
   })
   const projectRef = (i) => ({ id: projects[i].id, name: projects[i].name, type: projects[i].type, status: 'active' })
   const day = () => [
     { ...entry(1, { note: 'Phone call, asked for a quote.' }), lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' }, project: projectRef(0) },
-    { ...entry(2, { note: 'Visited the shop, owner present.', hasPhoto: true, photoUrl: PIXEL, latitude: 18.4966, longitude: 73.8993, gpsAccuracyM: 12, projectId: ids.d2d }), lead: { id: '22222221-2222-4222-8222-222222222222', name: 'Imran Shaikh', businessName: null }, project: projectRef(1) },
-    { ...entry(3, { note: 'Second visit, low signal here.', hasPhoto: true, photoUrl: PIXEL, latitude: 18.5, longitude: 73.9, gpsAccuracyM: 160, lowAccuracy: true, projectId: ids.d2d }), lead: { id: '22222222-2222-4222-8222-222222222222', name: 'Neha Joshi', businessName: 'Joshi Medicals' }, project: projectRef(1) },
-    { ...entry(4, { entryType: 'status_change', editable: false, note: 'Customer confirmed by phone.' }), lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' }, project: projectRef(0) },
+    {
+      ...entry(2, { note: 'Visited the shop, owner present.', hasPhoto: true, photoUrl: PIXEL, latitude: 18.4966, longitude: 73.8993, gpsAccuracyM: 12, projectId: ids.d2d }),
+      lead: { id: '22222221-2222-4222-8222-222222222222', name: 'Imran Shaikh', businessName: null },
+      project: projectRef(1),
+    },
+    {
+      ...entry(3, {
+        note: 'Second visit, low signal here.',
+        hasPhoto: true,
+        photoUrl: PIXEL,
+        latitude: 18.5,
+        longitude: 73.9,
+        gpsAccuracyM: 160,
+        lowAccuracy: true,
+        projectId: ids.d2d,
+      }),
+      lead: { id: '22222222-2222-4222-8222-222222222222', name: 'Neha Joshi', businessName: 'Joshi Medicals' },
+      project: projectRef(1),
+    },
+    {
+      ...entry(4, { entryType: 'status_change', editable: false, note: 'Customer confirmed by phone.' }),
+      lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' },
+      project: projectRef(0),
+    },
   ]
   const detail = (base) => {
     const p = projects.find((x) => x.id === base.projectId) ?? projects[0]
     return {
-      ...base, notes: 'Prefers calls after 4 pm.', project: { id: p.id, name: p.name, type: p.type, status: p.status }, convertedBy: null, recentEntries: [entry(0)], entryCount: 1, pendingTransfer: null, lastDecidedTransfer: null,
+      ...base,
+      notes: 'Prefers calls after 4 pm.',
+      openHelp: false,
+      coveringFor: null,
+      commentCount: 1,
+      pinnedComment: { id: 'c-1', body: 'Owner prefers calls after 4 pm. Sent pricing last week.', user: { id: ids.priya, name: 'Priya Desai' }, createdAt: iso() },
+      project: { id: p.id, name: p.name, type: p.type, status: p.status },
+      convertedBy: null,
+      recentEntries: [entry(0)],
+      entryCount: 1,
+      pendingTransfer: null,
+      lastDecidedTransfer: null,
       permissions:
         role === 'sales_person'
           ? { canLogFollowUp: true, canChangeStatus: true, canLeaveConverted: false, canEdit: true, canRequestTransfer: true, canReassign: false, canDelete: false }
-          : { canLogFollowUp: false, canChangeStatus: true, canLeaveConverted: true, canEdit: false, canRequestTransfer: false, canReassign: true, canDelete: role === 'super_admin' },
+          : {
+              canLogFollowUp: false,
+              canChangeStatus: true,
+              canLeaveConverted: true,
+              canEdit: false,
+              canRequestTransfer: false,
+              canReassign: true,
+              canDelete: role === 'super_admin',
+            },
     }
   }
 
   // ---- admin state
   const users = [
-    { id: ids.priya, name: 'Priya Desai', email: 'priya@example.test', phone: '9811111111', role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true, canManageAccount: true },
-    { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta', email: 'karan@example.test', phone: null, role: 'sales_person', isActive: true, createdBy: ids.me, createdAt: iso(), canManage: true, canManageAccount: true },
-    { id: ids.modOther, name: 'Farah Khan', email: 'farah@example.test', phone: null, role: 'moderator', isActive: true, createdBy: null, createdAt: iso(), canManage: role === 'super_admin', canManageAccount: role === 'super_admin' },
+    {
+      id: ids.priya,
+      name: 'Priya Desai',
+      email: 'priya@example.test',
+      phone: '9811111111',
+      role: 'sales_person',
+      isActive: true,
+      createdBy: ids.me,
+      createdAt: iso(),
+      canManage: true,
+      canManageAccount: true,
+    },
+    {
+      id: '99999999-9999-4999-8999-999999999999',
+      name: 'Karan Mehta',
+      email: 'karan@example.test',
+      phone: null,
+      role: 'sales_person',
+      isActive: true,
+      createdBy: ids.me,
+      createdAt: iso(),
+      canManage: true,
+      canManageAccount: true,
+    },
+    {
+      id: ids.modOther,
+      name: 'Farah Khan',
+      email: 'farah@example.test',
+      phone: null,
+      role: 'moderator',
+      isActive: true,
+      createdBy: null,
+      createdAt: iso(),
+      canManage: role === 'super_admin',
+      canManageAccount: role === 'super_admin',
+    },
   ]
   const members = [
-    { userId: ids.priya, name: 'Priya Desai', role: 'sales_person', userIsActive: true, isActive: true, joinedAt: iso(), email: 'priya@example.test', phone: '9811111111', targetCount: 10, targetPeriod: 'weekly', removedAt: null },
-    { userId: ids.modOther, name: 'Farah Khan', role: 'moderator', userIsActive: true, isActive: true, joinedAt: iso(), email: 'farah@example.test', phone: null, targetCount: null, targetPeriod: null, removedAt: null },
-    ...(role === 'sales_person' ? [] : [{ userId: ids.me, name: me.name, role, userIsActive: true, isActive: true, joinedAt: iso(), email: me.email, phone: null, targetCount: null, targetPeriod: null, removedAt: null }]),
+    {
+      userId: ids.priya,
+      name: 'Priya Desai',
+      role: 'sales_person',
+      userIsActive: true,
+      isActive: true,
+      joinedAt: iso(),
+      email: 'priya@example.test',
+      phone: '9811111111',
+      targetCount: 10,
+      targetPeriod: 'weekly',
+      removedAt: null,
+    },
+    {
+      userId: ids.modOther,
+      name: 'Farah Khan',
+      role: 'moderator',
+      userIsActive: true,
+      isActive: true,
+      joinedAt: iso(),
+      email: 'farah@example.test',
+      phone: null,
+      targetCount: null,
+      targetPeriod: null,
+      removedAt: null,
+    },
+    ...(role === 'sales_person'
+      ? []
+      : [
+          {
+            userId: ids.me,
+            name: me.name,
+            role,
+            userIsActive: true,
+            isActive: true,
+            joinedAt: iso(),
+            email: me.email,
+            phone: null,
+            targetCount: null,
+            targetPeriod: null,
+            removedAt: null,
+          },
+        ]),
   ]
   const projectDto = (p, extra = {}) => ({
-    id: p.id, name: p.name, description: p.id === ids.online ? 'Retail outreach across Pune.' : null, imageUrl: null, type: p.type, status: p.status, startDate: '2026-09-01', endDate: null, closedAt: null, createdAt: iso(),
-    pastEndDate: false, typeLocked: true, memberCount: members.length, leadCount: 42, ...extra,
+    id: p.id,
+    name: p.name,
+    description: p.id === ids.online ? 'Retail outreach across Pune.' : null,
+    imageUrl: null,
+    type: p.type,
+    status: p.status,
+    startDate: '2026-09-01',
+    endDate: null,
+    closedAt: null,
+    createdAt: iso(),
+    pastEndDate: false,
+    typeLocked: true,
+    memberCount: members.length,
+    leadCount: 42,
+    ...extra,
   })
   const transfers = [
-    { id: ids.transfer, lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store', projectId: ids.online, projectName: 'Pune Retail Drive' }, fromUser: { id: ids.priya, name: 'Priya Desai' }, toUser: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, requestedBy: { id: ids.priya, name: 'Priya Desai' }, reason: 'Karan lives next to the shop.', status: 'pending', createdAt: iso(), decidedBy: null, decidedAt: null, decisionNote: null, canDecide: true },
+    {
+      id: ids.transfer,
+      lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store', projectId: ids.online, projectName: 'Pune Retail Drive' },
+      fromUser: { id: ids.priya, name: 'Priya Desai' },
+      toUser: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' },
+      requestedBy: { id: ids.priya, name: 'Priya Desai' },
+      reason: 'Karan lives next to the shop.',
+      status: 'pending',
+      createdAt: iso(),
+      decidedBy: null,
+      decidedAt: null,
+      decisionNote: null,
+      canDecide: true,
+    },
   ]
   const dashboard = () => ({
-    from: today, to: today,
+    from: today,
+    to: today,
     targets: [
-      { projectId: ids.online, projectName: 'Pune Retail Drive', user: { id: ids.priya, name: 'Priya Desai' }, role: 'sales_person', targetCount: 10, targetPeriod: 'weekly', achieved: 6, progressPercent: 60, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 6, conversionsThisMonth: 14 },
-      { projectId: ids.online, projectName: 'Pune Retail Drive', user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', targetCount: null, targetPeriod: null, achieved: 2, progressPercent: null, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 2, conversionsThisMonth: 5 },
+      {
+        projectId: ids.online,
+        projectName: 'Pune Retail Drive',
+        user: { id: ids.priya, name: 'Priya Desai' },
+        role: 'sales_person',
+        targetCount: 10,
+        targetPeriod: 'weekly',
+        achieved: 6,
+        progressPercent: 60,
+        periodStart: iso(),
+        periodEnd: iso(),
+        conversionsThisWeek: 6,
+        conversionsThisMonth: 14,
+      },
+      {
+        projectId: ids.online,
+        projectName: 'Pune Retail Drive',
+        user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' },
+        role: 'sales_person',
+        targetCount: null,
+        targetPeriod: null,
+        achieved: 2,
+        progressPercent: null,
+        periodStart: iso(),
+        periodEnd: iso(),
+        conversionsThisWeek: 2,
+        conversionsThisMonth: 5,
+      },
     ],
-    newLeads: 6, followUps: 14, followUpsToday: 5,
+    newLeads: 6,
+    followUps: 14,
+    followUpsToday: 5,
     people: [
       { user: { id: ids.priya, name: 'Priya Desai' }, role: 'sales_person', newLeads: 4, followUps: 9, conversions: 2, followUpsToday: 3, revenue: 4998 },
       { user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', newLeads: 2, followUps: 5, conversions: 0, followUpsToday: 2, revenue: 0 },
     ],
-    conversions: 2, revenue: 4998,
-    funnel: [{ stage: 'created', count: 6 }, { stage: 'contacted', count: 5 }, { stage: 'interested', count: 3 }, { stage: 'converted', count: 2 }],
+    conversions: 2,
+    revenue: 4998,
+    funnel: [
+      { stage: 'created', count: 6 },
+      { stage: 'contacted', count: 5 },
+      { stage: 'interested', count: 3 },
+      { stage: 'converted', count: 2 },
+    ],
     trendBucket: 'day',
-    trend: Array.from({ length: 7 }, (_, i) => ({ date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10), followUps: [3, 5, 2, 6, 4, 8, 7][i], newLeads: [1, 0, 2, 1, 0, 1, 1][i], conversions: [0, 1, 0, 0, 1, 0, 0][i], revenue: [0, 2499, 0, 0, 2499, 0, 0][i] })),
-    lostReasons: [{ reason: 'price', count: 3 }, { reason: 'has_alternative', count: 2 }, { reason: 'unspecified', count: 1 }],
-    sources: [{ source: 'walk_in', count: 3 }, { source: 'referral', count: 2 }, { source: 'unspecified', count: 1 }],
+    trend: Array.from({ length: 7 }, (_, i) => ({
+      date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10),
+      followUps: [3, 5, 2, 6, 4, 8, 7][i],
+      newLeads: [1, 0, 2, 1, 0, 1, 1][i],
+      conversions: [0, 1, 0, 0, 1, 0, 0][i],
+      revenue: [0, 2499, 0, 0, 2499, 0, 0][i],
+    })),
+    lostReasons: [
+      { reason: 'price', count: 3 },
+      { reason: 'has_alternative', count: 2 },
+      { reason: 'unspecified', count: 1 },
+    ],
+    sources: [
+      { source: 'walk_in', count: 3 },
+      { source: 'referral', count: 2 },
+      { source: 'unspecified', count: 1 },
+    ],
     needsAttention: [
       { kind: 'overdue_pile', user: { id: ids.priya, name: 'Priya Desai' }, projectName: 'Pune Retail Drive', detail: '6 leads overdue', leadCount: 6 },
       { kind: 'idle', user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, projectName: null, detail: 'No entries for 3 days', leadCount: 12 },
     ],
     loggedNothingToday: [{ user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, role: 'sales_person', projects: ['Pune Retail Drive'] }],
     leadsByStatus: ['new', 'contacted', 'interested', 'follow_up_scheduled', 'not_interested', 'converted', 'lost'].map((status, i) => ({ status, count: 20 - i * 3 })),
-    conversionsThisWeek: [{ leadId: ids.lead, leadName: 'Asha Patil', businessName: 'Patil General Store', phone: '9810000000', projectName: 'Pune Retail Drive', convertedBy: { id: ids.priya, name: 'Priya Desai' }, currentOwner: { id: ids.priya, name: 'Priya Desai' }, convertedAt: iso(), via: 'follow_up' }],
-    pendingTransfers: transfers.filter((t) => t.status === 'pending').length, message: null,
+    conversionsThisWeek: [
+      {
+        leadId: ids.lead,
+        leadName: 'Asha Patil',
+        businessName: 'Patil General Store',
+        phone: '9810000000',
+        projectName: 'Pune Retail Drive',
+        convertedBy: { id: ids.priya, name: 'Priya Desai' },
+        currentOwner: { id: ids.priya, name: 'Priya Desai' },
+        convertedAt: iso(),
+        via: 'follow_up',
+      },
+    ],
+    pendingTransfers: transfers.filter((t) => t.status === 'pending').length,
+    message: null,
   })
 
   const page = (items) => ({ items, meta: { page: 1, limit: 20, total: items.length, totalPages: 1, hasNextPage: false, hasPreviousPage: false } })
-  const ok = (data, message = 'Fetched successfully.', status = 200) => ({ status, body: { success: true, statusCode: status, message, data } })
+  const ok = (data, message = 'Done.', status = 200) => ({ status, body: { success: true, statusCode: status, message, data } })
   const fail = (status, errorCode, message, details) => ({ status, body: { success: false, statusCode: status, errorCode, message, ...(details ? { details } : {}) } })
 
   /** Release notes: a live 1.1.0 (read, unless `unreadRelease`), over the quiet 1.0.0 everyone starts on. */
   const seenVersions = new Set(unreadRelease ? [] : ['aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'])
   const versions = [
-    { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', version: '1.1.0', title: 'Faster lead import', tags: ['Leads', 'Transfers'], notes: '## Added\n\n- Import a CSV of leads in one go', releasedAt: iso(), isPublished: true, notify: true, seenCount: 0, createdAt: iso(), updatedAt: iso() },
-    { id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', version: '1.0.0', title: 'First release', tags: [], notes: 'The first release of Sales Tracker.', releasedAt: iso(), isPublished: true, notify: false, seenCount: 0, createdAt: iso(), updatedAt: iso() },
+    {
+      id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+      version: '1.1.0',
+      title: 'Faster lead import',
+      tags: ['Leads', 'Transfers'],
+      notes: '## Added\n\n- Import a CSV of leads in one go',
+      releasedAt: iso(),
+      isPublished: true,
+      notify: true,
+      seenCount: 0,
+      createdAt: iso(),
+      updatedAt: iso(),
+    },
+    {
+      id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa',
+      version: '1.0.0',
+      title: 'First release',
+      tags: [],
+      notes: 'The first release of Sales Tracker.',
+      releasedAt: iso(),
+      isPublished: true,
+      notify: false,
+      seenCount: 0,
+      createdAt: iso(),
+      updatedAt: iso(),
+    },
+  ]
+
+  // ---- team state
+  const notifications = [
+    {
+      id: 'n1',
+      kind: 'mention',
+      title: 'Farah Khan mentioned you on Asha Patil',
+      body: 'Can you push for the demo this week?',
+      link: `/leads/${ids.lead}`,
+      actor: { id: ids.modOther, name: 'Farah Khan' },
+      leadId: ids.lead,
+      createdAt: iso(),
+      readAt: null,
+    },
+    {
+      id: 'n2',
+      kind: 'transfer_decided',
+      title: 'Farah Khan approved the handover of Neha Joshi to Ravi Kumar',
+      body: null,
+      link: '/transfers',
+      actor: { id: ids.modOther, name: 'Farah Khan' },
+      leadId: null,
+      createdAt: iso(),
+      readAt: iso(),
+    },
+  ]
+  const leaves = []
+  const comments = [
+    {
+      id: 'c-1',
+      kind: 'handover',
+      body: 'Owner prefers calls after 4 pm. Sent pricing last week.',
+      user: { id: ids.priya, name: 'Priya Desai' },
+      mentions: [],
+      pinned: true,
+      entryId: null,
+      resolvedAt: null,
+      resolvedBy: null,
+      createdAt: iso(),
+      editedAt: null,
+      canEdit: false,
+      canDelete: false,
+      canPin: true,
+      canResolve: false,
+    },
+  ]
+  const templates = []
+  const roster = () => [
+    {
+      user: { id: ids.priya, name: 'Priya Desai', phone: '9811111111', email: 'priya@example.test' },
+      role: 'sales_person',
+      projects: [{ id: ids.online, name: 'Pune Retail Drive' }],
+      onLeave: null,
+      nextLeave: null,
+      backup: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' },
+      lastActivityAt: iso(),
+      followUpsToday: 4,
+      openLeads: 18,
+      dueToday: 3,
+      overdue: 1,
+      target: { count: 10, period: 'weekly', achieved: 6 },
+    },
+    {
+      user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta', phone: null, email: 'karan@example.test' },
+      role: 'sales_person',
+      projects: [{ id: ids.online, name: 'Pune Retail Drive' }],
+      onLeave: { startsOn: today, endsOn: today },
+      nextLeave: null,
+      backup: { id: ids.priya, name: 'Priya Desai' },
+      lastActivityAt: null,
+      followUpsToday: 0,
+      openLeads: 9,
+      dueToday: 2,
+      overdue: 0,
+      target: null,
+    },
   ]
 
   /** Every request, and the non-GET ones separately, for assertions. */
@@ -126,10 +469,34 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if (p === '/auth/me') return ok(me)
     if (p === '/auth/logout') return ok(null, 'Signed out.')
     if (p === '/me/home')
-      return ok({ targets: [{ projectId: ids.online, projectName: projects[0].name, user: { id: me.id, name: me.name }, role: 'sales_person', targetCount: 20, targetPeriod: 'weekly', achieved: 12, progressPercent: 60, periodStart: iso(), periodEnd: iso(), conversionsThisWeek: 12, conversionsThisMonth: 30 }], dueToday: 4, overdue: 1, followUpsToday: 7, myLeads: 42, notice: null, conversionsThisMonth: 30, revenueThisMonth: 74970 })
+      return ok({
+        targets: [
+          {
+            projectId: ids.online,
+            projectName: projects[0].name,
+            user: { id: me.id, name: me.name },
+            role: 'sales_person',
+            targetCount: 20,
+            targetPeriod: 'weekly',
+            achieved: 12,
+            progressPercent: 60,
+            periodStart: iso(),
+            periodEnd: iso(),
+            conversionsThisWeek: 12,
+            conversionsThisMonth: 30,
+          },
+        ],
+        dueToday: 4,
+        overdue: 1,
+        followUpsToday: 7,
+        myLeads: 42,
+        notice: null,
+        conversionsThisMonth: 30,
+        revenueThisMonth: 74970,
+      })
     if (p === '/me/agenda') return ok({ overdue: 1, today: 3, tomorrow: 2, thisWeek: 5, cold: 3, untouched: 4 })
     if (p === '/me/due-today') return ok(page([0, 1, 2, 3].map((i) => lead(i))))
-    if (p === '/visits/capture-token') return ok({ captureToken: 'v1.test.sig', issuedAt: iso(), expiresAt: new Date(Date.now() + 600_000).toISOString() }, 'Created successfully.')
+    if (p === '/visits/capture-token') return ok({ captureToken: 'v1.test.sig', issuedAt: iso(), expiresAt: new Date(Date.now() + 600_000).toISOString() }, 'Saved.')
     if (p === '/timeline') return ok({ date: today, user: { id: me.id, name: me.name }, entries: day(), followUps: 3, visits: 2, statusChanges: 1, message: null })
     if (p === '/dashboard') return ok(dashboard())
     if (p === '/timeline/summary') {
@@ -142,9 +509,31 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       }
       const sum = (k) => days.reduce((n, x) => n + x[k], 0)
       const who = users.find((u) => u.id === query.get('userId'))
-      return ok({ from: query.get('from'), to: query.get('to'), user: { id: query.get('userId'), name: who?.name ?? 'Priya Desai' }, totals: { followUps: sum('followUps'), visits: sum('visits'), statusChanges: sum('statusChanges'), newLeads: sum('newLeads'), conversions: sum('conversions'), activeDays: days.filter((x) => x.followUps + x.statusChanges > 0).length }, days })
+      return ok({
+        from: query.get('from'),
+        to: query.get('to'),
+        user: { id: query.get('userId'), name: who?.name ?? 'Priya Desai' },
+        totals: {
+          followUps: sum('followUps'),
+          visits: sum('visits'),
+          statusChanges: sum('statusChanges'),
+          newLeads: sum('newLeads'),
+          conversions: sum('conversions'),
+          activeDays: days.filter((x) => x.followUps + x.statusChanges > 0).length,
+        },
+        days,
+      })
     }
-    if (p === '/exports/leads' || p === '/exports/follow-ups') return { status: 200, raw: '﻿Lead ID,Name\r\n1,Asha\r\n', headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${p.slice(9)}_${query.get('from')}_${query.get('to')}.csv"`, 'access-control-expose-headers': 'Content-Disposition' } }
+    if (p === '/exports/leads' || p === '/exports/follow-ups')
+      return {
+        status: 200,
+        raw: '﻿Lead ID,Name\r\n1,Asha\r\n',
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': `attachment; filename="${p.slice(9)}_${query.get('from')}_${query.get('to')}.csv"`,
+          'access-control-expose-headers': 'Content-Disposition',
+        },
+      }
 
     // ---- users
     if (p === '/users' && method === 'GET') {
@@ -154,58 +543,187 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     }
     if (p === '/users' && method === 'POST') {
       const b = json()
-      if (b.email === 'old@example.test') return fail(409, 'USER_DEACTIVATED_EXISTS', 'This email belongs to a deactivated user. Reactivate that user instead of creating a new one.', { userId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Old Timer', role: 'sales_person' })
-      const u = { id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', name: b.name, email: b.email, phone: b.phone ?? null, role: b.role, isActive: true, createdBy: me.id, createdAt: iso(), canManage: true, canManageAccount: true }
+      if (b.email === 'old@example.test')
+        return fail(409, 'USER_DEACTIVATED_EXISTS', 'This email belongs to someone who left the team. Bring them back to the team instead of adding them again.', {
+          userId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          name: 'Old Timer',
+          role: 'sales_person',
+        })
+      const u = {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        name: b.name,
+        email: b.email,
+        phone: b.phone ?? null,
+        role: b.role,
+        isActive: true,
+        createdBy: me.id,
+        createdAt: iso(),
+        canManage: true,
+        canManageAccount: true,
+      }
       users.push(u)
-      return ok(u, 'User created. An email has been sent to set the password.', 201)
+      return ok(u, 'Added to the team. We’ve emailed them an invite to set a password.', 201)
     }
     let m
+    // ---- team collaboration
+    if (p === '/notifications/unread-count') return ok({ count: notifications.filter((n) => !n.readAt).length })
+    if (p === '/notifications' && method === 'GET') return ok(page(notifications))
+    if (p === '/notifications/read') {
+      const b = json()
+      notifications.forEach((n) => (b.all || b.ids?.includes(n.id)) && (n.readAt = iso()))
+      return ok(null, 'Marked as read.')
+    }
+    if (p === '/me/covering')
+      return ok(
+        role === 'super_admin'
+          ? []
+          : [
+              {
+                user: { id: ids.priya, name: 'Priya Desai' },
+                projectId: ids.online,
+                projectName: 'Pune Retail Drive',
+                leave: { startsOn: today, endsOn: today },
+                dueToday: 2,
+                overdue: 1,
+              },
+            ],
+      )
+    if (p === '/leaves' && method === 'GET') return ok(leaves)
+    if (p === '/leaves' && method === 'POST') {
+      const b = json()
+      const l = {
+        id: `leave-${leaves.length + 1}`,
+        user: { id: b.userId ?? me.id, name: b.userId ? 'Priya Desai' : me.name },
+        startsOn: b.startsOn,
+        endsOn: b.endsOn,
+        note: b.note ?? null,
+        createdBy: { id: me.id, name: me.name },
+        createdAt: iso(),
+      }
+      leaves.push(l)
+      return ok(l, 'Leave saved.', 201)
+    }
+    if ((m = p.match(/^\/leaves\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Leave cancelled.')
+    if ((m = p.match(/^\/leads\/([^/]+)\/comments$/)) && method === 'GET') return ok(comments)
+    if ((m = p.match(/^\/leads\/([^/]+)\/(comments|help)$/)) && method === 'POST') {
+      const b = json()
+      const c = {
+        id: `c-${comments.length + 1}`,
+        kind: m[2] === 'help' ? 'help' : (b.kind ?? 'comment'),
+        body: b.body,
+        user: { id: me.id, name: me.name },
+        mentions: [],
+        pinned: false,
+        entryId: b.entryId ?? null,
+        resolvedAt: null,
+        resolvedBy: null,
+        createdAt: iso(),
+        editedAt: null,
+        canEdit: true,
+        canDelete: true,
+        canPin: true,
+        canResolve: true,
+      }
+      comments.push(c)
+      return ok(c, 'Note saved.', 201)
+    }
+    if ((m = p.match(/^\/leads\/([^/]+)\/mentionable$/)))
+      return ok([
+        { id: ids.modOther, name: 'Farah Khan' },
+        { id: ids.priya, name: 'Priya Desai' },
+      ])
+    if ((m = p.match(/^\/comments\/([^/]+)(\/resolve)?$/))) return ok(null, m[2] ? 'Help request resolved.' : method === 'DELETE' ? 'Note deleted.' : 'Note saved.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/leaderboard$/)))
+      return ok({
+        period: query.get('period') ?? 'week',
+        from: today,
+        to: today,
+        rows: [
+          { user: { id: ids.priya, name: 'Priya Desai' }, role: 'sales_person', conversions: 6, followUps: 21, rank: 1, isMe: false },
+          { user: { id: me.id, name: me.name }, role: 'sales_person', conversions: 4, followUps: 18, rank: 2, isMe: true },
+        ],
+      })
+    if (p === '/team/roster') return ok(roster())
+    if ((m = p.match(/^\/projects\/([^/]+)\/templates$/)) && method === 'GET') return ok(templates)
+    if ((m = p.match(/^\/projects\/([^/]+)\/templates$/)) && method === 'POST') {
+      const t = { id: `t-${templates.length + 1}`, sort: templates.length, ...json() }
+      templates.push(t)
+      return ok(t, 'Ready message saved.', 201)
+    }
+    if ((m = p.match(/^\/templates\/([^/]+)$/))) return ok(templates[0] ?? null, 'Ready message saved.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)\/backup$/))) return ok(null, 'Backup updated.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/request-by-phone$/))) return ok(transfers[0], 'Request sent. The lead moves to you once a manager approves it.', 201)
+
     if ((m = p.match(/^\/users\/([^/]+)\/(deactivate|reactivate)$/))) {
       const u = users.find((x) => x.id === m[1]) ?? users[0]
       u.isActive = m[2] === 'reactivate'
-      return ok(u, m[2] === 'reactivate' ? 'User reactivated.' : 'User deactivated.')
+      return ok(u, m[2] === 'reactivate' ? 'Back on the team.' : 'Removed from the team.')
     }
 
     // ---- projects
     if (p === '/projects' && method === 'GET') return ok(page(projects.map((x) => projectDto(x))))
-    if (p === '/projects' && method === 'POST') return ok(projectDto({ id: ids.other, name: 'New Drive', type: 'online', status: 'active' }, { typeLocked: false, memberCount: 0, leadCount: 0 }), 'Created successfully.', 201)
-    if ((m = p.match(/^\/projects\/([^/]+)\/join$/))) return ok(members[0], 'Project assigned to you.', 201)
-    if ((m = p.match(/^\/projects\/([^/]+)\/(close|reopen)$/))) return ok(projectDto(projects[0], { status: m[2] === 'close' ? 'closed' : 'active' }), m[2] === 'close' ? 'Project closed. It is now read-only.' : 'Project reopened.')
+    if (p === '/projects' && method === 'POST')
+      return ok(projectDto({ id: ids.other, name: 'New Drive', type: 'online', status: 'active' }, { typeLocked: false, memberCount: 0, leadCount: 0 }), 'Saved.', 201)
+    if ((m = p.match(/^\/projects\/([^/]+)\/join$/))) return ok(members[0], 'Added to the campaign team.', 201)
+    if ((m = p.match(/^\/projects\/([^/]+)\/(close|reopen)$/)))
+      return ok(
+        projectDto(projects[0], { status: m[2] === 'close' ? 'closed' : 'active' }),
+        m[2] === 'close' ? 'Campaign closed. It can still be viewed, but not changed.' : 'Campaign reopened.',
+      )
     if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)\/target$/))) return ok(members.find((x) => x.userId === m[2]) ?? members[0], 'Target updated.')
-    if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)$/)) && method === 'DELETE') return ok({ ...(members.find((x) => x.userId === m[2]) ?? members[0]), isActive: false }, 'Member removed from the project.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)$/)) && method === 'DELETE')
+      return ok({ ...(members.find((x) => x.userId === m[2]) ?? members[0]), isActive: false }, 'Removed from the campaign team.')
     if ((m = p.match(/^\/projects\/([^/]+)\/members$/))) {
-      if (method === 'POST') return ok(members[0], 'Member added to the project.', 201)
+      if (method === 'POST') return ok(members[0], 'Added to the campaign team.', 201)
       return ok(members)
     }
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/import$/))) {
       const field = (name) => new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)`).exec(body ?? '')?.[1]
-      if (/filename="wrong\.csv"/.test(body ?? '')) return fail(400, 'VALIDATION_FAILED', 'The first row must name the columns, including name and phone.')
+      if (/filename="wrong\.csv"/.test(body ?? '')) return fail(400, 'VALIDATION_FAILED', 'The top line of the sheet needs headings, including name and phone.')
       const dryRun = field('dryRun') === 'true'
       const owners = (field('ownerIds') ?? '').split(',').filter(Boolean)
       const names = owners.map((id) => users.find((u) => u.id === id)?.name ?? 'Meera Nair')
       const picked = names.length ? names : ['Priya Desai']
       const result = {
-        dryRun, total: 6, importable: 4, imported: dryRun ? 0 : 4, duplicates: 1, invalid: 1,
-        byOwner: picked.map((name, i) => ({ user: { id: users.find((u) => u.name === name)?.id ?? ids.priya, name }, count: i === 0 ? Math.ceil(4 / picked.length) : Math.floor(4 / picked.length) })),
+        dryRun,
+        total: 6,
+        importable: 4,
+        imported: dryRun ? 0 : 4,
+        duplicates: 1,
+        invalid: 1,
+        byOwner: picked.map((name, i) => ({
+          user: { id: users.find((u) => u.name === name)?.id ?? ids.priya, name },
+          count: i === 0 ? Math.ceil(4 / picked.length) : Math.floor(4 / picked.length),
+        })),
         problems: [
           { row: 5, kind: 'invalid', name: 'Bad Phone', phone: '12345', reason: 'Phone must be a 10-digit Indian mobile number.' },
-          { row: 6, kind: 'duplicate', name: 'Asha Patil', phone: '9876543210', reason: 'Already a lead in this project, owned by Ravi Kumar.' },
+          { row: 6, kind: 'duplicate', name: 'Asha Patil', phone: '9876543210', reason: 'Already a lead in this campaign, owned by Ravi Kumar.' },
         ],
         problemsTruncated: false,
-        sample: [{ row: 2, name: 'Imran Shaikh', phone: '9123456780', businessName: null, location: field('defaultLocation') ?? 'Kondhwa', owner: { id: ids.priya, name: picked[0] } }],
+        sample: [
+          { row: 2, name: 'Imran Shaikh', phone: '9123456780', businessName: null, location: field('defaultLocation') ?? 'Kondhwa', owner: { id: ids.priya, name: picked[0] } },
+        ],
       }
       // A review lists every row, unassigned, for picking on screen.
-      result.rows = field('review') === 'true'
-        ? [2, 3, 4, 7].map((row, i) => ({ row, name: `Lead ${i + 1}`, phone: `912345678${i}`, businessName: null, location: 'Kondhwa', owner: null }))
-        : result.sample
-      return ok(result, 'Leads imported.')
+      result.rows =
+        field('review') === 'true'
+          ? [2, 3, 4, 7].map((row, i) => ({ row, name: `Lead ${i + 1}`, phone: `912345678${i}`, businessName: null, location: 'Kondhwa', owner: null }))
+          : result.sample
+      return ok(result, 'Leads added.')
     }
-    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/reassign$/))) return ok({ reassigned: json().leadIds.length, skipped: 0 }, 'Leads reassigned.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/reassign$/))) return ok({ reassigned: json().leadIds.length, skipped: 0 }, 'Leads assigned.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads$/))) {
+      // A teammate already has this number: the rep may ask for it.
+      if (method === 'POST' && (body ?? '').includes('9811100000'))
+        return fail(409, 'DUPLICATE_LEAD_OTHER', 'This number is already a lead in this campaign, owned by Priya Desai.', { canRequest: true })
       if (method === 'POST') return ok(detail({ ...lead(9, m[1]), id: '55555555-5555-4555-8555-555555555555', name: 'New Client' }), 'Lead saved.', 201)
       return ok(page([0, 1, 2, 3].map((i) => lead(i, m[1]))))
     }
-    if ((m = p.match(/^\/projects\/([^/]+)\/locations$/))) return ok([{ id: 'l1', name: 'Wanowrie', usageCount: 9 }, { id: 'l2', name: 'Kondhwa', usageCount: 4 }])
+    if ((m = p.match(/^\/projects\/([^/]+)\/locations$/)))
+      return ok([
+        { id: 'l1', name: 'Wanowrie', usageCount: 9 },
+        { id: 'l2', name: 'Kondhwa', usageCount: 4 },
+      ])
     if ((m = p.match(/^\/projects\/([^/]+)$/))) return ok(projectDto(projects.find((x) => x.id === m[1]) ?? projects[0]))
 
     // ---- transfers
@@ -214,21 +732,27 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if ((m = p.match(/^\/transfers\/([^/]+)\/(approve|reject)$/))) {
       const t = transfers.find((x) => x.id === m[1])
       if (t.status !== 'pending') return fail(409, 'TRANSFER_ALREADY_DECIDED', 'Already decided by Farah Khan.', { status: t.status })
-      Object.assign(t, { status: m[2] === 'approve' ? 'approved' : 'rejected', decidedBy: { id: me.id, name: me.name }, decidedAt: iso(), decisionNote: json().note ?? null, canDecide: false })
-      return ok(t, m[2] === 'approve' ? 'Transfer approved.' : 'Transfer rejected.')
+      Object.assign(t, {
+        status: m[2] === 'approve' ? 'approved' : 'rejected',
+        decidedBy: { id: me.id, name: me.name },
+        decidedAt: iso(),
+        decisionNote: json().note ?? null,
+        canDecide: false,
+      })
+      return ok(t, m[2] === 'approve' ? 'Handover approved.' : 'Handover rejected.')
     }
 
     // ---- leads and entries
     if ((m = p.match(/^\/entries\/([^/]+)\/photo$/))) return ok({ url: PIXEL, expiresInSeconds: 600 })
-    if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
+    if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Removed.')
     if ((m = p.match(/^\/entries\/([^/]+)$/))) {
       const found = day().find((e) => e.id === m[1]) ?? day()[1]
-      if (method === 'PATCH') return ok({ entry: { ...found, edited: true }, lead: lead(0) }, 'Updated successfully.')
+      if (method === 'PATCH') return ok({ entry: { ...found, edited: true }, lead: lead(0) }, 'Changes saved.')
       return ok(found)
     }
-    if ((m = p.match(/^\/leads\/([^/]+)\/reassign$/))) return ok({ reassigned: 1, skipped: 0 }, 'Leads reassigned.')
-    if ((m = p.match(/^\/leads\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
-    if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Deleted successfully.')
+    if ((m = p.match(/^\/leads\/([^/]+)\/reassign$/))) return ok({ reassigned: 1, skipped: 0 }, 'Leads assigned.')
+    if ((m = p.match(/^\/leads\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Removed.')
+    if ((m = p.match(/^\/entries\/([^/]+)$/)) && method === 'DELETE') return ok(null, 'Removed.')
     if ((m = p.match(/^\/leads\/([^/]+)\/follow-ups$/))) {
       // The saved lead takes the status that was sent (multipart bodies keep the default).
       let status
@@ -247,13 +771,13 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     }
     if (p === '/versions/admin') return ok(versions.map((v) => ({ ...v, seenCount: seenVersions.has(v.id) ? 1 : 0 })))
     if (p === '/versions' && method === 'GET') return ok(versions.filter((v) => v.isPublished).map((v) => ({ ...v, seen: seenVersions.has(v.id) })))
-    if (p === '/versions' && method === 'POST') return ok({ ...versions[0], id: 'new', version: '9.9.9' }, 'Created successfully.', 201)
+    if (p === '/versions' && method === 'POST') return ok({ ...versions[0], id: 'new', version: '9.9.9' }, 'Saved.', 201)
     if ((m = p.match(/^\/versions\/([^/]+)\/seen$/))) {
       seenVersions.add(m[1])
       return { status: 204, raw: '' }
     }
     if ((m = p.match(/^\/versions\/([^/]+)\/views$/))) return ok({ seen: [{ userId: me.id, name: me.name, email: me.email, role: 'sales_person', seenAt: iso() }], pending: 3 })
-    if ((m = p.match(/^\/versions\/([^/]+)$/)) && method === 'PATCH') return ok(versions.find((v) => v.id === m[1]) ?? versions[0], 'Updated successfully.')
+    if ((m = p.match(/^\/versions\/([^/]+)$/)) && method === 'PATCH') return ok(versions.find((v) => v.id === m[1]) ?? versions[0], 'Changes saved.')
     if ((m = p.match(/^\/versions\/([^/]+)$/)) && method === 'DELETE') return { status: 204, raw: '' }
 
     return fail(404, 'NOT_FOUND', `mock: no route for ${method} ${p}`)

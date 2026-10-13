@@ -22,7 +22,20 @@ import { invalidateLeadData } from './queries'
 import { createStatuses, nextDateRule } from './rules'
 import { entryBody, VisitProofField, type VisitProof } from './VisitProof'
 
-const EMPTY: LeadValues = { name: '', businessName: '', phone: '', notes: '', status: 'new', note: '', nextFollowUpDate: '', location: '', source: null, reason: null, dealValue: '', plan: '' }
+const EMPTY: LeadValues = {
+  name: '',
+  businessName: '',
+  phone: '',
+  notes: '',
+  status: 'new',
+  note: '',
+  nextFollowUpDate: '',
+  location: '',
+  source: null,
+  reason: null,
+  dealValue: '',
+  plan: '',
+}
 
 /** Add lead = client details + first follow-up in one save (PRD §5.5, flow 7.1). */
 export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; onOpenChange: (o: boolean) => void; project: MeProject }) {
@@ -34,6 +47,9 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
   const [proof, setProof] = useState<VisitProof | null>(null)
   const [proofError, setProofError] = useState<string>()
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null)
+  // A teammate already has this number: the rep may ask for the lead instead of re-adding it.
+  const [takenPhone, setTakenPhone] = useState<string | null>(null)
+  const [asking, setAsking] = useState(false)
 
   const form = useForm<LeadValues>({ resolver: zodResolver(leadSchema), mode: 'onBlur', defaultValues: EMPTY })
   const { register, control, handleSubmit, formState, reset, setError, setValue } = form
@@ -56,7 +72,9 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
 
   const pickContact = async () => {
     try {
-      const [c] = await (navigator as unknown as { contacts: { select: (p: string[], o: { multiple: boolean }) => Promise<{ name?: string[]; tel?: string[] }[]> } }).contacts.select(['name', 'tel'], { multiple: false })
+      const [c] = await (
+        navigator as unknown as { contacts: { select: (p: string[], o: { multiple: boolean }) => Promise<{ name?: string[]; tel?: string[] }[]> } }
+      ).contacts.select(['name', 'tel'], { multiple: false })
       if (!c) return
       if (c.name?.[0]) setValue('name', c.name[0], { shouldDirty: true, shouldValidate: true })
       const tel = c.tel?.find((t) => normalizePhone(t)) ?? c.tel?.[0]
@@ -79,6 +97,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
     setProofError(undefined)
     setDuplicateOf(null)
     setExisting(null)
+    setTakenPhone(null)
   }, [open, reset])
 
   const onSubmit = handleSubmit(async (v) => {
@@ -119,6 +138,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
       }
       if (err instanceof ApiError && err.code === 'DUPLICATE_LEAD_OTHER') {
         setError('phone', { message: err.message })
+        if (err.details?.canRequest) setTakenPhone(normalizePhone(v.phone) ?? v.phone)
         haptic.error()
         return
       }
@@ -156,7 +176,15 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
               </Button>
             )}
           </legend>
-          <TextField label="Shop or business name" optional autoComplete="organization" autoCapitalize="words" enterKeyHint="next" error={formState.errors.businessName?.message} {...register('businessName')} />
+          <TextField
+            label="Shop or business name"
+            optional
+            autoComplete="organization"
+            autoCapitalize="words"
+            enterKeyHint="next"
+            error={formState.errors.businessName?.message}
+            {...register('businessName')}
+          />
           <TextField label="Contact person" autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
           <div className="flex flex-col gap-1.5">
             <TextField
@@ -189,6 +217,11 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
                 </button>
               </p>
             )}
+            {takenPhone && (
+              <Button type="button" variant="soft" size="sm" icon="swap" className="self-start" onClick={() => setAsking(true)}>
+                Ask for this lead
+              </Button>
+            )}
             {duplicateOf && (
               <Link
                 to={`/leads/${duplicateOf}`}
@@ -208,7 +241,9 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
           <Controller
             control={control}
             name="location"
-            render={({ field }) => <LocationField projectId={project.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />}
+            render={({ field }) => (
+              <LocationField projectId={project.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} error={formState.errors.location?.message} />
+            )}
           />
           <TextAreaField label="About the client" optional placeholder="Anything worth remembering" error={formState.errors.notes?.message} {...register('notes')} rows={2} />
           <Controller control={control} name="source" render={({ field }) => <SourceChoice value={(field.value as LeadSource | null) ?? null} onChange={field.onChange} />} />
@@ -227,6 +262,74 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
           <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} dealAlways />
         </fieldset>
       </form>
+      {takenPhone && (
+        <AskForLead
+          open={asking}
+          onOpenChange={setAsking}
+          projectId={project.id}
+          phone={takenPhone}
+          onSent={async () => {
+            onOpenChange(false)
+            await settleOverlays()
+          }}
+        />
+      )}
+    </ResponsiveOverlay>
+  )
+}
+
+/** Ask a moderator to move a teammate's lead (same phone) to you, with a reason. */
+function AskForLead({
+  open,
+  onOpenChange,
+  projectId,
+  phone,
+  onSent,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  projectId: string
+  phone: string
+  onSent: () => Promise<void>
+}) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const send = async () => {
+    setBusy(true)
+    try {
+      await apiWithMessage(`/projects/${projectId}/leads/request-by-phone`, { method: 'POST', body: { phone, reason: reason.trim() } })
+      haptic.success()
+      toast.success('Request sent. Your sales manager decides, and you get a notification.')
+      onOpenChange(false)
+      await onSent()
+    } catch (err) {
+      handleFormError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Ask for this lead"
+      description={`+91 ${formatPhone(phone)} belongs to a teammate. A sales manager decides.`}
+      variant="short"
+      footer={
+        <Button size="lg" block loading={busy} disabled={reason.trim().length < 3} onClick={() => void send()}>
+          Send request
+        </Button>
+      }
+    >
+      <div className="pt-1">
+        <TextAreaField
+          label="Why should it be yours?"
+          placeholder="e.g. The owner called me directly; I visited them today."
+          maxLength={500}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
     </ResponsiveOverlay>
   )
 }

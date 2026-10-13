@@ -25,7 +25,7 @@ type Step = 'form' | 'preview' | 'done'
 type Mode = 'review' | 'single'
 
 const downloadTemplate = () =>
-  saveCsv('leads-template.csv', COLUMNS, [
+  saveCsv('leads-sample-sheet.csv', COLUMNS, [
     ['Asha Patil', '98765 43210', 'Patil General Store', 'Wanowrie', 'Likes calls after 4 pm', ''],
     ['Imran Shaikh', '9123456780', '', 'Kondhwa', '', 'priya@yourcompany.com'],
   ])
@@ -65,8 +65,8 @@ export function ImportLeadsPage() {
   const choose = (f: File | undefined) => {
     setFileError(undefined)
     if (!f) return setFile(null)
-    if (!/\.csv$/i.test(f.name) && f.type !== 'text/csv') return setFileError('Choose a CSV file. In Excel: Save As › CSV (Comma delimited).')
-    if (f.size > MAX_BYTES) return setFileError('The file is over 1 MB. Split it into files of at most 1,000 leads.')
+    if (!/\.csv$/i.test(f.name) && f.type !== 'text/csv') return setFileError('Save your sheet as CSV first. In Excel: Save As › CSV (Comma delimited).')
+    if (f.size > MAX_BYTES) return setFileError('The sheet is over 1 MB. Split it into sheets of at most 1,000 leads.')
     setFile(f)
   }
 
@@ -91,7 +91,7 @@ export function ImportLeadsPage() {
         setStep('preview')
       } else {
         haptic.success()
-        toast.success(`${plural(data.imported, 'lead')} imported.`)
+        toast.success(`${plural(data.imported, 'lead')} added.`)
         setStep('done')
         invalidateProjects(qc)
         void qc.invalidateQueries({ queryKey: ['leads'] })
@@ -123,7 +123,7 @@ export function ImportLeadsPage() {
   const cta =
     step === 'form'
       ? {
-          label: 'Check file',
+          label: 'Check sheet',
           icon: 'checkmark' as const,
           onClick: () => void run(true),
           disabled: !file || closed || (mode === 'single' && !single),
@@ -131,7 +131,7 @@ export function ImportLeadsPage() {
         }
       : step === 'preview'
         ? {
-            label: !importable ? 'Nothing to import' : unassigned ? `Assign ${unassigned} more` : `Import ${plural(importable, 'lead')}`,
+            label: !importable ? 'Nothing to add' : unassigned ? `Assign ${unassigned} more` : `Add ${plural(importable, 'lead')}`,
             icon: 'download' as const,
             onClick: () => void run(false),
             disabled: !importable || unassigned > 0,
@@ -140,29 +140,34 @@ export function ImportLeadsPage() {
         : { label: 'View leads', icon: 'contacts' as const, onClick: () => navigate(back) }
 
   return (
-    <Page title="Import leads" back={back} cta={project.data && !closed && cta ? { ...cta, bar: true } : undefined}>
+    <Page title="Add leads from a sheet" back={back} cta={project.data && !closed && cta ? { ...cta, bar: true } : undefined}>
       <div className="expanded:max-w-[720px]">
         {project.isLoading || members.isLoading ? (
           <Skeleton className="h-64 rounded-xl" />
         ) : project.isError ? (
           <ErrorState message={project.error.message} onRetry={() => void project.refetch()} />
         ) : closed ? (
-          <EmptyState icon="lock" title="This project is closed" body="A closed project is read-only, so leads can't be imported into it." />
+          <EmptyState icon="lock" title="This campaign is closed" body="Leads can't be added to a closed campaign." />
         ) : step === 'form' ? (
           <div className="flex flex-col gap-8">
             <p className="text-body-md text-body">
-              Upload a CSV of leads. They start as <b>New</b> in <b>{project.data?.name}</b> and each person finds theirs in My leads.
+              Add many leads at once from an Excel or CSV sheet. They start as <b>New</b> in <b>{project.data?.name}</b>, and each person finds theirs in My leads.
             </p>
 
             <section className="flex flex-col gap-3">
               <h2 className="text-title-md">1. Who gets the leads</h2>
               <ListGroup>
-                <ModeRow selected={mode === 'review'} onSelect={() => setMode('review')} title="I'll assign them after upload" body="See every lead in the file, then pick a person for each one, or for many at once." />
-                <ModeRow selected={mode === 'single'} onSelect={() => setMode('single')} title="All to one person" body="Every lead in the file goes to the person you pick." />
+                <ModeRow
+                  selected={mode === 'review'}
+                  onSelect={() => setMode('review')}
+                  title="I'll assign them after checking"
+                  body="See every lead in the sheet, then pick a person for each one, or for many at once."
+                />
+                <ModeRow selected={mode === 'single'} onSelect={() => setMode('single')} title="All to one person" body="Every lead in the sheet goes to the person you pick." />
               </ListGroup>
               {mode === 'single' &&
                 (people.length === 0 ? (
-                  <p className="text-body-sm text-body">There are no active members in this project yet. Add some first.</p>
+                  <p className="text-body-sm text-body">No one is on this campaign's team yet. Add people first.</p>
                 ) : (
                   <ListGroup>
                     {people.map((m) => (
@@ -173,7 +178,7 @@ export function ImportLeadsPage() {
             </section>
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-title-md">2. The file</h2>
+              <h2 className="text-title-md">2. The sheet</h2>
               <input ref={fileInput} id="import-file" type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
               <label
                 htmlFor="import-file"
@@ -186,7 +191,7 @@ export function ImportLeadsPage() {
                   <Icon name="csv" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-title-sm">{file ? file.name : 'Choose a CSV file'}</span>
+                  <span className="block truncate text-title-sm">{file ? file.name : 'Choose your sheet'}</span>
                   <span className="block text-body-sm text-body">{file ? `${(file.size / 1024).toFixed(1)} KB · tap to change` : 'Up to 1,000 leads and 1 MB'}</span>
                 </span>
               </label>
@@ -197,29 +202,31 @@ export function ImportLeadsPage() {
                 </p>
               )}
               <p className="text-body-sm text-body">
-                First row = column names. <b>name</b> and <b>phone</b> are required. Optional: <b>business_name</b>, <b>location</b>, <b>notes</b>
+                Put these headings on the top line, then one lead on each line below. <b>name</b> and <b>phone</b> are needed. You can also add <b>business_name</b>,{' '}
+                <b>location</b>, <b>notes</b>
                 {mode === 'review' && (
                   <>
-                    {' '}and <b>owner_email</b> (pre-fills who gets that lead; you can still change it)
+                    {' '}
+                    and <b>owner_email</b> (fills in who gets that lead; you can still change it)
                   </>
                 )}
                 .
               </p>
               <Button variant="secondary" size="sm" icon="download" className="self-start" onClick={downloadTemplate}>
-                Download a template
+                Download a sample sheet
               </Button>
             </section>
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-title-md">3. Default location</h2>
+              <h2 className="text-title-md">3. Location for the rest</h2>
               <TextField
-                label="Location for rows that have none"
+                label="Location for leads that have none"
                 optional
                 value={defaultLocation}
                 onChange={(e) => setDefaultLocation(e.target.value)}
                 maxLength={100}
                 placeholder="e.g. Pune"
-                hint="Every lead needs a location. Rows with their own location keep it."
+                hint="Every lead needs a location. Leads with their own location keep it."
               />
             </section>
           </div>
@@ -244,9 +251,14 @@ function ModeRow({ selected, onSelect, title, body }: { selected: boolean; onSel
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={cn('flex min-h-14 w-full items-start gap-3 border-b border-hairline-soft px-4 py-3 text-left last:border-b-0', selected ? 'bg-surface-strong' : 'active:bg-surface-soft')}
+      className={cn(
+        'flex min-h-14 w-full items-start gap-3 border-b border-hairline-soft px-4 py-3 text-left last:border-b-0',
+        selected ? 'bg-surface-strong' : 'active:bg-surface-soft',
+      )}
     >
-      <span className={cn('mt-0.5 flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>
+      <span
+        className={cn('mt-0.5 flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}
+      >
         {selected && <Icon name="checkmark" size={16} />}
       </span>
       <span className="min-w-0 flex-1">
@@ -280,7 +292,8 @@ function AssignStep({
   const allPicked = rows.length > 0 && picked.length === rows.length
 
   const options = people.map((m) => ({ value: m.userId, label: m.name, description: m.email ?? ROLE_LABEL[m.role], leading: <Avatar name={m.name} size={32} /> }))
-  const bulkOptions = people.length > 1 ? [{ value: EVERYONE, label: 'Share evenly between everyone', description: `${people.length} people, in file order` }, ...options] : options
+  const bulkOptions =
+    people.length > 1 ? [{ value: EVERYONE, label: 'Share evenly between everyone', description: `${people.length} people, in sheet order` }, ...options] : options
 
   const assign = (target: number[], userId: string) => {
     const next = { ...assignments }
@@ -303,7 +316,7 @@ function AssignStep({
           {plural(rows.length, 'lead')} ready · {unassigned.length ? `${unassigned.length} not assigned yet` : 'all assigned'}
         </p>
         <p className="text-body-sm text-body">
-          {result.total} {result.total === 1 ? 'row' : 'rows'} in the file. Pick leads, then choose who gets them. Nothing is saved until you import.
+          {result.total} {result.total === 1 ? 'line' : 'lines'} in the sheet. Pick leads, then choose who gets them. Nothing is saved until you add them.
         </p>
         <Counts result={result} />
         {byOwner.length > 0 && <ByOwner result={{ ...result, byOwner }} />}
@@ -345,7 +358,10 @@ function AssignStep({
                   aria-checked={selected}
                   aria-label={`Select ${r.name}`}
                   onClick={() => toggle(r.row)}
-                  className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}
+                  className={cn(
+                    'flex size-6 flex-none items-center justify-center rounded-full border-2',
+                    selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline',
+                  )}
                 >
                   {selected && <Icon name="checkmark" size={16} />}
                 </button>
@@ -365,7 +381,10 @@ function AssignStep({
                     <button
                       type="button"
                       onClick={open}
-                      className={cn('flex h-9 max-w-40 flex-none items-center gap-1 rounded-pill border px-3 text-caption-strong', owner ? 'border-hairline' : 'border-dashed border-down text-down')}
+                      className={cn(
+                        'flex h-9 max-w-40 flex-none items-center gap-1 rounded-pill border px-3 text-caption-strong',
+                        owner ? 'border-hairline' : 'border-dashed border-down text-down',
+                      )}
                     >
                       <span className="truncate">{owner ? (names.get(owner) ?? 'Unknown') : 'Assign'}</span>
                       <Icon name="expand-arrow" size={16} className="flex-none" />
@@ -381,7 +400,7 @@ function AssignStep({
       <Problems result={result} />
 
       <Button variant="secondary" className="self-start" onClick={onBack}>
-        Choose another file
+        Choose another sheet
       </Button>
     </div>
   )
@@ -394,27 +413,36 @@ function OwnerRow({ member, selected, onToggle }: { member: Member; selected: bo
       role="checkbox"
       aria-checked={selected}
       onClick={onToggle}
-      className={cn('flex min-h-14 w-full items-center gap-3 border-b border-hairline-soft px-4 py-2 text-left last:border-b-0', selected ? 'bg-surface-strong' : 'active:bg-surface-soft')}
+      className={cn(
+        'flex min-h-14 w-full items-center gap-3 border-b border-hairline-soft px-4 py-2 text-left last:border-b-0',
+        selected ? 'bg-surface-strong' : 'active:bg-surface-soft',
+      )}
     >
-      <span className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>{selected && <Icon name="checkmark" size={16} />}</span>
+      <span className={cn('flex size-6 flex-none items-center justify-center rounded-full border-2', selected ? 'border-primary bg-primary text-on-primary' : 'border-hairline')}>
+        {selected && <Icon name="checkmark" size={16} />}
+      </span>
       <Avatar name={member.name} size={32} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-title-sm">{member.name}</span>
         <span className="block truncate text-caption text-muted">{member.email ?? ROLE_LABEL[member.role]}</span>
       </span>
-      {member.role === 'moderator' && <Tag>Moderator</Tag>}
+      {member.role === 'moderator' && <Tag>Manager</Tag>}
     </button>
   )
 }
 
 const reportCsv = (r: ImportResult) =>
-  saveCsv('leads-not-imported.csv', ['row', 'kind', 'name', 'phone', 'reason'], r.problems.map((p) => [p.row, p.kind, p.name, p.phone, p.reason]))
+  saveCsv(
+    'leads-not-added.csv',
+    ['row', 'kind', 'name', 'phone', 'reason'],
+    r.problems.map((p) => [p.row, p.kind, p.name, p.phone, p.reason]),
+  )
 
 function Counts({ result }: { result: ImportResult }) {
   return (
     <div className="flex flex-wrap gap-2">
       {result.duplicates > 0 && <Tag>{plural(result.duplicates, 'duplicate')}</Tag>}
-      {result.invalid > 0 && <Tag tone="down">{plural(result.invalid, 'row')} with a problem</Tag>}
+      {result.invalid > 0 && <Tag tone="down">{plural(result.invalid, 'line')} with a problem</Tag>}
     </div>
   )
 }
@@ -442,7 +470,7 @@ function Problems({ result }: { result: ImportResult }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-title-md">Not imported</h2>
+        <h2 className="text-title-md">Not added</h2>
         <Button variant="secondary" size="sm" icon="download" onClick={() => reportCsv(result)}>
           Download list
         </Button>
@@ -451,7 +479,7 @@ function Problems({ result }: { result: ImportResult }) {
         {result.problems.map((p) => (
           <li key={p.row} className="border-b border-hairline-soft px-4 py-3 last:border-b-0">
             <p className="flex flex-wrap items-center gap-2">
-              <span className="tabular-nums text-caption text-muted">Row {p.row}</span>
+              <span className="tabular-nums text-caption text-muted">Line {p.row}</span>
               <span className="text-title-sm">{p.name}</span>
               {p.phone && <span className="tabular-nums text-caption text-body">{p.phone}</span>}
             </p>
@@ -459,7 +487,7 @@ function Problems({ result }: { result: ImportResult }) {
           </li>
         ))}
       </ul>
-      {result.problemsTruncated && <p className="text-caption text-muted">Showing the first {result.problems.length}. The counts above include every row.</p>}
+      {result.problemsTruncated && <p className="text-caption text-muted">Showing the first {result.problems.length}. The counts above include every line.</p>}
     </section>
   )
 }
@@ -469,10 +497,10 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 card card--default rounded-2xl p-5">
         <p className="text-title-md" role="status">
-          {result.importable === 0 ? 'Nothing in this file can be imported' : `${plural(result.importable, 'lead')} ${result.importable === 1 ? 'is' : 'are'} ready to import`}
+          {result.importable === 0 ? 'Nothing in this sheet can be added' : `${plural(result.importable, 'lead')} ${result.importable === 1 ? 'is' : 'are'} ready to add`}
         </p>
         <p className="text-body-sm text-body">
-          {result.total} {result.total === 1 ? 'row' : 'rows'} in the file. Nothing has been saved yet.
+          {result.total} {result.total === 1 ? 'line' : 'lines'} in the sheet. Nothing has been saved yet.
         </p>
         <Counts result={result} />
       </div>
@@ -486,7 +514,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
 
       {result.sample.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-title-md">First rows</h2>
+          <h2 className="text-title-md">First few leads</h2>
           <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {result.sample.map((s) => (
               <li key={s.row} className="flex items-center gap-3 border-b border-hairline-soft px-4 py-3 last:border-b-0">
@@ -506,7 +534,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
       <Problems result={result} />
 
       <Button variant="secondary" className="self-start" onClick={onBack}>
-        Choose another file
+        Choose another sheet
       </Button>
     </div>
   )
@@ -518,11 +546,11 @@ function Done({ result, projectId, onAgain }: { result: ImportResult; projectId:
       <div className="flex flex-col items-start gap-3 card card--default rounded-2xl p-5">
         <Icon name="ok" size={32} className="text-up" />
         <p className="text-title-md" role="status">
-          {plural(result.imported, 'lead')} imported
+          {plural(result.imported, 'lead')} added
         </p>
         <p className="text-body-sm text-body">
           Each person finds theirs in <b>My leads</b>, as New.
-          {result.duplicates + result.invalid > 0 && ` ${plural(result.duplicates + result.invalid, 'row')} ${result.duplicates + result.invalid === 1 ? 'was' : 'were'} skipped.`}
+          {result.duplicates + result.invalid > 0 && ` ${plural(result.duplicates + result.invalid, 'line')} ${result.duplicates + result.invalid === 1 ? 'was' : 'were'} skipped.`}
         </p>
         <Counts result={result} />
       </div>
@@ -535,10 +563,10 @@ function Done({ result, projectId, onAgain }: { result: ImportResult; projectId:
       <Problems result={result} />
       <div className="flex flex-wrap gap-3">
         <Button asChild variant="secondary">
-          <Link to={`/projects/${projectId}?tab=leads`}>View the project's leads</Link>
+          <Link to={`/projects/${projectId}?tab=leads`}>View the campaign's leads</Link>
         </Button>
         <Button variant="tertiary" onClick={onAgain}>
-          Import another file
+          Add another sheet
         </Button>
       </div>
     </div>

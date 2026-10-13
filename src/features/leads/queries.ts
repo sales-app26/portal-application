@@ -13,6 +13,8 @@ export interface LeadListFilter {
   due?: LeadDue
   /** Open leads untouched for 14+ days. */
   cold?: boolean
+  /** A teammate's leads, while the caller covers for them (their backup, they're on leave). */
+  coveringFor?: string
 }
 
 export const leadKeys = {
@@ -37,7 +39,19 @@ export function useLeadList(projectId: string | undefined, f: LeadListFilter) {
     queryFn: ({ pageParam, signal }) =>
       api<Paginated<LeadSummary>>(`/projects/${projectId}/leads`, {
         signal,
-        query: { page: pageParam, limit: PAGE, search: f.search, status: f.status ?? undefined, mine: f.mine ? 'true' : undefined, sort: f.sort, ownerId: f.ownerId, ownerUnavailable: f.ownerUnavailable ? 'true' : undefined, due: f.due, cold: f.cold ? 'true' : undefined },
+        query: {
+          page: pageParam,
+          limit: PAGE,
+          search: f.search,
+          status: f.status ?? undefined,
+          mine: f.mine ? 'true' : undefined,
+          sort: f.sort,
+          ownerId: f.ownerId,
+          ownerUnavailable: f.ownerUnavailable ? 'true' : undefined,
+          due: f.due,
+          cold: f.cold ? 'true' : undefined,
+          coveringFor: f.coveringFor,
+        },
       }),
     getNextPageParam: (last) => (last.meta.hasNextPage ? last.meta.page + 1 : undefined),
   })

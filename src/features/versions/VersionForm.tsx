@@ -20,11 +20,14 @@ import { invalidateVersions } from './queries'
 const MAX_NOTE_BYTES = 512 * 1024
 
 const schema = z.object({
-  version: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Use three numbers separated by dots, like 1.2.0.'),
+  version: z
+    .string()
+    .trim()
+    .regex(/^\d+\.\d+\.\d+$/, 'Use three numbers separated by dots, like 1.2.0.'),
   title: z.string().trim().max(120),
   tags: z.string().trim(),
   notes: z.string(),
-  releasedOn: z.string().min(1, 'Choose a release date.'),
+  releasedOn: z.string().min(1, 'Choose a date.'),
   status: z.enum(['draft', 'published']),
   announce: z.enum(['announce', 'quiet']),
 })
@@ -62,14 +65,14 @@ export function VersionForm({ open, onOpenChange, version }: { open: boolean; on
   const pickFile = (f: File | undefined) => {
     setFileError(undefined)
     if (!f) return setFile(null)
-    if (!/\.(md|markdown|txt)$/i.test(f.name)) return setFileError('Choose a .md file.')
-    if (f.size > MAX_NOTE_BYTES) return setFileError('The file must be 512 KB or smaller.')
+    if (!/\.(md|markdown|txt)$/i.test(f.name)) return setFileError('Choose a .md document.')
+    if (f.size > MAX_NOTE_BYTES) return setFileError('The document must be 512 KB or smaller.')
     setFile(f)
   }
 
   const onSubmit = handleSubmit(async (v) => {
     if (!editing && !file && !v.notes.trim()) {
-      setError('notes', { message: 'Write the note, or choose a .md file.' })
+      setError('notes', { message: 'Write the note, or choose a .md document.' })
       return
     }
     const body = new FormData()
@@ -86,11 +89,15 @@ export function VersionForm({ open, onOpenChange, version }: { open: boolean; on
     try {
       await apiWithMessage<AppVersion>(version ? `/versions/${version.id}` : '/versions', { method: version ? 'PATCH' : 'POST', body })
       haptic.success()
-      toast.success(editing ? 'Release updated.' : v.status === 'published' ? 'Release published.' : 'Release saved as a draft.')
+      toast.success(editing ? 'Update saved.' : v.status === 'published' ? 'Update published.' : 'Update saved as a draft.')
       await invalidateVersions(qc)
       onOpenChange(false)
     } catch (err) {
-      handleFormError(err, setError, FIELDS.filter((f) => f !== 'releasedAt' && f !== 'isPublished' && f !== 'notify'))
+      handleFormError(
+        err,
+        setError,
+        FIELDS.filter((f) => f !== 'releasedAt' && f !== 'isPublished' && f !== 'notify'),
+      )
     }
   })
 
@@ -98,35 +105,57 @@ export function VersionForm({ open, onOpenChange, version }: { open: boolean; on
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={editing ? `Edit ${version.version}` : 'New release'}
+      title={editing ? `Edit ${version.version}` : 'New update'}
       variant="form"
       dirty={(formState.isDirty || !!file) && !formState.isSubmitting}
       footer={
         <Button type="submit" form="version-form" size="lg" block loading={formState.isSubmitting}>
-          {editing ? 'Save changes' : 'Save release'}
+          {editing ? 'Save changes' : 'Save update'}
         </Button>
       }
     >
       <form id="version-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-2">
-        <TextField label="Version" placeholder="1.1.0" inputMode="decimal" autoCapitalize="none" enterKeyHint="next" error={formState.errors.version?.message} {...register('version')} />
-        <TextField label="Title" optional placeholder="Faster lead import" enterKeyHint="next" error={formState.errors.title?.message} {...register('title')} />
-        <TextField label="Tags" optional placeholder="Leads, Transfers" hint="What this release touched, separated by commas." error={formState.errors.tags?.message} {...register('tags')} />
+        <TextField
+          label="Version"
+          placeholder="1.1.0"
+          inputMode="decimal"
+          autoCapitalize="none"
+          enterKeyHint="next"
+          error={formState.errors.version?.message}
+          {...register('version')}
+        />
+        <TextField label="Title" optional placeholder="Add leads from a sheet, faster" enterKeyHint="next" error={formState.errors.title?.message} {...register('title')} />
+        <TextField
+          label="Tags"
+          optional
+          placeholder="Leads, Handovers"
+          hint="What this update covers, separated by commas."
+          error={formState.errors.tags?.message}
+          {...register('tags')}
+        />
 
         <TextAreaField
-          label="Release note"
+          label="Note"
           optional={editing}
           rows={8}
-          placeholder="Markdown: ## Added, - a bullet…"
+          placeholder="## Added, then - one line per change…"
           disabled={!!file}
-          hint={file ? 'The note comes from the file below.' : undefined}
+          hint={file ? 'The note comes from the document below.' : undefined}
           error={formState.errors.notes?.message}
           {...register('notes')}
         />
-        <FieldShell label="Or upload a .md file" htmlFor="version-file" optional error={fileError} hint="Up to 512 KB. It replaces the note above.">
+        <FieldShell label="Or use a .md document" htmlFor="version-file" optional error={fileError} hint="Up to 512 KB. It replaces the note above.">
           <div className="flex items-center gap-3">
-            <input id="version-file" ref={fileRef} type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" className="sr-only" onChange={(e) => pickFile(e.target.files?.[0])} />
+            <input
+              id="version-file"
+              ref={fileRef}
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              className="sr-only"
+              onChange={(e) => pickFile(e.target.files?.[0])}
+            />
             <Button type="button" variant="secondary" size="sm" icon="csv" onClick={() => fileRef.current?.click()}>
-              {file ? 'Change file' : 'Choose file'}
+              {file ? 'Change document' : 'Choose document'}
             </Button>
             {file && (
               <>
@@ -142,13 +171,13 @@ export function VersionForm({ open, onOpenChange, version }: { open: boolean; on
         <Controller
           control={control}
           name="releasedOn"
-          render={({ field }) => <DatePicker label="Release date" value={field.value} onChange={field.onChange} error={formState.errors.releasedOn?.message} />}
+          render={({ field }) => <DatePicker label="Date" value={field.value} onChange={field.onChange} error={formState.errors.releasedOn?.message} />}
         />
         <Controller
           control={control}
           name="status"
           render={({ field }) => (
-            <FieldShell label="Status" htmlFor="version-status" hint="A draft is visible only to you. Publishing makes it the live release.">
+            <FieldShell label="Status" htmlFor="version-status" hint="A draft is seen only by you. Publish it to show it to everyone.">
               <div id="version-status">
                 <Segmented
                   label="Status"

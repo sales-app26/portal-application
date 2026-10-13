@@ -58,5 +58,5 @@ export async function captureFrame(video: HTMLVideoElement, maxEdge = 1280, qual
   canvas.width = Math.round(w * scale)
   canvas.height = Math.round(h * scale)
   canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height)
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not capture the photo.'))), 'image/jpeg', quality))
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't take the photo. Try again."))), 'image/jpeg', quality))
 }

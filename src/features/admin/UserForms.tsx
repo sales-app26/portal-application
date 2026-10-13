@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/Field'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { Picker } from '@/components/ui/Picker'
+import { Segmented } from '@/components/ui/Choice'
+import { useMembers } from '@/features/leads/queries'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { formatPhone, normalizePhone, ROLE_LABEL } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
@@ -15,7 +17,10 @@ import { haptic } from '@/lib/haptics'
 import type { User, UserRole } from '@/lib/types'
 import { invalidateUsers } from './queries'
 
-const phoneRule = z.string().trim().refine((v) => v === '' || normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.')
+const phoneRule = z
+  .string()
+  .trim()
+  .refine((v) => v === '' || normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.')
 
 const createSchema = z.object({
   name: z.string().trim().min(1, 'Enter a name.').max(120),
@@ -26,8 +31,26 @@ const createSchema = z.object({
 type CreateValues = z.input<typeof createSchema>
 
 /** Super Admin adds moderators and sales persons; a moderator adds sales persons only (PRD §5.2). */
-export function AddUserForm({ open, onOpenChange, canAddModerator, defaultRole }: { open: boolean; onOpenChange: (o: boolean) => void; canAddModerator: boolean; defaultRole: UserRole }) {
+export function AddUserForm({
+  open,
+  onOpenChange,
+  canAddModerator,
+  defaultRole,
+  projects = [],
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  canAddModerator: boolean
+  defaultRole: UserRole
+  /** Projects the person can be put straight into, with a target and a backup, in the same step. */
+  projects?: { id: string; name: string }[]
+}) {
   const qc = useQueryClient()
+  const [projectId, setProjectId] = useState<string | null>(projects.length === 1 ? projects[0].id : null)
+  const [targetCount, setTargetCount] = useState('')
+  const [targetPeriod, setTargetPeriod] = useState<'weekly' | 'monthly'>('weekly')
+  const [backupId, setBackupId] = useState<string | null>(null)
+  const members = useMembers(projectId ?? '-', !!projectId)
   const [existing, setExisting] = useState<{ userId: string; name: string } | null>(null)
   const role = defaultRole === 'moderator' && canAddModerator ? 'moderator' : 'sales_person'
   const { register, control, handleSubmit, formState, reset, setError } = useForm<CreateValues>({
@@ -40,24 +63,42 @@ export function AddUserForm({ open, onOpenChange, canAddModerator, defaultRole }
     if (!open) return
     reset({ name: '', email: '', phone: '', role })
     setExisting(null)
+    setProjectId(projects.length === 1 ? projects[0].id : null)
+    setTargetCount('')
+    setBackupId(null)
   }, [open, reset, role])
 
   const onSubmit = handleSubmit(async (v) => {
     setExisting(null)
     try {
-      const { message } = await apiWithMessage<User>('/users', {
+      const created = await apiWithMessage<User>('/users', {
         method: 'POST',
         body: { name: v.name.trim(), email: v.email.toLowerCase(), role: canAddModerator ? v.role : 'sales_person', ...(v.phone ? { phone: normalizePhone(v.phone) } : {}) },
       })
+      // One step for the manager: project, target and backup follow the account. If one of
+      // them fails the account still exists, so say what's left to do instead of failing it all.
+      let followUp = ''
+      if (projectId) {
+        const n = Number(targetCount)
+        try {
+          await apiWithMessage(`/projects/${projectId}/members`, { method: 'POST', body: { userId: created.data.id, ...(n > 0 ? { targetCount: n, targetPeriod } : {}) } })
+          if (backupId) await apiWithMessage(`/projects/${projectId}/members/${created.data.id}/backup`, { method: 'PUT', body: { backupUserId: backupId } })
+          followUp = ` Added to ${projects.find((p) => p.id === projectId)?.name}${n > 0 ? ` with a target of ${n} a ${targetPeriod === 'monthly' ? 'month' : 'week'}` : ''}.`
+        } catch (err) {
+          toast.error(`${v.name.trim()} was added, but not to the campaign: ${err instanceof ApiError ? err.message : 'please add them from the campaign.'}`)
+        }
+      }
       haptic.success()
-      toast.success(message)
+      toast.success(`${created.message}${followUp}`)
       invalidateUsers(qc)
+      void qc.invalidateQueries({ queryKey: ['projects'] })
+      void qc.invalidateQueries({ queryKey: ['team'] })
       onOpenChange(false)
     } catch (err) {
       // A deactivated user already has this email: offer to bring them back (PRD §5.2).
       if (err instanceof ApiError && err.code === 'USER_DEACTIVATED_EXISTS') {
         haptic.error()
-        setExisting({ userId: String(err.details?.userId), name: String(err.details?.name ?? 'this user') })
+        setExisting({ userId: String(err.details?.userId), name: String(err.details?.name ?? 'this person') })
         setError('email', { message: err.message })
         return
       }
@@ -81,7 +122,7 @@ export function AddUserForm({ open, onOpenChange, canAddModerator, defaultRole }
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={role === 'moderator' ? 'Add moderator' : 'Add sales person'}
+      title={role === 'moderator' ? 'Add sales manager' : 'Add sales rep'}
       description="They get an email to set their password."
       variant="form"
       dirty={formState.isDirty && !formState.isSubmitting}
@@ -98,7 +139,7 @@ export function AddUserForm({ open, onOpenChange, canAddModerator, defaultRole }
             name="role"
             render={({ field }) => (
               <Picker
-                label="Role"
+                label="Position"
                 value={field.value}
                 onChange={field.onChange}
                 options={[
@@ -111,14 +152,79 @@ export function AddUserForm({ open, onOpenChange, canAddModerator, defaultRole }
         )}
         <TextField label="Name" autoCapitalize="words" autoComplete="off" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
         <div className="flex flex-col gap-2">
-          <TextField label="Email" type="email" inputMode="email" autoCapitalize="off" autoComplete="off" enterKeyHint="next" error={formState.errors.email?.message} {...register('email')} />
+          <TextField
+            label="Email"
+            type="email"
+            inputMode="email"
+            autoCapitalize="off"
+            autoComplete="off"
+            enterKeyHint="next"
+            error={formState.errors.email?.message}
+            {...register('email')}
+          />
           {existing && (
             <Button type="button" variant="secondary" size="sm" className="self-start" onClick={() => void reactivate()}>
-              Reactivate {existing.name}
+              Bring {existing.name} back to the team
             </Button>
           )}
         </div>
-        <TextField label="Phone" optional type="tel" inputMode="tel" prefix="+91" autoComplete="off" enterKeyHint="done" error={formState.errors.phone?.message} {...register('phone')} />
+        <TextField
+          label="Phone"
+          optional
+          type="tel"
+          inputMode="tel"
+          prefix="+91"
+          autoComplete="off"
+          enterKeyHint="done"
+          error={formState.errors.phone?.message}
+          {...register('phone')}
+        />
+        {projects.length > 0 && (role === 'sales_person' || !canAddModerator) && (
+          <fieldset className="flex flex-col gap-4 rounded-2xl bg-surface-secondary p-4">
+            <legend className="sr-only">Put them to work</legend>
+            <p className="text-title-sm">
+              Put them to work <span className="text-body-sm font-normal text-muted">(optional)</span>
+            </p>
+            <Picker
+              label="Campaign"
+              value={projectId}
+              onChange={(v) => (setProjectId(v), setBackupId(null))}
+              placeholder="Choose a campaign"
+              options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            />
+            {projectId && (
+              <>
+                <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+                  <TextField
+                    label="Target"
+                    optional
+                    inputMode="numeric"
+                    placeholder="e.g. 10"
+                    value={targetCount}
+                    onChange={(e) => setTargetCount(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
+                  <Segmented
+                    label="Per"
+                    value={targetPeriod}
+                    onChange={setTargetPeriod}
+                    options={[
+                      { value: 'weekly', label: 'Week' },
+                      { value: 'monthly', label: 'Month' },
+                    ]}
+                    className="h-12"
+                  />
+                </div>
+                <Picker
+                  label="Backup while on leave"
+                  value={backupId}
+                  onChange={setBackupId}
+                  placeholder={members.isLoading ? 'Loading…' : 'No backup'}
+                  options={(members.data ?? []).filter((m) => m.isActive && m.userIsActive && m.role !== 'super_admin').map((m) => ({ value: m.userId, label: m.name }))}
+                />
+              </>
+            )}
+          </fieldset>
+        )}
       </form>
     </ResponsiveOverlay>
   )
@@ -156,7 +262,7 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
       if (superAdmin && d.email) await apiWithMessage(`/users/${user.id}/email`, { method: 'PATCH', body: { email: v.email.toLowerCase() } })
       if (superAdmin && d.role) await apiWithMessage(`/users/${user.id}/role`, { method: 'PATCH', body: { role: v.role } })
       haptic.success()
-      toast.success('User updated.')
+      toast.success('Details saved.')
       invalidateUsers(qc)
       onOpenChange(false)
     } catch (err) {
@@ -169,7 +275,7 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title="Edit user"
+      title="Edit details"
       description={user.email}
       variant="form"
       dirty={formState.isDirty && !formState.isSubmitting}
@@ -184,13 +290,21 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
         <TextField label="Phone" optional type="tel" inputMode="tel" prefix="+91" error={formState.errors.phone?.message} {...register('phone')} />
         {superAdmin && (
           <>
-            <TextField label="Email" type="email" inputMode="email" autoCapitalize="off" hint="They sign in with the new email from then on." error={formState.errors.email?.message} {...register('email')} />
+            <TextField
+              label="Email"
+              type="email"
+              inputMode="email"
+              autoCapitalize="off"
+              hint="They sign in with the new email from then on."
+              error={formState.errors.email?.message}
+              {...register('email')}
+            />
             <Controller
               control={control}
               name="role"
               render={({ field }) => (
                 <Picker
-                  label="Role"
+                  label="Position"
                   value={field.value}
                   onChange={field.onChange}
                   options={[

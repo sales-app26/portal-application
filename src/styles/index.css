@@ -119,10 +119,11 @@
   --field-shadow: 0 1px 2px rgb(15 17 21 / 0.04);
 
   /* Pronttera blue. The logo's #1eace4 is too light behind white text (2.6:1), so actions use
-     a deeper shade of it (4.9:1) and the bright one is kept for the mark and highlights. */
-  --accent: #0a78b0;
+     a deeper shade of it and the bright one is kept for the mark and highlights. This shade
+     also holds 4.5:1 as text on the grey page and the tinted rows (4.9:1). */
+  --accent: #0870a5;
   --accent-foreground: #ffffff;
-  --success: #0b8a55;
+  --success: #087a4b;
   --success-foreground: #ffffff;
   --warning: #e08600;
   --warning-foreground: #1a1200;
@@ -274,7 +275,9 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 @utility pressable {
-  transition: transform 100ms var(--ease-standard), background-color 100ms var(--ease-standard);
+  transition:
+    transform 100ms var(--ease-standard),
+    background-color 100ms var(--ease-standard);
   &:active {
     transform: scale(0.97);
   }

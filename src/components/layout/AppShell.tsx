@@ -67,10 +67,7 @@ function BottomBar({ items }: { items: NavItem[] }) {
   return (
     <nav
       aria-label="Main"
-      className={cn(
-        'fixed inset-x-0 bottom-0 z-20 border-t border-separator bg-surface/85 pb-safe backdrop-blur-xl backdrop-saturate-150 medium:hidden',
-        keyboard && 'hidden',
-      )}
+      className={cn('fixed inset-x-0 bottom-0 z-20 border-t border-separator bg-surface/85 pb-safe backdrop-blur-xl backdrop-saturate-150 medium:hidden', keyboard && 'hidden')}
     >
       <ul className="flex h-16">
         {items.map((item) => (
@@ -126,7 +123,10 @@ function Badge({ count }: { count: number }) {
 function SideRail() {
   const me = useMe()
   return (
-    <nav aria-label="Main" className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col items-center gap-1 border-r border-separator bg-surface pt-[max(12px,env(safe-area-inset-top))] medium:flex large:hidden">
+    <nav
+      aria-label="Main"
+      className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col items-center gap-1 border-r border-separator bg-surface pt-[max(12px,env(safe-area-inset-top))] medium:flex large:hidden"
+    >
       <BrandMark className="mb-4" />
       {flatNav(me.role).map((item) => (
         <RailLink key={item.to} item={item} />
@@ -138,10 +138,19 @@ function SideRail() {
 function RailLink({ item }: { item: NavItem }) {
   const badge = useBadge(item)
   return (
-    <NavLink to={item.to} className="group flex w-full flex-col items-center gap-1 py-1.5" onClick={(e) => scrollTopIfActive(e.currentTarget.getAttribute('aria-current') === 'page')}>
+    <NavLink
+      to={item.to}
+      className="group flex w-full flex-col items-center gap-1 py-1.5"
+      onClick={(e) => scrollTopIfActive(e.currentTarget.getAttribute('aria-current') === 'page')}
+    >
       {({ isActive }) => (
         <>
-          <span className={cn('relative flex h-8 w-14 items-center justify-center rounded-pill transition-colors', isActive ? 'bg-accent-soft text-primary' : 'text-muted group-hover:bg-default')}>
+          <span
+            className={cn(
+              'relative flex h-8 w-14 items-center justify-center rounded-pill transition-colors',
+              isActive ? 'bg-accent-soft text-primary' : 'text-muted group-hover:bg-default',
+            )}
+          >
             <Icon name={item.icon} filled={isActive} />
             <Badge count={badge} />
           </span>
@@ -183,12 +192,15 @@ function DrawerLink({ item }: { item: NavItem }) {
     <NavLink
       to={item.to}
       className={({ isActive }) =>
-        cn('flex h-11 items-center gap-3 rounded-xl px-3.5 text-nav transition-colors', isActive ? 'bg-accent-soft font-semibold text-primary' : 'text-body hover:bg-default hover:text-ink')
+        cn(
+          'flex h-11 items-center gap-3 rounded-xl px-3.5 text-nav transition-colors',
+          isActive ? 'bg-accent-soft font-semibold text-ink' : 'text-body hover:bg-default hover:text-ink',
+        )
       }
     >
       {({ isActive }) => (
         <>
-          <Icon name={item.icon} filled={isActive} />
+          <Icon name={item.icon} filled={isActive} className={isActive ? 'text-primary' : undefined} />
           <span className="flex-1">{item.label}</span>
           {badge > 0 && <span className="rounded-pill bg-down px-2 text-caption-strong text-white tabular-nums">{badge}</span>}
         </>

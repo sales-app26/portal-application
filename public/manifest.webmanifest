@@ -27,6 +27,6 @@
     { "src": "/screenshots/home.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Today: your target, what's due and one-tap Call and WhatsApp" },
     { "src": "/screenshots/lead.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "A lead: deal value, history and quick actions" },
     { "src": "/screenshots/performance.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Your performance by week or month" },
-    { "src": "/screenshots/dashboard.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "The team dashboard: revenue, funnel and leaderboard" }
+    { "src": "/screenshots/dashboard.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "The team sales overview: revenue, funnel and leaderboard" }
   ]
 }

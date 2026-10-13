@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
+import { TeamRoster } from '@/features/team/TeamRoster'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { FilterChips, Segmented } from '@/components/ui/Choice'
@@ -13,7 +14,7 @@ import { Confirm, ResponsiveOverlay } from '@/components/ui/Overlay'
 import { Picker } from '@/components/ui/Picker'
 import { Button } from '@/components/ui/Button'
 import { AddUserForm, EditUserForm } from '@/features/admin/UserForms'
-import { invalidateProjects, invalidateUsers, useUserList, useUserOptions } from '@/features/admin/queries'
+import { invalidateProjects, invalidateUsers, useProjectOptions, useUserList, useUserOptions } from '@/features/admin/queries'
 import { useDebounced } from '@/hooks/useDebounced'
 import { apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
@@ -28,6 +29,15 @@ export function PeoplePage() {
   const qc = useQueryClient()
   const isSuper = me.role === 'super_admin'
   const [tab, setTab] = useState<'sales_person' | 'moderator'>('sales_person')
+  // The live roster is what a manager checks every day; accounts are for adding and editing people.
+  // Kept in the URL, so Back from a person returns to the same view.
+  const [params, setParams] = useSearchParams()
+  const view = params.get('view') === 'accounts' ? 'accounts' : 'roster'
+  const setView = (v: 'roster' | 'accounts') => setParams(v === 'roster' ? {} : { view: v }, { replace: true })
+  const projectOptions = useProjectOptions()
+  const scopeProjects = isSuper
+    ? (projectOptions.data ?? []).filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name }))
+    : me.projects.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name }))
   const [activity, setActivity] = useState<Activity>('active')
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
@@ -63,42 +73,60 @@ export function PeoplePage() {
     <Page
       title={isSuper ? 'People' : 'Team'}
       wide
-      cta={{ label: role === 'moderator' ? 'Add moderator' : 'Add sales person', icon: 'add-user-male', onClick: () => setAdding(true) }}
+      cta={{ label: role === 'moderator' ? 'Add sales manager' : 'Add sales rep', icon: 'add-user-male', onClick: () => setAdding(true) }}
       header={
         <div className="flex flex-col gap-3">
-          {isSuper && (
+          <Segmented
+            label="View"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'roster', label: 'Today' },
+              { value: 'accounts', label: 'Team list' },
+            ]}
+            className="w-full medium:w-auto medium:self-start"
+          />
+          {view === 'accounts' && isSuper && (
             <Segmented
               label="Group"
               value={tab}
               onChange={setTab}
               options={[
-                { value: 'sales_person', label: 'Team' },
-                { value: 'moderator', label: 'Moderators' },
+                { value: 'sales_person', label: 'Sales reps' },
+                { value: 'moderator', label: 'Sales managers' },
               ]}
               className="w-full medium:w-auto medium:self-start"
             />
           )}
-          <SearchInput label="Search people" placeholder="Name, email or phone" value={search} onChange={setSearch} className="medium:max-w-md" />
-          <FilterChips
-            label="Activity"
-            value={activity}
-            onChange={setActivity}
-            options={[
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-              { value: 'all', label: 'All' },
-            ]}
-          />
+          {view === 'accounts' && <SearchInput label="Search people" placeholder="Name, email or phone" value={search} onChange={setSearch} className="medium:max-w-md" />}
+          {view === 'accounts' && (
+            <FilterChips
+              label="Activity"
+              value={activity}
+              onChange={setActivity}
+              options={[
+                { value: 'active', label: 'On the team' },
+                { value: 'inactive', label: 'Left the team' },
+                { value: 'all', label: 'All' },
+              ]}
+            />
+          )}
         </div>
       }
     >
       <div className="expanded:max-w-[900px]">
-        {list.isLoading ? (
+        {view === 'roster' ? (
+          <TeamRoster projects={scopeProjects} />
+        ) : list.isLoading ? (
           <ListSkeleton />
         ) : list.isError ? (
           <ErrorState message={list.error.message} onRetry={() => void list.refetch()} />
         ) : users.length === 0 ? (
-          <EmptyState icon="conference-call" title={q ? 'No one matches' : 'No people here yet'} body={q ? 'Try another name, email or number.' : 'Add someone and they get an email to set a password.'} />
+          <EmptyState
+            icon="conference-call"
+            title={q ? 'No one matches' : 'No people here yet'}
+            body={q ? 'Try another name, email or number.' : 'Add someone and they get an email to set a password.'}
+          />
         ) : (
           <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {users.map((u) => (
@@ -107,8 +135,8 @@ export function PeoplePage() {
                 <button type="button" className="flex min-w-0 flex-1 flex-col text-left" onClick={() => navigate(`/people/${u.id}`)}>
                   <span className="flex items-center gap-2">
                     <span className="truncate text-title-sm">{u.name}</span>
-                    {!u.isActive && <Tag>Inactive</Tag>}
-                    {isSuper && u.role === 'moderator' && tab === 'sales_person' && <Tag>Moderator</Tag>}
+                    {!u.isActive && <Tag>Left the team</Tag>}
+                    {isSuper && u.role === 'moderator' && tab === 'sales_person' && <Tag>Manager</Tag>}
                   </span>
                   <span className="truncate text-body-sm text-body">{u.email}</span>
                 </button>
@@ -122,7 +150,12 @@ export function PeoplePage() {
                       { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
                       { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id || !u.canManageAccount },
                       { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(u), hidden: !isSuper || u.id === me.id || u.role === 'super_admin' },
-                      { label: u.isActive ? 'Deactivate' : 'Reactivate', icon: u.isActive ? 'lock' : 'refresh', onSelect: () => setToggling(u), hidden: (!u.isActive && u.id === me.id) || !u.canManageAccount },
+                      {
+                        label: u.isActive ? 'Remove from team' : 'Bring back to team',
+                        icon: u.isActive ? 'lock' : 'refresh',
+                        onSelect: () => setToggling(u),
+                        hidden: (!u.isActive && u.id === me.id) || !u.canManageAccount,
+                      },
                     ]}
                   />
                 )}
@@ -133,18 +166,18 @@ export function PeoplePage() {
         )}
       </div>
 
-      <AddUserForm open={adding} onOpenChange={setAdding} canAddModerator={isSuper} defaultRole={role} />
+      <AddUserForm open={adding} onOpenChange={setAdding} canAddModerator={isSuper} defaultRole={role} projects={scopeProjects} />
       {editing && <EditUserForm user={editing} open onOpenChange={(o) => !o && setEditing(null)} superAdmin={isSuper} />}
       <Confirm
         open={!!toggling}
         onOpenChange={(o) => !o && setToggling(null)}
-        title={toggling?.isActive ? `Deactivate ${toggling?.name}?` : `Reactivate ${toggling?.name}?`}
+        title={toggling?.isActive ? `Remove ${toggling?.name} from the team?` : `Bring ${toggling?.name} back to the team?`}
         body={
           toggling?.isActive
-            ? 'They can no longer sign in. Their leads stay in their name, tagged “Owner inactive”, until you reassign them. Pending transfers they are part of are rejected.'
+            ? 'They can no longer sign in. Their leads stay in their name, tagged “Owner left the team”, until you assign them to someone else. Handover requests they are part of are rejected.'
             : `${toggling?.name} can sign in again.`
         }
-        confirmLabel={toggling?.isActive ? `Deactivate ${toggling?.name ?? ''}`.trim() : `Reactivate ${toggling?.name ?? ''}`.trim()}
+        confirmLabel={toggling?.isActive ? `Remove ${toggling?.name ?? ''}`.trim() : `Bring ${toggling?.name ?? 'them'} back`}
         onConfirm={toggleActive}
         loading={busy}
       />
@@ -260,7 +293,8 @@ function DeleteUserSheet({ user, onClose }: { user: User; onClose: () => void })
     <ResponsiveOverlay open onOpenChange={(o) => !o && onClose()} title={`Delete ${user.name}?`} variant="confirm">
       <div className="flex flex-col gap-4 text-body-md text-body">
         <p>
-          This can’t be undone. Their login, name, email and phone are erased, and the email can be used for a new account. The visits and follow-ups they logged stay, shown as <b>Deleted user</b>.
+          This can’t be undone. Their sign-in, name, email and phone are erased, and the email can be used again for someone new. The visits and follow-ups they logged stay, shown
+          as <b>Former team member</b>.
         </p>
         <Picker
           label="Who takes over their leads"
@@ -268,7 +302,7 @@ function DeleteUserSheet({ user, onClose }: { user: User; onClose: () => void })
           options={people.map((p) => ({ value: p.id, label: p.name, description: p.email, leading: <Avatar name={p.name} size={32} /> }))}
           onChange={setTo}
           placeholder="Choose a person"
-          hint="Needed if they own any leads. That person joins those projects if they aren’t in them already."
+          hint="Needed if they own any leads. That person joins those campaigns if they aren’t on them already."
         />
         <div className="mt-2 flex flex-col gap-3 medium:flex-row-reverse">
           <Button loading={busy} onClick={() => void remove()}>

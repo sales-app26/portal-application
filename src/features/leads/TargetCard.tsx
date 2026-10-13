@@ -17,7 +17,17 @@ function daysLeft(periodEnd: string, now = Date.now()): number {
  * ("8 to go · 5 days left · about 2 a day"), and revenue this month when deals carry a value.
  * No target means a count and no bar (PRD §5.4).
  */
-export function TargetCard({ t, showProject, to, revenue }: { t: TargetProgress; showProject?: boolean; /** Makes the card open this page (the rep's performance). */ to?: string; revenue?: number | null }) {
+export function TargetCard({
+  t,
+  showProject,
+  to,
+  revenue,
+}: {
+  t: TargetProgress
+  showProject?: boolean
+  /** Makes the card open this page (the rep's performance). */ to?: string
+  revenue?: number | null
+}) {
   const period = t.targetPeriod === 'monthly' ? 'this month' : 'this week'
   const target = t.targetCount
   const met = !!target && t.achieved >= target
@@ -29,14 +39,14 @@ export function TargetCard({ t, showProject, to, revenue }: { t: TargetProgress;
       {/* The Pronttera mark as a quiet watermark. */}
       <img src="/brand/pronttera-mark-white.svg" alt="" aria-hidden className="pointer-events-none absolute -right-6 -bottom-10 h-44 opacity-[0.09]" />
       <div className="relative flex items-center justify-between gap-3">
-        <p className="text-caption-strong tracking-wide text-white/85 uppercase">{showProject ? t.projectName : target ? `Target ${period}` : `Converted ${period}`}</p>
+        <p className="text-caption-strong tracking-wide text-white/85 uppercase">{showProject ? t.projectName : target ? `Target ${period}` : `Won ${period}`}</p>
         {revenue ? <span className="rounded-pill bg-white/15 px-2.5 py-0.5 text-caption-strong text-white tabular-nums">{rupees(revenue)} this month</span> : null}
       </div>
       {target ? (
         <>
           <p className="relative flex items-baseline gap-2">
             <span className="text-[44px] leading-none font-bold tracking-tight tabular-nums">{t.achieved}</span>
-            <span className="text-title-md text-white/80 tabular-nums">/ {target} converted</span>
+            <span className="text-title-md text-white/80 tabular-nums">/ {target} won</span>
           </p>
           <ProgressBar value={t.achieved} max={target} label={`${t.projectName} target`} onAccent />
           {met ? (
@@ -53,7 +63,7 @@ export function TargetCard({ t, showProject, to, revenue }: { t: TargetProgress;
       ) : (
         <>
           <p className="relative text-[44px] leading-none font-bold tracking-tight tabular-nums">{t.conversionsThisWeek}</p>
-          <p className="relative text-body-sm text-white/90">converted this week · no target set</p>
+          <p className="relative text-body-sm text-white/90">won this week · no target set</p>
         </>
       )}
       {to && (

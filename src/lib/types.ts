@@ -4,14 +4,7 @@ export type UserRole = 'super_admin' | 'moderator' | 'sales_person'
 export type ProjectType = 'online' | 'door_to_door'
 export type ProjectStatus = 'active' | 'closed'
 export type TargetPeriod = 'weekly' | 'monthly'
-export type LeadStatus =
-  | 'new'
-  | 'contacted'
-  | 'interested'
-  | 'follow_up_scheduled'
-  | 'not_interested'
-  | 'converted'
-  | 'lost'
+export type LeadStatus = 'new' | 'contacted' | 'interested' | 'follow_up_scheduled' | 'not_interested' | 'converted' | 'lost'
 export type EntryType = 'follow_up' | 'status_change'
 export type TransferStatus = 'pending' | 'approved' | 'rejected'
 export type LeadOwnerTag = 'owner_inactive' | 'owner_removed'
@@ -20,7 +13,7 @@ export type LeadSource = 'walk_in' | 'referral' | 'phone' | 'whatsapp' | 'social
 export type LostReason = 'price' | 'has_alternative' | 'not_ready' | 'no_need' | 'owner_unavailable' | 'shop_closed' | 'competitor' | 'other'
 export type LeadDue = 'overdue' | 'today' | 'tomorrow' | 'week' | 'none'
 export type FunnelStage = 'created' | 'contacted' | 'interested' | 'converted'
-export type AttentionKind = 'behind_target' | 'overdue_pile' | 'idle' | 'stale_transfer'
+export type AttentionKind = 'behind_target' | 'overdue_pile' | 'idle' | 'stale_transfer' | 'help_request'
 
 export interface Paginated<T> {
   items: T[]
@@ -48,6 +41,11 @@ export interface MeProject {
   targetPeriod: TargetPeriod | null
 }
 
+export interface LeaveSpan {
+  startsOn: string
+  endsOn: string
+}
+
 export interface Me {
   id: string
   name: string
@@ -56,6 +54,17 @@ export interface Me {
   role: UserRole
   projects: MeProject[]
   notice: string | null
+  /** On leave today. */
+  onLeave?: LeaveSpan | null
+  nextLeave?: LeaveSpan | null
+}
+
+export interface Leave extends LeaveSpan {
+  id: string
+  user: PersonRef
+  note: string | null
+  createdBy: PersonRef
+  createdAt: string
 }
 
 export interface Session {
@@ -76,6 +85,7 @@ export interface User {
   createdBy: string | null
   createdAt: string
   canManage: boolean
+  onLeave?: LeaveSpan | null
   /** Reset link, deactivate, reactivate: false when the person also works in projects the caller doesn't run. */
   canManageAccount: boolean
 }
@@ -112,6 +122,9 @@ export interface Member {
   targetCount?: number | null
   targetPeriod?: TargetPeriod | null
   removedAt?: string | null
+  onLeave?: LeaveSpan | null
+  /** Who covers this member's follow-ups in this project while they are on leave. */
+  backup?: PersonRef | null
 }
 
 export interface LocationSuggestion {
@@ -142,6 +155,10 @@ export interface Entry {
   editable: boolean
   /** Why it was lost: only on Not interested and Lost entries. */
   reason: LostReason | null
+  /** The owner a backup logged this for, while the owner was on leave. */
+  coveringFor?: PersonRef | null
+  /** A manager's notes on this entry. */
+  feedback?: { id: string; body: string; user: PersonRef; createdAt: string }[]
 }
 
 export interface TimelineEntry extends Entry {
@@ -185,6 +202,8 @@ export interface LeadTransferRef {
 }
 
 export interface LeadPermissions {
+  /** The caller is the owner's backup and the owner is on leave today. */
+  covering?: boolean
   canLogFollowUp: boolean
   canChangeStatus: boolean
   canLeaveConverted: boolean
@@ -203,6 +222,83 @@ export interface LeadDetail extends LeadSummary {
   pendingTransfer: LeadTransferRef | null
   lastDecidedTransfer: LeadTransferRef | null
   permissions: LeadPermissions
+  /** The owner, when the caller is covering for them. */
+  coveringFor?: PersonRef | null
+  openHelp?: boolean
+  pinnedComment?: { id: string; body: string; user: PersonRef; createdAt: string } | null
+  commentCount?: number
+}
+
+export type CommentKind = 'comment' | 'help' | 'feedback' | 'handover'
+
+export interface LeadComment {
+  id: string
+  kind: CommentKind
+  body: string
+  user: PersonRef
+  mentions: PersonRef[]
+  pinned: boolean
+  entryId: string | null
+  resolvedAt: string | null
+  resolvedBy: PersonRef | null
+  createdAt: string
+  editedAt: string | null
+  canEdit: boolean
+  canDelete: boolean
+  canPin: boolean
+  canResolve: boolean
+}
+
+export type NotificationKind = 'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover'
+
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  title: string
+  body: string | null
+  link: string | null
+  actor: PersonRef | null
+  leadId: string | null
+  createdAt: string
+  readAt: string | null
+}
+
+export interface Covering {
+  user: PersonRef
+  projectId: string
+  projectName: string
+  leave: LeaveSpan
+  dueToday: number
+  overdue: number
+}
+
+export interface Leaderboard {
+  period: 'week' | 'month'
+  from: string
+  to: string
+  rows: { user: PersonRef; role: UserRole; conversions: number; followUps: number; rank: number; isMe: boolean }[]
+}
+
+export interface RosterRow {
+  user: PersonRef & { phone: string | null; email: string }
+  role: UserRole
+  projects: { id: string; name: string }[]
+  onLeave: LeaveSpan | null
+  nextLeave: LeaveSpan | null
+  backup: PersonRef | null
+  lastActivityAt: string | null
+  followUpsToday: number
+  openLeads: number
+  dueToday: number
+  overdue: number
+  target: { count: number; period: TargetPeriod; achieved: number } | null
+}
+
+export interface MessageTemplate {
+  id: string
+  label: string
+  body: string
+  sort: number
 }
 
 export interface EntrySaveResult {
@@ -296,7 +392,7 @@ export interface Dashboard {
   trend: { date: string; followUps: number; newLeads: number; conversions: number; revenue: number }[]
   lostReasons: { reason: LostReason | 'unspecified'; count: number }[]
   sources: { source: LeadSource | 'unspecified'; count: number }[]
-  needsAttention: { kind: AttentionKind; user: PersonRef | null; projectName: string | null; detail: string; leadCount?: number }[]
+  needsAttention: { kind: AttentionKind; user: PersonRef | null; projectName: string | null; detail: string; leadCount?: number; leadId?: string }[]
   loggedNothingToday: { user: PersonRef; role: UserRole; projects: string[] }[]
   leadsByStatus: { status: LeadStatus; count: number }[]
   conversionsThisWeek: {

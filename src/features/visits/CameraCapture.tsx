@@ -120,12 +120,24 @@ export function CameraCapture({ open, onClose, onCapture }: Props) {
 
   let blocker: { icon: IconName; title: string; body: string; action?: { label: string; onClick: () => void } } | null = null
   if (!supported || camera.state === 'unavailable')
-    blocker = { icon: 'camera', title: 'Use your phone to log this visit', body: 'Visits need a live photo and your location. This device has no camera or location we can use.' }
+    blocker = { icon: 'camera', title: 'Use your phone to log this visit', body: "Visits need a live photo and your location, and we can't use either here." }
   else if (camera.state === 'denied') blocker = { icon: 'camera', title: 'Allow the camera', body: permissionHelp('camera'), action: { label: 'Try again', onClick: camera.retry } }
-  else if (gps.state === 'denied') blocker = { icon: 'marker', title: 'Allow your location', body: permissionHelp('location'), action: { label: 'Try again', onClick: gps.restart } }
+  else if (gps.state === 'denied')
+    blocker = { icon: 'marker', title: 'Allow your location', body: permissionHelp('location'), action: { label: 'Try again', onClick: gps.restart } }
   else if (gps.state === 'unavailable')
-    blocker = { icon: 'marker', title: 'Turn on location', body: 'Location is switched off on this phone. Turn it on in your phone settings, then try again.', action: { label: 'Try again', onClick: gps.restart } }
-  else if (camera.state === 'error') blocker = { icon: 'error', title: 'The camera could not start', body: 'Close other apps that use the camera, then try again.', action: { label: 'Try again', onClick: camera.retry } }
+    blocker = {
+      icon: 'marker',
+      title: 'Turn on location',
+      body: 'Location is switched off on this phone. Turn it on in your phone settings, then try again.',
+      action: { label: 'Try again', onClick: gps.restart },
+    }
+  else if (camera.state === 'error')
+    blocker = {
+      icon: 'error',
+      title: 'The camera could not start',
+      body: 'Close other apps that use the camera, then try again.',
+      action: { label: 'Try again', onClick: camera.retry },
+    }
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Visit photo" className="fixed inset-0 z-[70] flex flex-col bg-surface-dark text-on-dark select-none">
@@ -221,9 +233,9 @@ function GpsPill({ state, fix }: { state: string; fix: GpsFix | null }) {
     <span
       className={cn('flex h-9 items-center gap-1.5 rounded-pill bg-surface-dark-elevated px-3 tabular-nums text-caption-strong', low ? 'text-accent-yellow' : 'text-on-dark')}
       aria-live="polite"
-      aria-label={`Location found, accuracy ${Math.round(fix.accuracy)} metres${low ? ', low accuracy' : ''}`}
+      aria-label={`Location found, within about ${Math.round(fix.accuracy)} metres${low ? ', location is approximate' : ''}`}
     >
-      <Icon name={low ? 'high-priority' : 'near-me'} size={16} />± {Math.round(fix.accuracy)} m{low && <span className="font-sans">· Low accuracy</span>}
+      <Icon name={low ? 'high-priority' : 'near-me'} size={16} />± {Math.round(fix.accuracy)} m{low && <span className="font-sans">· Approximate</span>}
     </span>
   )
 }

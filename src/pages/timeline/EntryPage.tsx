@@ -29,14 +29,14 @@ export function EntryPage() {
   const hasGps = !!e && e.latitude !== null && e.longitude !== null
 
   return (
-    <Page title="Entry" back="/">
+    <Page title="Follow-up" back="/">
       {q.isLoading ? (
         <div className="flex flex-col gap-4">
           <Skeleton className="h-24 rounded-xl" />
           <Skeleton className="h-48 rounded-xl" />
         </div>
       ) : q.error instanceof ApiError && q.error.code === 'NOT_FOUND' ? (
-        <EmptyState icon="search" title="Entry not found" body="It may have been removed, or it belongs to a project you can't see." />
+        <EmptyState icon="search" title="Follow-up not found" body="It may have been deleted, or it belongs to a campaign you can't see." />
       ) : q.isError ? (
         <ErrorState message={q.error.message} onRetry={() => void q.refetch()} />
       ) : e ? (
@@ -47,11 +47,19 @@ export function EntryPage() {
               {e.entryType === 'status_change' ? 'Status change' : e.hasPhoto ? 'Visit' : 'Follow-up'} by {e.user.name}
             </span>
           </div>
-          <p className="text-body-sm text-muted">{formatDateTime(e.createdAt)}{e.edited && ' · Edited'}</p>
+          <p className="text-body-sm text-muted">
+            {formatDateTime(e.createdAt)}
+            {e.edited && ' · Edited'}
+          </p>
           {e.note && <p className="text-body-md whitespace-pre-line">{e.note}</p>}
 
           {e.hasPhoto && (
-            <button type="button" onClick={() => setViewing(true)} className="pressable relative flex h-64 items-center justify-center overflow-hidden rounded-xl bg-surface-strong" aria-label="Open visit photo">
+            <button
+              type="button"
+              onClick={() => setViewing(true)}
+              className="pressable relative flex h-64 items-center justify-center overflow-hidden rounded-xl bg-surface-strong"
+              aria-label="Open visit photo"
+            >
               {e.photoUrl && <img src={e.photoUrl} alt="Visit" className="size-full object-cover" />}
               <span className="absolute right-3 bottom-3 flex size-10 items-center justify-center rounded-full bg-surface-dark text-on-dark">
                 <Icon name="expand-arrow" size={20} />
@@ -61,12 +69,16 @@ export function EntryPage() {
 
           {hasGps && (
             <section className="flex flex-col gap-3">
-              <LazyMap points={[{ id: e.id, latitude: e.latitude!, longitude: e.longitude!, accuracy: e.gpsAccuracyM }]} interactive={false} className="h-48 rounded-xl border border-hairline" />
+              <LazyMap
+                points={[{ id: e.id, latitude: e.latitude!, longitude: e.longitude!, accuracy: e.gpsAccuracyM }]}
+                interactive={false}
+                className="h-48 rounded-xl border border-hairline"
+              />
               <div className="flex flex-wrap items-center gap-3">
                 <span className="tabular-nums text-caption text-body">
                   {e.latitude!.toFixed(5)}, {e.longitude!.toFixed(5)} · ± {Math.round(e.gpsAccuracyM ?? 0)} m
                 </span>
-                {e.lowAccuracy && <Tag>Low accuracy</Tag>}
+                {e.lowAccuracy && <Tag>Location is approximate</Tag>}
                 <Button asChild variant="secondary" size="sm" className="ml-auto">
                   <a href={openInMapsUrl(e.latitude!, e.longitude!)} target="_blank" rel="noreferrer">
                     Open in Maps
@@ -88,7 +100,10 @@ export function EntryPage() {
           )}
           {!e.hasPhoto && !hasGps && e.entryType === 'follow_up' && (
             <p className="text-caption text-muted">
-              Online follow-ups carry no photo or location. <Link to="/day" className="underline">Back to My day</Link>
+              Online follow-ups carry no photo or location.{' '}
+              <Link to="/day" className="underline">
+                Back to My day
+              </Link>
             </p>
           )}
         </div>

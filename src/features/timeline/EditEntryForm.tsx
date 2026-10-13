@@ -67,7 +67,7 @@ export function EditEntryForm({ entry, open, onOpenChange }: { entry: Entry; ope
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title="Edit entry"
+      title="Edit follow-up"
       description="You can change the note and next date until midnight."
       variant="short"
       dirty={formState.isDirty && !formState.isSubmitting}

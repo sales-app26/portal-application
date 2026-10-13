@@ -2,12 +2,15 @@ import { useMe } from '@/auth/AuthProvider'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { whatsappHref } from '@/lib/contact'
 import { rememberContact } from '@/lib/contactPrompt'
+import { useTemplates } from '@/features/team/queries'
 
 export interface ContactLead {
   id: string
   name: string
   phone: string
   businessName?: string | null
+  /** Picks the project's own messages, when its manager wrote some. */
+  projectId?: string
 }
 
 const first = (name: string) => name.trim().split(/\s+/)[0] ?? name
@@ -30,6 +33,13 @@ function templates(client: string, rep: string) {
  */
 export function WhatsAppSheet({ open, onOpenChange, lead, prompt = true }: { open: boolean; onOpenChange: (o: boolean) => void; lead: ContactLead; prompt?: boolean }) {
   const me = useMe()
+  const project = useTemplates(open ? lead.projectId : undefined)
+  const fill = (body: string) =>
+    body
+      .replaceAll('{client}', first(lead.name))
+      .replaceAll('{rep}', first(me.name))
+      .replaceAll('{business}', lead.businessName ?? 'your shop')
+  const messages = project.data?.length ? project.data.map((t) => ({ label: t.label, text: fill(t.body) })) : templates(first(lead.name), first(me.name))
   const sent = () => {
     if (prompt) rememberContact({ leadId: lead.id, name: lead.name, kind: 'whatsapp' })
     onOpenChange(false)
@@ -37,17 +47,35 @@ export function WhatsAppSheet({ open, onOpenChange, lead, prompt = true }: { ope
   const href = (text?: string) => `${whatsappHref(lead.phone)}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 
   return (
-    <ResponsiveOverlay open={open} onOpenChange={onOpenChange} title={`WhatsApp ${lead.name}`} description="Pick a message. You can edit it in WhatsApp before sending." variant="choice">
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`WhatsApp ${lead.name}`}
+      description="Pick a message. You can edit it in WhatsApp before sending."
+      variant="choice"
+    >
       <ul className="flex flex-col py-1">
         <li>
-          <a href={href()} target="_blank" rel="noreferrer" onClick={sent} className="flex min-h-14 flex-col justify-center px-4 py-3 active:bg-surface-soft expanded:px-6 expanded:hover:bg-surface-soft">
+          <a
+            href={href()}
+            target="_blank"
+            rel="noreferrer"
+            onClick={sent}
+            className="flex min-h-14 flex-col justify-center px-4 py-3 active:bg-surface-soft expanded:px-6 expanded:hover:bg-surface-soft"
+          >
             <span className="text-title-sm">Just open the chat</span>
             <span className="text-body-sm text-body">No message, type your own</span>
           </a>
         </li>
-        {templates(first(lead.name), first(me.name)).map((t) => (
+        {messages.map((t) => (
           <li key={t.label} className="border-t border-hairline-soft">
-            <a href={href(t.text)} target="_blank" rel="noreferrer" onClick={sent} className="flex flex-col gap-0.5 px-4 py-3 active:bg-surface-soft expanded:px-6 expanded:hover:bg-surface-soft">
+            <a
+              href={href(t.text)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={sent}
+              className="flex flex-col gap-0.5 px-4 py-3 active:bg-surface-soft expanded:px-6 expanded:hover:bg-surface-soft"
+            >
               <span className="text-title-sm">{t.label}</span>
               <span className="line-clamp-2 text-body-sm text-body">{t.text}</span>
             </a>

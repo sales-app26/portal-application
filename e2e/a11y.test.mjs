@@ -64,7 +64,7 @@ describe('axe: open overlays', () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await clickNth(page, 'More actions', 0)
-    await waitForText(page, 'Request transfer')
+    await waitForText(page, 'Ask for handover')
     await sleep(500)
     assert.deepEqual(await axeViolations(page), [])
     await page.close()

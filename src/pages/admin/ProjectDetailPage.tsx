@@ -4,6 +4,9 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
+import { BackupPicker } from '@/features/team/BackupPicker'
+import { TemplatesManager } from '@/features/team/TemplatesManager'
+import { LeaveForm } from '@/features/team/LeaveForm'
 import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { ActionMenu } from '@/components/ui/ActionMenu'
@@ -21,35 +24,35 @@ import { useLeadList } from '@/features/leads/queries'
 import { useDebounced } from '@/hooks/useDebounced'
 import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
-import { formatDate, ROLE_LABEL, STATUSES, STATUS_LABEL } from '@/lib/format'
+import { formatDate, ROLE_LABEL, STATUS_LABEL, STATUSES } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import type { LeadStatus, Member, Project } from '@/lib/types'
 
-type Tab = 'members' | 'leads' | 'settings'
+type Tab = 'members' | 'leads' | 'messages' | 'settings'
 
 export function ProjectDetailPage() {
   const { id } = useParams()
   const me = useMe()
   const isSuper = me.role === 'super_admin'
   const [params, setParams] = useSearchParams()
-  const tab = (['members', 'leads', 'settings'] as const).find((t) => t === params.get('tab') && (t !== 'settings' || isSuper)) ?? 'members'
+  const tab = (['members', 'leads', 'messages', 'settings'] as const).find((t) => t === params.get('tab') && (t !== 'settings' || isSuper)) ?? 'members'
   const project = useProjectDetail(id)
   const p = project.data
   const notFound = project.error instanceof ApiError && project.error.code === 'NOT_FOUND'
 
   return (
-    <Page title={p?.name ?? 'Project'} back="/projects" wide>
+    <Page title={p?.name ?? 'Campaign'} back="/projects" wide>
       {project.isLoading ? (
         <Skeleton className="h-40 rounded-xl" />
       ) : notFound ? (
-        <EmptyState icon="briefcase" title="Project not found" body="It may be closed for your account or you may not be assigned to it." />
+        <EmptyState icon="briefcase" title="Campaign not found" body="It may be closed, or you may not be on its team." />
       ) : project.isError ? (
         <ErrorState message={project.error.message} onRetry={() => void project.refetch()} />
       ) : p ? (
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center gap-2">
             <Tag>{p.type === 'door_to_door' ? 'Door-to-door' : 'Online'}</Tag>
-            {p.status === 'closed' && <Tag>Closed · read-only</Tag>}
+            {p.status === 'closed' && <Tag>Closed · view only</Tag>}
             {p.pastEndDate && <Tag tone="down">Past end date</Tag>}
             <span className="text-body-sm text-body">
               {formatDate(p.startDate, { withYear: true })}
@@ -62,14 +65,16 @@ export function ProjectDetailPage() {
             value={tab}
             onChange={(t) => setParams({ tab: t }, { replace: true })}
             options={[
-              { value: 'members', label: `Members · ${p.memberCount}` },
+              { value: 'members', label: `Team · ${p.memberCount}` },
               { value: 'leads', label: `Leads · ${p.leadCount}` },
+              { value: 'messages', label: 'Messages' },
               ...(isSuper ? [{ value: 'settings' as Tab, label: 'Settings' }] : []),
             ]}
             className="w-full medium:w-auto medium:self-start"
           />
           {tab === 'members' && <MembersTab project={p} />}
           {tab === 'leads' && <LeadsTab project={p} />}
+          {tab === 'messages' && <TemplatesManager projectId={p.id} canEdit={p.status === 'active'} />}
           {tab === 'settings' && isSuper && <SettingsTab project={p} />}
         </div>
       ) : null}
@@ -89,6 +94,8 @@ function MembersTab({ project }: { project: Project }) {
   const q = useProjectMembers(project.id)
   const [adding, setAdding] = useState(false)
   const [target, setTarget] = useState<Member | null>(null)
+  const [backupFor, setBackupFor] = useState<Member | null>(null)
+  const [leaveFor, setLeaveFor] = useState<Member | null>(null)
   const [removing, setRemoving] = useState<Member | null>(null)
   const [busy, setBusy] = useState(false)
   const closed = project.status === 'closed'
@@ -119,12 +126,12 @@ function MembersTab({ project }: { project: Project }) {
       {!closed && (
         <div className="flex flex-wrap gap-2">
           <Button icon="add-user-male" variant="secondary" onClick={() => setAdding(true)}>
-            Add member
+            Add to team
           </Button>
           <Button asChild variant="secondary">
             <Link to={`/projects/${project.id}/import`}>
               <Icon name="csv" size={20} />
-              Import from CSV
+              Add leads from a sheet
             </Link>
           </Button>
         </div>
@@ -134,7 +141,7 @@ function MembersTab({ project }: { project: Project }) {
       ) : q.isError ? (
         <ErrorState message={q.error.message} onRetry={() => void q.refetch()} />
       ) : members.length === 0 ? (
-        <EmptyState icon="conference-call" title="No members yet" body="Add sales persons so they can log leads here." />
+        <EmptyState icon="conference-call" title="No one on the team yet" body="Add sales reps so they can log leads here." />
       ) : (
         <ListGroup>
           {members.map((m) => (
@@ -144,10 +151,12 @@ function MembersTab({ project }: { project: Project }) {
               title={
                 <span className="flex items-center gap-2">
                   {m.name}
-                  {m.role === 'moderator' && <Tag>Moderator</Tag>}
+                  {m.role === 'moderator' && <Tag>Manager</Tag>}
                 </span>
               }
-              subtitle={targetText(m)}
+              subtitle={[targetText(m), m.backup ? `Backup: ${m.backup.name}` : null, m.onLeave ? `On leave until ${formatDate(m.onLeave.endsOn)}` : null]
+                .filter(Boolean)
+                .join(' · ')}
               trailing={
                 !closed && (
                   <ActionMenu
@@ -156,8 +165,25 @@ function MembersTab({ project }: { project: Project }) {
                       { label: 'Week and month', icon: 'statistics', onSelect: () => navigate(`/people/${m.userId}`) },
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${m.userId}/day`) },
                       { label: 'Set target', icon: 'goal', onSelect: () => setTarget(m), hidden: !isSuper && m.role === 'moderator' && m.userId !== me.id },
-                      { label: 'Upload leads for them', icon: 'csv', onSelect: () => navigate(`/projects/${project.id}/import?owner=${m.userId}`), hidden: !m.isActive || !m.userIsActive || m.role === 'super_admin' },
-                      { label: 'Remove from project', icon: 'trash', onSelect: () => setRemoving(m), hidden: !canRemove(m) },
+                      {
+                        label: m.backup ? `Backup: ${m.backup.name}` : 'Set backup',
+                        icon: 'shield',
+                        onSelect: () => setBackupFor(m),
+                        hidden: !m.isActive || m.role === 'super_admin' || (!isSuper && m.role === 'moderator' && m.userId !== me.id),
+                      },
+                      {
+                        label: 'Set leave',
+                        icon: 'leave',
+                        onSelect: () => setLeaveFor(m),
+                        hidden: !m.isActive || !m.userIsActive || m.userId === me.id || (!isSuper && m.role !== 'sales_person'),
+                      },
+                      {
+                        label: 'Add leads for them from a sheet',
+                        icon: 'csv',
+                        onSelect: () => navigate(`/projects/${project.id}/import?owner=${m.userId}`),
+                        hidden: !m.isActive || !m.userIsActive || m.role === 'super_admin',
+                      },
+                      { label: 'Remove from campaign', icon: 'trash', onSelect: () => setRemoving(m), hidden: !canRemove(m) },
                     ]}
                   />
                 )
@@ -168,11 +194,13 @@ function MembersTab({ project }: { project: Project }) {
       )}
       <AddMemberForm projectId={project.id} members={q.data ?? []} canAddModerators={isSuper} open={adding} onOpenChange={setAdding} />
       {target && <SetTargetForm projectId={project.id} member={target} open onOpenChange={(o) => !o && setTarget(null)} />}
+      {backupFor && <BackupPicker projectId={project.id} member={backupFor} members={members} open onOpenChange={(o) => !o && setBackupFor(null)} />}
+      <LeaveForm open={!!leaveFor} onOpenChange={(o) => !o && setLeaveFor(null)} person={leaveFor ? { id: leaveFor.userId, name: leaveFor.name } : undefined} />
       <Confirm
         open={!!removing}
         onOpenChange={(o) => !o && setRemoving(null)}
         title={`Remove ${removing?.name ?? ''}?`}
-        body="Their history stays. Their leads here are tagged “Owner removed” until you reassign them, and any pending transfer involving them is rejected."
+        body="Their history stays. Their leads here are tagged “Owner removed” until you assign them to someone else, and any handover request involving them is rejected."
         confirmLabel={`Remove ${removing?.name ?? ''}`.trim()}
         onConfirm={remove}
         loading={busy}
@@ -194,7 +222,12 @@ function LeadsTab({ project }: { project: Project }) {
   const q = useDebounced(search.trim(), 300)
   const closed = project.status === 'closed'
 
-  const list = useLeadList(project.id, { search: q || undefined, status: status === 'all' ? null : status, ownerId: owner !== 'all' && owner !== 'unavailable' ? owner : undefined, ownerUnavailable: owner === 'unavailable' })
+  const list = useLeadList(project.id, {
+    search: q || undefined,
+    status: status === 'all' ? null : status,
+    ownerId: owner !== 'all' && owner !== 'unavailable' ? owner : undefined,
+    ownerUnavailable: owner === 'unavailable',
+  })
   const leads = list.data?.pages.flatMap((pg) => pg.items) ?? []
   const toggle = (id: string) => setPicked((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)))
   const exit = () => (setSelecting(false), setPicked(new Set()))
@@ -206,7 +239,7 @@ function LeadsTab({ project }: { project: Project }) {
     <Button asChild>
       <Link to={`/projects/${project.id}/import`}>
         <Icon name="csv" size={20} />
-        Import from CSV
+        Add leads from a sheet
       </Link>
     </Button>
   )
@@ -221,7 +254,7 @@ function LeadsTab({ project }: { project: Project }) {
             <div className="flex gap-2">
               {leads.length > 0 && (
                 <Button variant="secondary" icon={selecting ? 'multiply' : 'checkmark'} onClick={() => (selecting ? exit() : setSelecting(true))}>
-                  {selecting ? 'Cancel' : 'Reassign'}
+                  {selecting ? 'Cancel' : 'Assign'}
                 </Button>
               )}
               {!selecting && importButton}
@@ -231,8 +264,20 @@ function LeadsTab({ project }: { project: Project }) {
       )}
       {!empty && (
         <div className="flex flex-col gap-2">
-          {ownerOptions.length > 1 && <FilterChips label="Owner" value={owner} onChange={setOwner} options={[{ value: 'all', label: 'Everyone' }, ...ownerOptions, { value: 'unavailable', label: 'Owner inactive or removed' }]} />}
-          <FilterChips label="Status" value={status} onChange={setStatus} options={[{ value: 'all' as const, label: 'All statuses' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]} />
+          {ownerOptions.length > 1 && (
+            <FilterChips
+              label="Owner"
+              value={owner}
+              onChange={setOwner}
+              options={[{ value: 'all', label: 'Everyone' }, ...ownerOptions, { value: 'unavailable', label: 'Owner left or removed' }]}
+            />
+          )}
+          <FilterChips
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[{ value: 'all' as const, label: 'All statuses' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
+          />
         </div>
       )}
 
@@ -244,7 +289,7 @@ function LeadsTab({ project }: { project: Project }) {
         <EmptyState
           icon="contacts"
           title="No leads yet"
-          body={closed ? 'This project is closed.' : 'Import a CSV to hand leads out to your team, or wait for sales persons to add them in the field.'}
+          body={closed ? 'This campaign is closed.' : 'Add leads from a sheet to hand them out to your team, or wait for sales reps to add them in the field.'}
           action={!closed && importButton}
         />
       ) : leads.length === 0 ? (
@@ -273,7 +318,7 @@ function LeadsTab({ project }: { project: Project }) {
             {picked.size} selected
           </span>
           <Button disabled={picked.size === 0} onClick={() => setReassigning(true)}>
-            Reassign {picked.size || ''}
+            Assign {picked.size || ''}
           </Button>
         </div>
       )}
@@ -310,12 +355,12 @@ function SettingsTab({ project }: { project: Project }) {
   return (
     <section className="flex flex-col gap-6 expanded:max-w-[640px]">
       <ListGroup>
-        <ListRow icon="edit" title="Edit project" subtitle="Name, dates, type and image" chevron onClick={() => setEditing(true)} />
-        {project.imageUrl && <ListRow icon="image" title="Remove image" onClick={() => void run('image')} />}
+        <ListRow icon="edit" title="Edit campaign" subtitle="Name, dates, type and picture" chevron onClick={() => setEditing(true)} />
+        {project.imageUrl && <ListRow icon="image" title="Remove picture" onClick={() => void run('image')} />}
         <ListRow
           icon={closed ? 'refresh' : 'lock'}
-          title={closed ? 'Reopen project' : 'Close project'}
-          subtitle={closed ? 'Members and targets come back as they were.' : 'Becomes read-only. Nothing is deleted.'}
+          title={closed ? 'Reopen campaign' : 'Close campaign'}
+          subtitle={closed ? 'The team and targets come back as they were.' : 'Becomes view only. Nothing is deleted.'}
           destructive={!closed}
           onClick={() => setConfirm(closed ? 'reopen' : 'close')}
         />
@@ -325,8 +370,8 @@ function SettingsTab({ project }: { project: Project }) {
         open={confirm === 'close'}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={`Close ${project.name}?`}
-        body="No new leads, follow-ups, status changes or transfers. Pending transfers are rejected, and follow-ups due here leave everyone's Due today list. Photos stay viewable."
-        confirmLabel="Close project"
+        body="No new leads, follow-ups, status changes or handovers. Handover requests are rejected, and follow-ups due here leave everyone's Due today list. Photos stay viewable."
+        confirmLabel="Close campaign"
         onConfirm={() => run('close')}
         loading={busy}
       />
@@ -334,12 +379,12 @@ function SettingsTab({ project }: { project: Project }) {
         open={confirm === 'reopen'}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={`Reopen ${project.name}?`}
-        body="Members and targets return as they were. Transfers that were rejected on closing are not restored."
-        confirmLabel="Reopen project"
+        body="The team and targets return as they were. Handovers that were rejected on closing are not restored."
+        confirmLabel="Reopen campaign"
         onConfirm={() => run('reopen')}
         loading={busy}
       />
-      <p className="text-caption text-muted">Roles: {ROLE_LABEL.super_admin}s can see every project. A project can't be deleted, only closed.</p>
+      <p className="text-caption text-muted">{ROLE_LABEL.super_admin}s can see every campaign. A campaign can't be deleted, only closed.</p>
     </section>
   )
 }

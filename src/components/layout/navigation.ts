@@ -12,12 +12,12 @@ export interface NavItem {
 const home: NavItem = { to: '/home', label: 'Home', icon: 'home' }
 const leads: NavItem = { to: '/leads', label: 'Leads', icon: 'contacts' }
 const day: NavItem = { to: '/day', label: 'My day', icon: 'timeline' }
-const dashboard: NavItem = { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' }
-const transfers: NavItem = { to: '/transfers', label: 'Transfers', icon: 'swap', badge: 'transfers' }
+const dashboard: NavItem = { to: '/dashboard', label: 'Overview', icon: 'dashboard' }
+const transfers: NavItem = { to: '/transfers', label: 'Handovers', icon: 'swap', badge: 'transfers' }
 const team: NavItem = { to: '/people', label: 'Team', icon: 'conference-call' }
 const people: NavItem = { to: '/people', label: 'People', icon: 'conference-call' }
-const projects: NavItem = { to: '/projects', label: 'Projects', icon: 'briefcase' }
-const versions: NavItem = { to: '/versions', label: 'Versions', icon: 'timeline' }
+const projects: NavItem = { to: '/projects', label: 'Campaigns', icon: 'briefcase' }
+const versions: NavItem = { to: '/versions', label: 'What’s new', icon: 'timeline' }
 const performance: NavItem = { to: '/performance', label: 'Performance', icon: 'statistics' }
 const profile: NavItem = { to: '/profile', label: 'Profile', icon: 'user-male-circle' }
 export const moreItem: NavItem = { to: '/more', label: 'More', icon: 'menu-2' }

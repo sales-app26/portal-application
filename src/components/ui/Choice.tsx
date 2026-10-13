@@ -85,17 +85,7 @@ export interface ChoiceOption<T extends string> {
 }
 
 /** 56px option rows for quick-choice sheets and popovers (UX-COMPONENTS.md §3). */
-export function ChoiceList<T extends string>({
-  options,
-  value,
-  onSelect,
-  label,
-}: {
-  options: ChoiceOption<T>[]
-  value?: T | null
-  onSelect: (v: T) => void
-  label: string
-}) {
+export function ChoiceList<T extends string>({ options, value, onSelect, label }: { options: ChoiceOption<T>[]; value?: T | null; onSelect: (v: T) => void; label: string }) {
   return (
     <div role="listbox" aria-label={label} className="flex flex-col py-1">
       {options.map((o) => {
@@ -146,13 +136,13 @@ export function Segmented<T extends string>({
       value={value}
       onValueChange={(v) => v && onChange(v as T)}
       aria-label={label}
-      className={cn('inline-flex h-11 rounded-pill bg-default p-1', className)}
+      className={cn('inline-flex h-11 max-w-full overflow-x-auto rounded-pill bg-default p-1 [scrollbar-width:none]', className)}
     >
       {options.map((o) => (
         <ToggleGroup.Item
           key={o.value}
           value={o.value}
-          className="flex-1 rounded-pill px-4 whitespace-nowrap text-nav text-body transition-[background-color,box-shadow,color] duration-200 hover:text-ink data-[state=on]:bg-segment data-[state=on]:font-semibold data-[state=on]:text-segment-foreground data-[state=on]:shadow-[0_1px_3px_rgb(15_17_21/0.12)]"
+          className="flex-1 rounded-pill px-3.5 whitespace-nowrap text-nav text-body transition-[background-color,box-shadow,color] duration-200 hover:text-ink data-[state=on]:bg-segment data-[state=on]:font-semibold data-[state=on]:text-segment-foreground data-[state=on]:shadow-[0_1px_3px_rgb(15_17_21/0.12)]"
         >
           {o.label}
         </ToggleGroup.Item>

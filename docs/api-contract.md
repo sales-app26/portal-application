@@ -181,11 +181,14 @@ Other database errors:
         "targetPeriod": "weekly|monthly|null"
       }
     ],
-    "notice": "string|null"
+    "notice": "string|null",
+    "onLeave": "LeaveSpanDto|null",
+    "nextLeave": "LeaveSpanDto|null"
   }
   ```
   - `projects` lists active memberships ordered by `joinedAt` ascending. It is always `[]` for super_admin.
   - `notice` is `"You are not assigned to any project yet."` for a non-super-admin with no projects, otherwise `null`.
+  - `onLeave` is the caller's active (not cancelled) leave covering today (IST), else null. `nextLeave` is the soonest active leave starting after today, else null. Both are `{ "startsOn": "YYYY-MM-DD", "endsOn": "YYYY-MM-DD" }` (inclusive dates).
 - **Refresh:** `POST /auth/refresh` with `{ refreshToken }` returns a new `SessionDto` with the same shape. A rejected token gives 401 `UNAUTHORIZED`, "Your session has expired. Please sign in again." Refresh is also refused for deactivated or unknown accounts (`ACCOUNT_DEACTIVATED` / `UNAUTHORIZED`).
 - Login errors:
   - Wrong email or password: 401 `INVALID_CREDENTIALS`, "Email or password is incorrect".
@@ -207,8 +210,11 @@ Other database errors:
 - `LostReason` (`follow_ups.reason`): `price`, `has_alternative`, `not_ready`, `no_need`, `owner_unavailable`, `shop_closed`, `competitor`, `other`
 - `LeadDue` (lead list `due` filter, derived): `overdue`, `today`, `tomorrow`, `week`, `none`
 - `FunnelStage` (dashboard `funnel`): `created`, `contacted`, `interested`, `converted`
-- `AttentionKind` (dashboard `needsAttention`): `behind_target`, `overdue_pile`, `idle`, `stale_transfer`
+- `AttentionKind` (dashboard `needsAttention`): `behind_target`, `overdue_pile`, `idle`, `stale_transfer`, `help_request`
 - `TrendBucket` (dashboard `trendBucket`): `day`, `week`
+- `CommentKind` (`lead_comments.kind`): `comment`, `help`, `feedback`, `handover`. `POST /leads/:id/comments` accepts only `comment` and `feedback`; `help` comes from `POST /leads/:id/help`, `handover` from transfers and reassignments.
+- `NotificationKind` (`notifications.kind`): `transfer_requested`, `transfer_decided`, `lead_assigned`, `mention`, `help_requested`, `help_resolved`, `comment`, `feedback`, `leave_cover`
+- `LeaderboardPeriod` (`GET /projects/:id/leaderboard?period=`): `week` (default), `month`
 
 Related constants:
 - `TERMINAL_STATUSES` = `NOT_DUE_STATUSES` = [`not_interested`, `converted`, `lost`]
@@ -227,14 +233,17 @@ All paths below are relative to `/api/v1`.
 ### Shared response shapes
 - **PersonRefDto:** `{ id, name }`
 - **LocationRefDto:** `{ id, name }`
+- **LeaveSpanDto:** `{ startsOn: "YYYY-MM-DD", endsOn: "YYYY-MM-DD" }`, India dates, both included.
 - **UserDto:**
   ```json
   {
     "id": "...", "name": "...", "email": "...", "phone": "string|null",
     "role": "...", "isActive": true, "createdBy": "uuid|null",
-    "createdAt": "ISO", "canManage": true
+    "createdAt": "ISO", "canManage": true, "canManageAccount": true,
+    "onLeave": "LeaveSpanDto|null"
   }
   ```
+  - `onLeave` is the person's leave covering today (IST). It is filled only for people the caller manages (`canManage`: the Super Admin everyone, a moderator the sales persons he created or shares an active project with); for anyone else it is always `null`, matching what `GET /leaves` lets the caller see.
 - **ProjectDto:**
   ```json
   {
@@ -259,10 +268,12 @@ All paths below are relative to `/api/v1`.
     "userId": "...", "name": "...", "role": "...", "userIsActive": true, "isActive": true,
     "joinedAt": "ISO",
     "email": "...", "phone": "string|null", "targetCount": "number|null",
-    "targetPeriod": "...|null", "removedAt": "ISO|null"
+    "targetPeriod": "...|null", "removedAt": "ISO|null",
+    "backup": "{id,name}|null",
+    "onLeave": "LeaveSpanDto|null"
   }
   ```
-  `email`, `phone`, `targetCount`, `targetPeriod` and `removedAt` are only present when the caller is an admin of the project.
+  `email`, `phone`, `targetCount`, `targetPeriod` and `removedAt` are only present when the caller is an admin of the project. `backup` (who covers this member's follow-ups in this project while he is on leave) and `onLeave` (his leave covering today, IST) are present for every caller who may list the members.
 - **EntryDto:**
   ```json
   {
@@ -278,6 +289,8 @@ All paths below are relative to `/api/v1`.
     "latitude": "number|null", "longitude": "number|null", "gpsAccuracyM": "number|null",
     "lowAccuracy": false,
     "user": { "id": "...", "name": "..." },
+    "coveringFor": "{id,name}|null",
+    "feedback": [ { "id": "...", "body": "...", "user": { "id": "...", "name": "..." }, "createdAt": "ISO" } ],
     "createdAt": "ISO", "updatedAt": "ISO",
     "edited": false,
     "editable": false
@@ -288,6 +301,8 @@ All paths below are relative to `/api/v1`.
   - `photoUrl` is a signed URL with a TTL of `SIGNED_URL_TTL_SECONDS` (default 600 s).
   - `lowAccuracy` is true when `gpsAccuracyM > 100`.
   - `user` is whoever logged the entry.
+  - `coveringFor` is the lead's owner when a backup logged the entry for him while he was on leave (`follow_ups.covering_for_id`), else null. `user` is then the backup.
+  - `feedback` lists admins' `feedback` comments on this entry, oldest first (`[]` when none). It is on every `EntryDto`: lead detail `recentEntries`, `GET /leads/:id/entries`, `GET /timeline`, `GET /entries/:id` and `EntrySaveResultDto.entry`.
   - `createdAt` is the server time and is the official visit time.
   - `edited` is true when `updatedAt > createdAt`.
   - `editable` is true when the viewer is the author, the project is active, and the entry was created today in IST.
@@ -327,11 +342,20 @@ All paths below are relative to `/api/v1`.
     "lastDecidedTransfer": "LeadTransferRefDto|null",
     "permissions": {
       "canLogFollowUp": true, "canChangeStatus": true, "canLeaveConverted": false,
-      "canEdit": true, "canRequestTransfer": true, "canReassign": false, "canDelete": false
-    }
+      "canEdit": true, "canRequestTransfer": true, "canReassign": false, "canDelete": false,
+      "covering": false
+    },
+    "coveringFor": "{id,name}|null",
+    "openHelp": false,
+    "pinnedComment": "{ id, body, user: {id,name}, createdAt }|null",
+    "commentCount": 0
   }
   ```
   - `recentEntries` holds at most 20 entries, newest first.
+  - `coveringFor` is the owner when the caller is covering for him (see *Covering* below), else null.
+  - `openHelp` is true while a `help` comment on the lead is unresolved.
+  - `pinnedComment` is the newest pinned, non-deleted comment of any kind (a handover note is pinned automatically).
+  - `commentCount` counts non-deleted comments of every kind.
   - `lastDecidedTransfer` is the latest approved or rejected transfer where `fromUser` is the current owner.
 - **LeadTransferRefDto:**
   ```json
@@ -341,9 +365,10 @@ All paths below are relative to `/api/v1`.
     "decisionNote": "string|null"
   }
   ```
-- **Permission rules.** Let *ownerWorks* mean the caller is the owner and an active member, and *open* mean the project is active.
-  - `canLogFollowUp` = open && ownerWorks
-  - `canChangeStatus` = open && (ownerWorks || isAdmin)
+- **Permission rules.** Let *ownerWorks* mean the caller is the owner and an active member, *covering* mean the caller is covering for the owner today (see *Covering*), and *open* mean the project is active.
+  - `covering` = covering
+  - `canLogFollowUp` = open && (ownerWorks || covering)
+  - `canChangeStatus` = open && (ownerWorks || isAdmin || covering)
   - `canLeaveConverted` = canChangeStatus && isAdmin
   - `canEdit` = open && ownerWorks
   - `canRequestTransfer` = open && ownerWorks && no pending transfer
@@ -432,6 +457,7 @@ Create errors:
 | POST | `/projects/:id/members` | SA, MOD | `userId` (uuid v4); `targetCount?` (int, 1–100000); `targetPeriod?` (TargetPeriod). Send both or neither, else 400 "Set the target number and the period together, or clear both." | `MemberDto`. 201, "Member added to the project." |
 | DELETE | `/projects/:id/members/:userId` | SA, MOD | both params are uuid v4 | `MemberDto` (with `isActive: false` and `removedAt` set). "Member removed from the project." |
 | PATCH | `/projects/:id/members/:userId/target` | SA, MOD | `targetCount` (int 1–100000, or null; **required key**); `targetPeriod` (TargetPeriod or null; **required key**). Both null clears the target. | `MemberDto`. "Target updated." |
+| PUT | `/projects/:id/members/:userId/backup` | SA, MOD | `backupUserId` (uuid v4 or null; **required key**). null clears it. | `MemberDto`. "Backup updated." See *Backups* in section 3a. |
 
 Membership errors:
 - Inactive user: 422 "A deactivated user cannot be added to a project."
@@ -439,6 +465,7 @@ Membership errors:
 - Moderator adding a non-sales user: 403 "Only the Super Admin can add moderators to a project."
 - Closed project: 409 PROJECT_CLOSED.
 - A previously removed member is reactivated and keeps their old target unless a new one is sent.
+- Removing a member (`DELETE /projects/:id/members/:userId`) also clears every `backup` in that project that pointed to him.
 
 ### Locations (`modules/locations/locations.controller.ts`)
 | Method | Path | Roles | Query | data |
@@ -451,13 +478,13 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | Method | Path | Roles | Params / Body | data |
 |---|---|---|---|---|
 | POST | `/projects/:id/leads` | **SP, MOD** (must be an active member) | JSON or multipart. **CreateLeadDto**, see the field table below. | `LeadDetailDto`. **201**, "Lead saved." |
-| GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `due?` (LeadDue, see below), `cold?` ("true"/"false"), `source?` (LeadSource), `sort?` (`updated`, `created`, `name`, `next_follow_up`, `value` or `activity`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. Filters combine with AND. | Paginated `LeadSummaryDto` |
-| GET | `/leads/:id` | any (admin of the project, or owner and active member; else 404) | | `LeadDetailDto` |
+| GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `coveringFor?` (uuid v4; the owner the caller is covering for today — that owner's leads, any other value is 403 "You are not covering for this person in this project today."; overrides `mine`/`ownerId`, every other filter still applies), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `due?` (LeadDue, see below), `cold?` ("true"/"false"), `source?` (LeadSource), `sort?` (`updated`, `created`, `name`, `next_follow_up`, `value` or `activity`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. Filters combine with AND. | Paginated `LeadSummaryDto` |
+| GET | `/leads/:id` | any (admin of the project, owner and active member, or the backup covering for the owner today; else 404) | | `LeadDetailDto` |
 | GET | `/leads/:id/entries` | same | Query: pagination | Paginated `EntryDto`, newest first |
 | PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace); `dealValue?` (integer 0–100000000, or null to clear); `plan?` (string or null, trimmed, max 80, "" becomes null); `source?` (LeadSource, or null to clear) | `LeadDetailDto` |
 | DELETE | `/leads/:id` | **SA** | | `null`, "Deleted successfully." This is a soft delete. |
-| POST | `/leads/:id/follow-ups` | **SP, MOD** (owner only) | JSON or multipart. **LogFollowUpDto**, see below. | `EntrySaveResultDto`. **201**, "Follow-up saved." |
-| POST | `/leads/:id/status` | any (owner, or an admin of the project) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); `dealValue?`, `plan?` (only with `converted`; same validation as on create) | `EntrySaveResultDto`. **200**, "Status changed." |
+| POST | `/leads/:id/follow-ups` | **SP, MOD** (owner, or the backup covering for him) | JSON or multipart. **LogFollowUpDto**, see below. | `EntrySaveResultDto`. **201**, "Follow-up saved." |
+| POST | `/leads/:id/status` | any (owner, an admin of the project, or the backup covering for the owner) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); `dealValue?`, `plan?` (only with `converted`; same validation as on create) | `EntrySaveResultDto`. **200**, "Status changed." |
 
 **CreateLeadDto fields.** It extends `LogFollowUpDto`, so it includes every follow-up field.
 
@@ -484,7 +511,7 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 
 Duplicate phone on create:
 - The phone is already your lead: 409 `DUPLICATE_LEAD_OWN`, "You already have this lead.", `details: { leadId }`.
-- The phone is someone else's lead: 409 `DUPLICATE_LEAD_OTHER`, "This number is already a lead in this project, owned by {owner}.", `details: { ownerName }`.
+- The phone is someone else's lead: 409 `DUPLICATE_LEAD_OTHER`, "This number is already a lead in this project, owned by {owner}.", `details: { ownerName, canRequest: true }`. `canRequest` means the screen can offer `POST /projects/:id/leads/request-by-phone`. (`PATCH /leads/:id` with a taken phone gives the same error without `canRequest`.)
 
 Other create errors:
 - Super admin: 403 "Only members of the project can add leads."
@@ -526,7 +553,7 @@ Follow-up and status rules (`lead-rules.ts`):
 ### Entries (`modules/leads/entries.controller.ts`)
 | Method | Path | Roles | Body | data |
 |---|---|---|---|---|
-| GET | `/entries/:id` | any (author, owner who is an active member, or admin of the project; else 404) | | `EntryDto` |
+| GET | `/entries/:id` | any (author, owner who is an active member, admin of the project, or the backup covering for the owner today; else 404) | | `EntryDto` |
 | GET | `/entries/:id/photo` | same | | `{ url: string, expiresInSeconds: number }` (default 600). No photo: 404 "This entry has no photo." Storage failure: 502 INTEGRATION_ERROR. |
 | PATCH | `/entries/:id` | any (author only) | `note?` (trimmed, 5–2000); `nextFollowUpDate?` (YYYY-MM-DD, or null/"" to clear; follow-ups only). At least one field is required, else 400 "Send a note or a next follow-up date to change." | `EntrySaveResultDto`, "Updated successfully." |
 | DELETE | `/entries/:id` | **SA** | | `null`. The lead's status, next date, conversion and `lastActivityAt` are rebuilt from the remaining entries (`lastActivityAt` falls back to the lead's `createdAt` if none remain). Deal value and plan are kept. |
@@ -547,10 +574,11 @@ Entry edit errors:
 ### Transfers (`modules/transfers/transfers.controller.ts`)
 | Method | Path | Roles | Body / Query | data |
 |---|---|---|---|---|
-| POST | `/leads/:id/transfers` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can request a transfer.") | `toUserId` (uuid v4); `reason` (trimmed, non-empty, max 500) | `TransferDto`. **201**, "Transfer requested. It moves once an admin approves it." |
-| POST | `/leads/:id/reassign` | SA, MOD | same body: `toUserId`, `reason` | `{ reassigned: number, skipped: number }`. 200, "Leads reassigned." |
-| POST | `/projects/:id/leads/reassign` | SA, MOD | `toUserId`, `reason`, `leadIds` (array of uuid v4, 1–500, unique) | `{ reassigned, skipped }`. 200, "Leads reassigned." |
-| GET | `/transfers` | any | Query: pagination plus `status?` (TransferStatus), `projectId?` (uuid v4). Ordered by `createdAt` descending. Scope: SA sees all; MOD sees transfers in his projects; SP sees transfers where he is `fromUser` or `requestedBy`. | Paginated `TransferDto` |
+| POST | `/leads/:id/transfers` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can request a transfer.") | `toUserId` (uuid v4); `reason` (trimmed, non-empty, max 500); `handoverNote?` (string or null, trimmed, max 500, "" becomes null) | `TransferDto`. **201**, "Transfer requested. It moves once an admin approves it." |
+| POST | `/projects/:id/leads/request-by-phone` | **SP, MOD** (active member of the project, else 404; SA 403) | `phone` (string, non-empty, max 20; normalised like a lead's phone, else 400 "Enter a 10-digit Indian mobile number."); `reason` (trimmed, non-empty, max 500) | `TransferDto` (pending, `fromUser` = the owner, `toUser` = `requestedBy` = the caller). **201**, "Request sent. The lead moves to you once an admin approves it." |
+| POST | `/leads/:id/reassign` | SA, MOD | same body: `toUserId`, `reason`, `handoverNote?` | `{ reassigned: number, skipped: number }`. 200, "Leads reassigned." |
+| POST | `/projects/:id/leads/reassign` | SA, MOD | `toUserId`, `reason`, `handoverNote?`, `leadIds` (array of uuid v4, 1–500, unique) | `{ reassigned, skipped }`. 200, "Leads reassigned." |
+| GET | `/transfers` | any | Query: pagination plus `status?` (TransferStatus), `projectId?` (uuid v4). Ordered by `createdAt` descending. Scope: SA sees all; MOD sees transfers in his projects; SP sees transfers where he is `fromUser`, `toUser` or `requestedBy`. | Paginated `TransferDto` |
 | GET | `/transfers/pending-count` | any | | `{ pending: number }` |
 | GET | `/transfers/:id` | any (in scope, else 404) | | `TransferDto` |
 | POST | `/transfers/:id/approve` | SA, MOD | `note?` (string or null, max 500; "" becomes null) | `TransferDto`. 200, "Transfer approved." |
@@ -565,6 +593,22 @@ Transfer errors:
 - A moderator reassigning to or from himself: 403, "You cannot reassign a lead to or from yourself. Ask another admin."
 - Bulk reassign with leads not in the project: 404, "Some leads were not found in this project."
 - Single reassign where the recipient already owns the lead (skipped > 0): 422 RECIPIENT_INVALID.
+
+Request by phone (`POST /projects/:id/leads/request-by-phone`):
+- No live lead with that number in the project: 404 "Lead not found."
+- The caller already owns it: 409 `DUPLICATE_LEAD_OWN`, "You already have this lead.", `details: { leadId }`.
+- A pending transfer on it already: 409 `TRANSFER_PENDING`.
+- Closed project: 409 `PROJECT_CLOSED`.
+- It is decided by an admin like any request (`canDecide` is false for the requester, who is also `toUser`).
+
+Handover note: when `handoverNote` is sent, a pinned comment of kind `handover`, written by the caller, is added to the lead (request) or to every lead that actually moves (reassign; skipped leads get none). It shows in `GET /leads/:id/comments` and as the lead's `pinnedComment`.
+
+Transfer notifications (never to the person who acted):
+- A request (owner's or by phone): `transfer_requested` to every admin of the project (active super admins and active moderator members), link `/transfers`, `body` = the reason (first 140 chars). Title: "{requester} asked to move {lead} to {recipient}", or "{requester} asked for {lead}" when the requester is the recipient (by phone).
+- Approve: `lead_assigned` to the new owner ("{admin} assigned {lead} to you", link `/leads/:id`), and `transfer_decided` to the requester and the previous owner ("{admin} approved moving {lead} to {recipient}", link `/leads/:id`, `body` = decision note). Each person gets one: a requester who is also the new owner gets only `lead_assigned`.
+- Reject: `transfer_decided` to the requester and the owner ("{admin} rejected moving {lead} to {recipient}").
+- Reassign: one `lead_assigned` to the new owner. One lead moved: "{admin} assigned {lead} to you", link `/leads/:id`, `leadId` set. Several: "{admin} assigned {n} leads in {project} to you", link `/leads`, `leadId` null. `body` = the reason.
+- Automatic rejections (deactivation, removal, project closed, lead deleted, superseded) notify nobody.
 
 ### Me, timeline, dashboard (`modules/reports/reports.controller.ts`)
 
@@ -665,11 +709,12 @@ Transfer errors:
     ],
     "needsAttention": [
       {
-        "kind": "behind_target|overdue_pile|idle|stale_transfer",
+        "kind": "behind_target|overdue_pile|idle|stale_transfer|help_request",
         "user": "{id,name}|null",
         "projectName": "string|null",
         "detail": "...",
-        "leadCount": 0
+        "leadCount": 0,
+        "leadId": "uuid"
       }
     ],
     "loggedNothingToday": [
@@ -696,12 +741,14 @@ Transfer errors:
   - `trend` has one point per IST day in the range, zeros included, and `trendBucket` is `day`. When the range is longer than 92 days the points are Monday–Sunday weeks instead (`trendBucket` is `week`, at most 53 points); each point's `date` is the week's Monday, except the first, which is `from` when the range starts mid-week. `followUps` counts `follow_up` entries (filtered by who logged them), `newLeads` as above, `conversions` and `revenue` as above.
   - `lostReasons` counts `not_interested` and `lost` entries logged in the range by `reason` (null → `"unspecified"`), filtered by who logged them; only non-zero reasons, most common first.
   - `sources` counts leads created in the range by `source` (null → `"unspecified"`); only non-zero, most common first. With `userId` it follows the owner, like `funnel`.
-  - `needsAttention` is about **now**, not the date range (project and person filters still apply). At most 20 items, most severe first. Severity is how far past its threshold each item is (gap ÷ 20 points, overdue ÷ 5, idle days ÷ 2, hours ÷ 24), then by kind in the order listed, then name.
+  - `needsAttention` is about **now**, not the date range (project and person filters still apply). At most 20 items, most severe first. Severity is how far past its threshold each item is (gap ÷ 20 points, overdue ÷ 5, idle days ÷ 2, hours ÷ 24), then by kind (`help_request`, then the order listed), then name. A help request scores 10 + days waited, so it ranks above everything short of an extreme.
+    - `help_request`: one per unresolved help request (`POST /leads/:id/help`) on a live lead in an active project in scope, oldest first (at most 20 fetched). `user` = who asked, `projectName` set, `detail`: "Asked for help on {lead name}", `leadId` = the lead (present only on this kind). With `userId`, requests that person asked or that are on his leads. No `leadCount`.
     - `behind_target`: one per member target (active project) whose conversions share (`achieved / targetCount`, capped at 100%) is more than 20 percentage points behind the share of the current week or month gone. `detail`: "3 of 10 conversions with 65% of the week gone." No `leadCount`.
     - `overdue_pile`: one per owner and project with 5 or more overdue leads (`nextFollowUpDate` before today), counting only owners who are active users and active members of an active project. `leadCount` = the overdue leads. `detail`: "7 leads overdue for a follow-up."
-    - `idle`: one per active sales person or moderator who owns at least one lead in an active project in scope and has logged no entry in scope for 2 or more IST days (today counts as day 0, so nothing today or yesterday). Someone who never logged is counted from the day they joined. `projectName` is null when it spans several projects. `leadCount` = their open (non-terminal) leads in scope. `detail`: "No entry for 3 days." or "Nothing logged since joining 5 days ago."
+    - `idle`: one per active sales person or moderator, **not on leave today**, who owns at least one lead in an active project in scope and has logged no entry in scope for 2 or more IST days (today counts as day 0, so nothing today or yesterday). Someone who never logged is counted from the day they joined. `projectName` is null when it spans several projects. `leadCount` = their open (non-terminal) leads in scope. `detail`: "No entry for 3 days." or "Nothing logged since joining 5 days ago."
     - `stale_transfer`: one per pending transfer older than 24 hours, oldest first; `user` is the person it is from. With `userId`, transfers from or to that person. `detail`: "Transfer of Asha Patil to Priya Desai waiting 30 hours." No `leadCount`.
-    - `leadCount` is omitted (not null) where it does not apply.
+    - `leadCount` and `leadId` are omitted (not null) where they do not apply.
+  - `loggedNothingToday` leaves out anyone with an active leave covering today (IST).
   - `leadsByStatus` always contains all 7 statuses, zeros included.
   - `conversionsThisWeek` covers the current Monday–Sunday IST week, newest first, at most 500.
   - `message` is "No data for these dates." when both `newLeads` and `followUps` are 0.
@@ -720,6 +767,212 @@ Transfer errors:
 - `achieved` counts the current month for a monthly target; otherwise it counts the current week.
 - `progressPercent` is `round(achieved / targetCount * 100)`, or null when there is no target.
 - `periodEnd` is exclusive.
+
+---
+
+## 3a. Team collaboration (`06_team_collaboration.sql`)
+
+Leave and cover, comments and help on leads, in-app notifications, the roster, the leaderboard and message templates. "Admin of project P" means the Super Admin, or a moderator with an active membership in P. All dates are IST calendar days.
+
+### Leave (`modules/leaves/leaves.controller.ts`)
+**LeaveDto:**
+```json
+{
+  "id": "uuid",
+  "user": { "id": "...", "name": "..." },
+  "startsOn": "YYYY-MM-DD",
+  "endsOn": "YYYY-MM-DD",
+  "note": "string|null",
+  "createdBy": { "id": "...", "name": "..." },
+  "createdAt": "ISO"
+}
+```
+
+| Method | Path | Roles | Params / Body | data |
+|---|---|---|---|---|
+| POST | `/leaves` | any | `userId?` (uuid v4; omit or your own id for yourself); `startsOn` (YYYY-MM-DD); `endsOn` (YYYY-MM-DD); `note?` (string or null, trimmed, max 200, "" becomes null) | `LeaveDto`. **201**, "Leave saved." |
+| GET | `/leaves` | any | Query: `userId?` (uuid v4). **No pagination params.** | `LeaveDto[]`: not cancelled, `endsOn` today or later, by `startsOn` then name. |
+| DELETE | `/leaves/:id` | any | | `null`, "Leave cancelled." Sets `cancelled_at`; the row stays. |
+
+Who:
+- Booking for yourself: anyone. For someone else: the Super Admin (anyone), or a moderator for a sales person he manages (created by him, or sharing an active project). A sales person sending another `userId`: 403 "You can add leave only for yourself." A moderator outside his reach (another moderator, a sales person elsewhere): 403 "You can only manage sales persons you created or share a project with." Unknown or deleted user: 404. Deactivated user: 422 "Leave can be added only for an active user."
+- Listing: a sales person sees his own (another `userId`: 403). A moderator sees his own and those of people he manages (another `userId`: 404 "User not found."); without `userId`, all of those. The Super Admin sees everyone.
+- Cancelling: the person, or whoever could have booked it for him; otherwise (and for an already cancelled leave) 404 "Leave not found."
+
+Date rules (400 VALIDATION_FAILED unless noted):
+- `endsOn` before `startsOn`: "The last day of leave must be on or after the first."
+- `endsOn` more than 60 days after `startsOn` (`user_leaves_span_max`, so at most 61 days): "The last day of leave can be at most 60 days after the first."
+- `endsOn` before today: "A leave cannot end before today." A leave that started earlier is fine while it still covers today.
+- `startsOn` more than 365 days ahead: "A leave can start at most 365 days ahead."
+- Overlaps another active leave of the same person: **409** CONFLICT "This person already has leave on some of these days."
+
+"On leave today" means an active leave with `startsOn <= today <= endsOn`. It shows as `onLeave` on `MeDto` (plus `nextLeave`), `MemberDto`, `UserDto` and the roster. People on leave today are left out of the dashboard's `loggedNothingToday` and `needsAttention` `idle`.
+
+Booking a leave sends one `leave_cover` notification to each active backup of the person (in active projects where both are active members): title "{name} is on leave 14 Oct–16 Oct" (a single day: "on leave 14 Oct"), body "You're covering their follow-ups in {Project A, Project B}.", link `/home`.
+
+### Backups
+`PUT /projects/:id/members/:userId/backup` with `{ "backupUserId": "uuid|null" }` (key required).
+- Who: an admin of the project. A moderator may set it for sales persons and for himself only, else 403 "You can set backups only for sales persons in your projects and for yourself." A project he is not in: 404. A sales person: 403 (roles).
+- The member must be an active member (else 404 "This person is not a member of the project.").
+- The backup must be an active, undeleted user, an active member of the same project, not a Super Admin and not the member himself; else 422 UNPROCESSABLE "Choose an active member of this project as the backup — not this person, and not a Super Admin."
+- Closed project: 409 `PROJECT_CLOSED`.
+- Returns the admin view of `MemberDto` (with `backup` and `onLeave`).
+
+### Covering
+User A **covers** owner O in project P today when O has an active leave covering today, O's membership in P is active with `backup` = A, and A is an active member of P. It is checked on every request, never stored, so it ends with the leave, a cancellation, or a backup change.
+
+While covering, A:
+- sees O's leads in P: `GET /projects/:id/leads?coveringFor=<O>`, `GET /leads/:id`, `GET /leads/:id/entries`, `GET /entries/:id`, `GET /entries/:id/photo`, and the lead's comments;
+- logs follow-ups and status changes on them (`permissions.covering`, `canLogFollowUp`, `canChangeStatus` are true; `canEdit`, `canRequestTransfer`, `canReassign`, `canLeaveConverted` stay false). The entry's `user` is A and `coveringFor` is O; the lead stays O's, a conversion is credited to O (`convertedBy`), `lastActivityAt` moves. Door-to-door visits still need A's own capture token, photo and GPS;
+- may comment, be mentioned, and ask for help on them.
+
+Anyone else (another rep, a backup whose owner is not on leave) gets 404 on the lead and 403 on `coveringFor`.
+
+**GET `/me/covering`** (roles SP, MOD)
+- Query: `projectId?` (uuid v4; a project the caller cannot see gives 404). **No pagination.**
+- `data`, by owner name then project (active projects only):
+  ```json
+  [
+    {
+      "user": { "id": "...", "name": "..." },
+      "projectId": "...", "projectName": "...",
+      "leave": { "startsOn": "YYYY-MM-DD", "endsOn": "YYYY-MM-DD" },
+      "dueToday": 0,
+      "overdue": 0
+    }
+  ]
+  ```
+  - `dueToday`: the owner's open (non-terminal) leads in that project with `nextFollowUpDate <= today` (overdue included). `overdue`: `nextFollowUpDate < today`.
+
+### Comments, mentions, help (`modules/comments/comments.controller.ts`)
+Whoever may open the lead — the owner (active member), the project's admins, the backup covering for the owner — may read and write its comments. Anyone else gets **404** on every route below (a comment id included).
+
+**CommentDto:**
+```json
+{
+  "id": "uuid",
+  "kind": "comment|help|feedback|handover",
+  "body": "string",
+  "user": { "id": "...", "name": "..." },
+  "mentions": [ { "id": "...", "name": "..." } ],
+  "pinned": false,
+  "entryId": "uuid|null",
+  "resolvedAt": "ISO|null",
+  "resolvedBy": "{id,name}|null",
+  "createdAt": "ISO",
+  "editedAt": "ISO|null",
+  "canEdit": false,
+  "canDelete": false,
+  "canPin": false,
+  "canResolve": false
+}
+```
+- `canEdit`: the caller wrote it and the project is active. `canDelete`: the caller wrote it, or is the Super Admin. `canPin`: the project is active and the caller is the owner (active member) or an admin. `canResolve`: an unresolved `help` comment, the project is active, and the caller is an admin or wrote it.
+
+| Method | Path | Roles | Body | data |
+|---|---|---|---|---|
+| GET | `/leads/:id/comments` | any | | `CommentDto[]`, oldest first, deleted ones left out. **No pagination.** |
+| GET | `/leads/:id/mentionable` | any | | `PersonRefDto[]` by name: the lead's owner, the project's active moderators, and the owner's backup **while he is covering** — active users who are active members and can open the lead — never the caller. |
+| POST | `/leads/:id/comments` | any | `body` (trimmed, 1–2000); `mentionIds?` (uuid v4 array, unique, max 20, each from `mentionable`, else 400 VALIDATION_FAILED "You can mention only the lead’s owner, the project’s moderators and the backup covering for the owner."); `pinned?` (boolean; owner or admin, else 403 "Only the lead’s owner or an admin can pin a comment."); `kind?` (`comment` default, or `feedback`); `entryId?` (uuid v4; must be a live entry of this lead, else 400 "That entry is not part of this lead’s history.") | `CommentDto`. **201**, "Comment saved." |
+| PATCH | `/comments/:id` | any | `body?` (trimmed, 1–2000; author only, else 403 "Only the person who wrote this comment can edit it."; sets `editedAt`); `pinned?` (owner or admin). At least one, else 400 "Send a new text or pin setting to change." | `CommentDto`, "Comment saved." |
+| DELETE | `/comments/:id` | any | | `null`, "Comment deleted." Author or Super Admin, else 403 "Only the person who wrote this comment, or the Super Admin, can delete it." Soft delete. |
+| POST | `/leads/:id/help` | **SP, MOD** | `body` (trimmed, 1–2000) | `CommentDto` (kind `help`). **201**, "Your moderators have been asked for help." |
+| POST | `/comments/:id/resolve` | any | none | `CommentDto`. 200, "Help request resolved." |
+
+Rules:
+- `kind: "feedback"`: an admin of the project only (403 "Only an admin of the project can give feedback on an entry."), `entryId` required (400 "Choose the entry this feedback is about."). It appears in that entry's `feedback` everywhere `EntryDto` is returned.
+- Help: the owner (active member) or the backup covering for him, else 403 "Only the lead’s owner, or the backup covering for them, can ask for help." It mentions every active moderator of the project (except the caller). One open help per lead: 409 CONFLICT "A help request on this lead is already open." Unresolved help shows as `openHelp` on the lead and as a `help_request` item on the dashboard.
+- Resolve: an admin of the project or the person who asked (403 "Only an admin of the project or the person who asked can resolve this."). Not a help comment: 422 "Only a help request can be resolved." Already resolved: 409 "This help request is already resolved."
+- Writes (except DELETE) in a closed project: 409 `PROJECT_CLOSED`.
+
+Comment notifications (one per person, never the author; `link` `/leads/:id`, `leadId` set, `body` = first 140 characters of the comment):
+- `mention` to each mentioned person: "{author} mentioned you on {lead}".
+- `feedback` to the entry's author (if not already mentioned): "{author} left feedback on your entry for {lead}", link `/day?date=<entry's IST date>`.
+- `comment` to the lead's owner, if he can open the lead and was not already told: "{author} commented on {lead}".
+- `help_requested` to each mentioned moderator: "{asker} asked for help on {lead}".
+- `help_resolved` to the asker when someone else resolves it (and he can still open the lead): "{resolver} resolved your help request on {lead}". No body.
+
+### Notifications (`modules/notifications/notifications.controller.ts`)
+Private: every route reads or changes only the caller's own rows. Nobody, the Super Admin included, sees anyone else's.
+
+**NotificationDto:**
+```json
+{
+  "id": "uuid",
+  "kind": "<NotificationKind>",
+  "title": "Meera Nair mentioned you on Anil Sharma",
+  "body": "string|null",
+  "link": "/leads/<id>|/transfers|/leads|/home|/day?date=YYYY-MM-DD|null",
+  "actor": "{id,name}|null",
+  "leadId": "uuid|null",
+  "createdAt": "ISO",
+  "readAt": "ISO|null"
+}
+```
+
+| Method | Path | Roles | Params / Body | data |
+|---|---|---|---|---|
+| GET | `/notifications` | any | Query: pagination plus `unreadOnly?` ("true"/"false"). | Paginated `NotificationDto`, newest first. |
+| GET | `/notifications/unread-count` | any | | `{ count: number }` |
+| POST | `/notifications/read` | any | `ids?` (uuid v4 array, 1–100, unique; ids that are not the caller's are ignored) and/or `all?` (boolean). Neither: 400 "Send the ids to mark as read, or all: true." | `{ count: number }` = the caller's unread count afterwards. 200, "Marked as read." |
+
+What sends which kind: leave booked → `leave_cover`; transfers → `transfer_requested`, `transfer_decided`, `lead_assigned` (see *Transfer notifications*); comments → `mention`, `comment`, `feedback`, `help_requested`, `help_resolved`. The actor is never notified about his own action.
+
+### Team (`modules/team/team.controller.ts`)
+**GET `/projects/:id/leaderboard`** (any active member of the project, or the Super Admin; else 404)
+- Query: `period?` (`week` default, `month`; anything else 400).
+- `data`:
+  ```json
+  {
+    "period": "week|month",
+    "from": "YYYY-MM-DD",
+    "to": "YYYY-MM-DD",
+    "rows": [
+      { "user": { "id": "...", "name": "..." }, "role": "sales_person|moderator", "conversions": 0, "followUps": 0, "rank": 1, "isMe": false }
+    ]
+  }
+  ```
+  - `from`/`to`: the current Monday–Sunday week or calendar month, IST, inclusive.
+  - Rows: every active sales person and moderator with an active membership in the project. `conversions` = leads in the project credited to them (`convertedBy`) with `convertedAt` in the period; `followUps` = their `follow_up` entries in the project in the period (status changes not counted).
+  - Ordered by conversions desc, follow-ups desc, then name. `rank` starts at 1; equal conversions and follow-ups share a rank and the next one skips (1, 2, 2, 4). No revenue.
+
+**GET `/team/roster`** (roles SA, MOD)
+- Query: `projectId?` (uuid v4; a moderator's must be one of his projects, else 404). Without it: the caller's active projects (every active project for the Super Admin). **No pagination.**
+- `data`:
+  ```json
+  [
+    {
+      "user": { "id": "...", "name": "...", "phone": "string|null", "email": "..." },
+      "role": "sales_person|moderator",
+      "projects": [ { "id": "...", "name": "..." } ],
+      "onLeave": "LeaveSpanDto|null",
+      "nextLeave": "LeaveSpanDto|null",
+      "backup": "{id,name}|null",
+      "lastActivityAt": "ISO|null",
+      "followUpsToday": 0,
+      "openLeads": 0,
+      "dueToday": 0,
+      "overdue": 0,
+      "target": "{ count: number, period: 'weekly|monthly', achieved: number }|null"
+    }
+  ]
+  ```
+  - One row per active, undeleted sales person or moderator with an active membership in the projects in scope (deduplicated; `projects` lists those projects).
+  - Every count covers only the projects in scope: `lastActivityAt` = their latest entry; `followUpsToday` = `follow_up` entries today (IST); `openLeads` = owned non-terminal leads; `dueToday` = open leads with `nextFollowUpDate <= today` (overdue included); `overdue` = before today.
+  - `backup` and `target` only with `projectId` (else null). `target` is null when no target is set; `achieved` is the current week/month count as in `TargetProgressDto`.
+  - Sorted: people on leave today last, then `overdue` desc, then name.
+
+### Message templates (`modules/templates/templates.controller.ts`)
+**TemplateDto:** `{ "id": "uuid", "label": "string", "body": "string", "sort": 0 }`. The body keeps `{client}`, `{rep}` and `{business}` exactly as written; the app fills them in.
+
+| Method | Path | Roles | Body | data |
+|---|---|---|---|---|
+| GET | `/projects/:id/templates` | any (member of the project or SA, else 404) | | `TemplateDto[]` by `sort`, then label (case-insensitive). Deleted ones left out. |
+| POST | `/projects/:id/templates` | SA, MOD (admin of the project; a member who is not: 403; others 404) | `label` (trimmed, 1–40); `body` (trimmed, 1–1000); `sort?` (int 0–10000, default 0) | `TemplateDto`. **201**, "Template saved." |
+| PATCH | `/templates/:id` | SA, MOD (admin of the template's project; can't see the project: 404) | `label?`, `body?`, `sort?` (same rules). At least one, else 400 "Send a label, text or position to change." | `TemplateDto`, "Template saved." |
+| DELETE | `/templates/:id` | SA, MOD (same) | | `null`, "Deleted successfully." Soft delete; a deleted template is 404 afterwards. |
+
+Writes in a closed project: 409 `PROJECT_CLOSED`.
 
 ---
 
@@ -875,6 +1128,44 @@ Both are **`multipart/form-data`**. There is no base64 path. Parts:
 - ALREADY_ASSIGNED: "This project is already assigned to you."
 - TARGET_PAIR: "Set the target number and the period together, or clear both."
 - TARGET_NOT_ALLOWED: "You can set targets only for sales persons in your projects and for yourself."
+- BACKUP_NOT_ALLOWED: "You can set backups only for sales persons in your projects and for yourself."
+- BACKUP_INVALID: "Choose an active member of this project as the backup — not this person, and not a Super Admin."
+
+**LEAVE_ERROR**
+- NOT_FOUND: "Leave not found."
+- ONLY_SELF: "You can add leave only for yourself."
+- USER_INACTIVE: "Leave can be added only for an active user."
+- END_BEFORE_START: "The last day of leave must be on or after the first."
+- IN_PAST: "A leave cannot end before today."
+- TOO_LONG: "The last day of leave can be at most 60 days after the first."
+- TOO_FAR: "A leave can start at most 365 days ahead."
+- OVERLAP: "This person already has leave on some of these days."
+
+**COVER_ERROR**
+- NOT_COVERING: "You are not covering for this person in this project today."
+
+**COMMENT_ERROR**
+- NOT_FOUND: "Comment not found."
+- MENTION_INVALID: "You can mention only the lead’s owner, the project’s moderators and the backup covering for the owner."
+- PIN_NOT_ALLOWED: "Only the lead’s owner or an admin can pin a comment."
+- FEEDBACK_ADMIN_ONLY: "Only an admin of the project can give feedback on an entry."
+- FEEDBACK_NEEDS_ENTRY: "Choose the entry this feedback is about."
+- ENTRY_NOT_ON_LEAD: "That entry is not part of this lead’s history."
+- ONLY_AUTHOR_EDITS: "Only the person who wrote this comment can edit it."
+- ONLY_AUTHOR_DELETES: "Only the person who wrote this comment, or the Super Admin, can delete it."
+- NOTHING_TO_UPDATE: "Send a new text or pin setting to change."
+- HELP_OPEN: "A help request on this lead is already open."
+- HELP_NOT_ALLOWED: "Only the lead’s owner, or the backup covering for them, can ask for help."
+- NOT_HELP: "Only a help request can be resolved."
+- ALREADY_RESOLVED: "This help request is already resolved."
+- RESOLVE_NOT_ALLOWED: "Only an admin of the project or the person who asked can resolve this."
+
+**NOTIFICATION_ERROR**
+- NOTHING_TO_MARK: "Send the ids to mark as read, or all: true."
+
+**TEMPLATE_ERROR**
+- NOT_FOUND: "Template not found."
+- NOTHING_TO_UPDATE: "Send a label, text or position to change."
 
 **LOCATION_ERROR**
 - LENGTH: "Location must be 2 to 100 characters."
@@ -968,6 +1259,16 @@ The messages use the typographic apostrophe `’` in "lead’s".
 | TRANSFER_APPROVED | "Transfer approved." |
 | TRANSFER_REJECTED | "Transfer rejected." |
 | LEADS_REASSIGNED | "Leads reassigned." |
+| LEAVE_SAVED | "Leave saved." |
+| LEAVE_CANCELLED | "Leave cancelled." |
+| BACKUP_UPDATED | "Backup updated." |
+| COMMENT_SAVED | "Comment saved." |
+| COMMENT_DELETED | "Comment deleted." |
+| HELP_REQUESTED | "Your moderators have been asked for help." |
+| HELP_RESOLVED | "Help request resolved." |
+| NOTIFICATIONS_READ | "Marked as read." |
+| LEAD_REQUESTED | "Request sent. The lead moves to you once an admin approves it." |
+| TEMPLATE_SAVED | "Template saved." |
 | NOTHING_LOGGED | "Nothing logged on this day." |
 | NO_DATA | "No data for these dates." |
 | NO_PROJECTS | "You are not assigned to any project yet." |
@@ -1005,6 +1306,15 @@ The messages use the typographic apostrophe `’` in "lead’s".
 - EXPORT_MAX_DAYS **92**; EXPORT_MAX_ROWS **20,000**
 - BULK_REASSIGN_MAX_LEADS 500
 - Member target count: 1 to 100000
+
+**Team collaboration**
+- LEAVE_MAX_SPAN_DAYS **60** (from the first day to the last; at most 61 days), LEAVE_MAX_DAYS_AHEAD 365, LEAVE_NOTE_MAX_LENGTH 200
+- COMMENT_MAX_LENGTH 2000, COMMENT_MAX_MENTIONS 20, NOTIFICATION_PREVIEW_LENGTH 140 (notification `body`)
+- HANDOVER_NOTE_MAX_LENGTH 500
+- TEMPLATE_LABEL_MAX_LENGTH 40, TEMPLATE_BODY_MAX_LENGTH 1000, TEMPLATE_SORT_MAX 10000
+- NOTIFICATIONS_READ_MAX_IDS 100
+- ATTENTION_HELP_BASE_SEVERITY 10 (dashboard help requests; + 1 per day waiting)
+- Notification links (`NOTIFICATION_LINK`): `/home`, `/transfers`, `/leads`, `/leads/:id`, `/day?date=YYYY-MM-DD`
 
 **Lists, paging**
 - LEAD_DETAIL_RECENT_ENTRIES 20

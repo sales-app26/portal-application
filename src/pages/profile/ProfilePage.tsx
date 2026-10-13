@@ -12,7 +12,7 @@ import { TextField } from '@/components/ui/Field'
 import { ListGroup, ListRow } from '@/components/ui/ListRow'
 import { Confirm, ResponsiveOverlay } from '@/components/ui/Overlay'
 import { apiWithMessage } from '@/lib/api'
-import { formatPhone, normalizePhone, ROLE_LABEL } from '@/lib/format'
+import { formatDate, formatPhone, normalizePhone, ROLE_LABEL, todayIST } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import { Tag } from '@/components/ui/Display'
@@ -22,6 +22,8 @@ import { ProntteraMark } from '@/components/brand/Logo'
 import { Segmented } from '@/components/ui/Choice'
 import { getThemeChoice, setThemeChoice, type ThemeChoice } from '@/lib/theme'
 import { useInstall } from '@/hooks/useInstall'
+import { LeaveForm } from '@/features/team/LeaveForm'
+import { invalidateTeam, useLeaves } from '@/features/team/queries'
 import { Icon } from '@/icons'
 
 export function ProfilePage() {
@@ -62,14 +64,27 @@ export function ProfilePage() {
           </ListGroup>
         )}
 
+        {me.role !== 'super_admin' && <MyLeave />}
+        {me.role === 'sales_person' && (
+          <ListGroup title="Requests">
+            <ListRow icon="swap" title="My handovers" subtitle="Leads you asked to hand over or take, and what was decided" to="/transfers" chevron />
+          </ListGroup>
+        )}
+
         <ListGroup title="Account">
-          <ListRow icon="user-male-circle" title="Name and phone" subtitle={me.phone ? `${me.name} · ${formatPhone(me.phone)}` : me.name} chevron onClick={() => setEditOpen(true)} />
+          <ListRow
+            icon="user-male-circle"
+            title="Name and phone"
+            subtitle={me.phone ? `${me.name} · ${formatPhone(me.phone)}` : me.name}
+            chevron
+            onClick={() => setEditOpen(true)}
+          />
           <ListRow icon="info" title="Email" subtitle={me.email} />
           <ListRow icon="lock" title="Change password" chevron onClick={() => setPasswordOpen(true)} />
         </ListGroup>
 
         {me.projects.length > 0 && (
-          <ListGroup title="My projects">
+          <ListGroup title="My campaigns">
             {me.projects.map((p) => (
               <ListRow
                 key={p.id}
@@ -91,13 +106,13 @@ export function ProfilePage() {
               value={theme}
               onChange={(t) => (setTheme(t), setThemeChoice(t))}
               options={[
-                { value: 'system', label: 'System' },
+                { value: 'system', label: 'Auto' },
                 { value: 'light', label: 'Light' },
                 { value: 'dark', label: 'Dark' },
               ]}
               className="w-full"
             />
-            <p className="mt-2 px-1 text-caption text-muted">System follows your phone's light or dark setting. Dark is easier on the eyes at night.</p>
+            <p className="mt-2 px-1 text-caption text-muted">Auto follows your phone's light or dark setting. Dark is easier on the eyes at night.</p>
           </div>
         </section>
 
@@ -105,7 +120,7 @@ export function ProfilePage() {
           <ListRow
             icon="timeline"
             title="What’s new"
-            subtitle={latest ? `Version ${latest.version}` : 'Release notes'}
+            subtitle={latest ? `Version ${latest.version}` : 'Latest updates'}
             trailing={latest && latest.notify && !latest.seen ? <Tag>New</Tag> : undefined}
             to="/whats-new"
             chevron
@@ -131,8 +146,22 @@ export function ProfilePage() {
       <ResponsiveOverlay open={iosHelp} onOpenChange={setIosHelp} title="Install Pronttera Sales" description="Two taps in Safari." variant="short">
         <ol className="flex flex-col gap-4 pb-2">
           {[
-            { icon: 'share' as const, text: <>Tap <strong>Share</strong> in Safari's toolbar.</> },
-            { icon: 'add-square' as const, text: <>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</> },
+            {
+              icon: 'share' as const,
+              text: (
+                <>
+                  Tap <strong>Share</strong> in Safari's toolbar.
+                </>
+              ),
+            },
+            {
+              icon: 'add-square' as const,
+              text: (
+                <>
+                  Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
+                </>
+              ),
+            },
           ].map((step, i) => (
             <li key={i} className="flex items-center gap-3">
               <span className="flex size-10 flex-none items-center justify-center rounded-full bg-accent-soft text-primary">
@@ -144,7 +173,14 @@ export function ProfilePage() {
         </ol>
         <p className="mt-4 text-body-sm text-muted">Pronttera Sales then opens from its own icon, full screen, and keeps you signed in.</p>
       </ResponsiveOverlay>
-      <Confirm open={logoutOpen} onOpenChange={setLogoutOpen} title="Log out?" body="You'll need your email and password to sign in again." confirmLabel="Log out" onConfirm={logout} />
+      <Confirm
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Log out?"
+        body="You'll need your email and password to sign in again."
+        confirmLabel="Log out"
+        onConfirm={logout}
+      />
     </Page>
   )
 }
@@ -159,7 +195,11 @@ const profileSchema = z.object({
 
 function EditProfile({ open, onOpenChange, me }: { open: boolean; onOpenChange: (o: boolean) => void; me: Me }) {
   const qc = useQueryClient()
-  const { register, handleSubmit, formState, reset, setError } = useForm({ resolver: zodResolver(profileSchema), mode: 'onBlur', defaultValues: { name: me.name, phone: me.phone ?? '' } })
+  const { register, handleSubmit, formState, reset, setError } = useForm({
+    resolver: zodResolver(profileSchema),
+    mode: 'onBlur',
+    defaultValues: { name: me.name, phone: me.phone ?? '' },
+  })
 
   useEffect(() => {
     if (open) reset({ name: me.name, phone: me.phone ?? '' })
@@ -192,7 +232,17 @@ function EditProfile({ open, onOpenChange, me }: { open: boolean; onOpenChange: 
     >
       <form id="profile-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-1">
         <TextField label="Name" autoComplete="name" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
-        <TextField label="Phone" optional type="tel" inputMode="tel" autoComplete="tel-national" prefix="+91" enterKeyHint="done" error={formState.errors.phone?.message} {...register('phone')} />
+        <TextField
+          label="Phone"
+          optional
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel-national"
+          prefix="+91"
+          enterKeyHint="done"
+          error={formState.errors.phone?.message}
+          {...register('phone')}
+        />
       </form>
     </ResponsiveOverlay>
   )
@@ -244,9 +294,59 @@ function ChangePassword({ open, onOpenChange }: { open: boolean; onOpenChange: (
     >
       <form id="password-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-1">
         <TextField label="Current password" type="password" autoComplete="current-password" error={formState.errors.currentPassword?.message} {...register('currentPassword')} />
-        <TextField label="New password" type="password" autoComplete="new-password" hint="At least 8 characters." error={formState.errors.newPassword?.message} {...register('newPassword')} />
-        <TextField label="Confirm new password" type="password" autoComplete="new-password" enterKeyHint="done" error={formState.errors.confirm?.message} {...register('confirm')} />
+        <TextField
+          label="New password"
+          type="password"
+          autoComplete="new-password"
+          hint="At least 8 characters."
+          error={formState.errors.newPassword?.message}
+          {...register('newPassword')}
+        />
+        <TextField
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          enterKeyHint="done"
+          error={formState.errors.confirm?.message}
+          {...register('confirm')}
+        />
       </form>
     </ResponsiveOverlay>
+  )
+}
+
+/** Your leave: what's coming, cancel it, or mark new leave. Your backup covers meanwhile. */
+function MyLeave() {
+  const me = useMe()
+  const qc = useQueryClient()
+  const leaves = useLeaves(me.id)
+  const [marking, setMarking] = useState(false)
+  const cancel = async (id: string) => {
+    try {
+      await apiWithMessage(`/leaves/${id}`, { method: 'DELETE' })
+      toast.success('Leave cancelled.')
+      invalidateTeam(qc)
+    } catch (err) {
+      handleFormError(err)
+    }
+  }
+  return (
+    <ListGroup title="Leave">
+      {(leaves.data ?? []).map((l) => (
+        <ListRow
+          key={l.id}
+          icon="leave"
+          title={l.startsOn === l.endsOn ? formatDate(l.startsOn) : `${formatDate(l.startsOn)} – ${formatDate(l.endsOn)}`}
+          subtitle={l.note ?? (l.startsOn <= todayIST() ? 'On leave now' : 'Coming up')}
+          trailing={
+            <Button variant="tertiary" size="sm" onClick={() => void cancel(l.id)}>
+              Cancel
+            </Button>
+          }
+        />
+      ))}
+      <ListRow icon="plus-math" title="Mark leave" subtitle="Your backup covers your follow-ups while you're away" chevron onClick={() => setMarking(true)} />
+      <LeaveForm open={marking} onOpenChange={setMarking} />
+    </ListGroup>
   )
 }

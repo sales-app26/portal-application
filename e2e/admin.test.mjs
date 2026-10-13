@@ -13,7 +13,8 @@ const bodyOf = (api, pathEnd, method = 'POST') => {
   assert.ok(w, `${method} ${pathEnd} was sent`)
   return JSON.parse(w.body)
 }
-const visibleButtons = (page, text) => page.evaluate((t) => [...document.querySelectorAll('button, a')].filter((b) => b.textContent.trim() === t && b.getClientRects().length).length, text)
+const visibleButtons = (page, text) =>
+  page.evaluate((t) => [...document.querySelectorAll('button, a')].filter((b) => b.textContent.trim() === t && b.getClientRects().length).length, text)
 
 describe('dashboard', () => {
   test('phone: numbers, targets, logged-nothing list and people; no overflow', async () => {
@@ -21,7 +22,23 @@ describe('dashboard', () => {
     await go('/dashboard')
     await waitForText(page, 'Target vs achieved')
     const text = await page.evaluate(() => document.body.innerText)
-    for (const t of ['New leads', 'Pending transfers', 'Priya Desai', 'Logged nothing today', 'Karan Mehta', 'Conversions this week', 'Leads by status', 'Monthly revenue won', 'Funnel', 'Needs attention', '6 leads overdue', 'Why leads say no', 'Price too high', 'Where leads come from', 'Leaderboard'])
+    for (const t of [
+      'New leads',
+      'Handover requests',
+      'Priya Desai',
+      'Logged nothing today',
+      'Karan Mehta',
+      'Deals won this week',
+      'Leads by status',
+      'Monthly revenue won',
+      'Funnel',
+      'Needs attention',
+      '6 leads overdue',
+      'Why leads say no',
+      'Price too high',
+      'Where leads come from',
+      'Leaderboard',
+    ])
       assert.ok(text.includes(t), `shows ${t}`)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), PHONE.width)
     assert.deepEqual(errors, [])
@@ -33,7 +50,7 @@ describe('dashboard', () => {
     await go('/dashboard')
     await click(page, 'Filters', 'button[aria-label^="Filters"]')
     await click(page, 'Last 7 days')
-    await click(page, 'All my projects', 'button[aria-haspopup=listbox]')
+    await click(page, 'All my campaigns', 'button[aria-haspopup=listbox]')
     await click(page, 'Pune Retail Drive', '[role=option]')
     await click(page, 'Show results')
     // Wait for the request with both filters, rather than a fixed pause the refetch can miss.
@@ -53,7 +70,7 @@ describe('dashboard', () => {
     const { page, go, api } = await app.open(LAPTOP, { role: 'super_admin' })
     await go('/dashboard')
     await waitForText(page, 'Target vs achieved')
-    await mouseClick(page, 'button[aria-label="Export CSV"]')
+    await mouseClick(page, 'button[aria-label="Download report"]')
     await page.waitForSelector('[role=menuitem]')
     await mouseClick(page, '[role=menuitem]')
     await waitForText(page, 'Saved leads_')
@@ -66,9 +83,9 @@ describe('dashboard', () => {
     const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
     await go('/dashboard?from=2026-01-01&to=2026-10-01')
     await waitForText(page, 'Target vs achieved')
-    await click(page, 'Export CSV', 'button[aria-label="Export CSV"]')
-    await click(page, 'Export leads (CSV)', 'button')
-    await waitForText(page, 'An export can cover at most 92 days.')
+    await click(page, 'Download report', 'button[aria-label="Download report"]')
+    await click(page, 'Leads report', 'button')
+    await waitForText(page, 'A report can cover at most 92 days.')
     assert.equal(api.calls.filter((c) => c.path === '/exports/leads').length, 0)
     await page.close()
   })
@@ -81,8 +98,8 @@ describe('transfers', () => {
     await waitForText(page, 'Karan lives next to the shop.')
     assert.ok(await page.$('nav[aria-label=Main] a[href="/transfers"] .bg-down'), 'badge before')
     await click(page, 'Approve')
-    await waitForText(page, 'Transfer approved.')
-    await waitForText(page, 'No transfers waiting')
+    await waitForText(page, 'Handover approved.')
+    await waitForText(page, 'No handover requests')
     assert.ok(api.writes.some((w) => w.path === `/transfers/${ids.transfer}/approve`))
     await page.waitForFunction(() => !document.querySelector('nav[aria-label=Main] a[href="/transfers"] .bg-down'), { timeout: 3000 })
     assert.deepEqual(errors, [])
@@ -93,11 +110,11 @@ describe('transfers', () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
     await go('/transfers')
     await click(page, 'Reject')
-    await waitForText(page, 'Reject transfer')
+    await waitForText(page, 'Reject handover')
     await page.waitForSelector('textarea')
     await page.type('textarea', 'Priya keeps this one.')
-    await click(page, 'Reject transfer', 'button')
-    await waitForText(page, 'Transfer rejected.')
+    await click(page, 'Reject handover', 'button')
+    await waitForText(page, 'Handover rejected.')
     assert.equal(bodyOf(api, '/reject').note, 'Priya keeps this one.')
     await page.close()
   })
@@ -106,16 +123,16 @@ describe('transfers', () => {
 describe('people', () => {
   test('super admin adds a moderator with only the needed fields', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
-    await go('/people')
+    await go('/people?view=accounts')
     await waitForText(page, 'Priya Desai')
-    await click(page, 'Moderators', 'button[role=radio]')
+    await click(page, 'Sales managers', 'button[role=radio]')
     await waitForText(page, 'Farah Khan')
-    await click(page, 'Add moderator')
+    await click(page, 'Add sales manager')
     await waitForText(page, 'They get an email to set their password.')
     await fill(page, 'Name', 'Zoya Ali')
     await fill(page, 'Email', 'Zoya@Example.test')
     await click(page, 'Add and send invite')
-    await waitForText(page, 'An email has been sent to set the password.')
+    await waitForText(page, 'We’ve emailed them an invite to set a password.')
     const b = bodyOf(api, '/users')
     assert.deepEqual(b, { name: 'Zoya Ali', email: 'zoya@example.test', role: 'moderator' })
     await page.close()
@@ -124,27 +141,27 @@ describe('people', () => {
   test('an email that belongs to a deactivated user offers Reactivate', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
     await go('/people')
-    await click(page, 'Add sales person')
+    await click(page, 'Add sales rep')
     await fill(page, 'Name', 'Old Timer')
     await fill(page, 'Email', 'old@example.test')
     await click(page, 'Add and send invite')
-    await waitForText(page, 'Reactivate Old Timer')
-    await click(page, 'Reactivate Old Timer')
-    await waitForText(page, 'User reactivated.')
+    await waitForText(page, 'Bring Old Timer back to the team')
+    await click(page, 'Bring Old Timer back to the team')
+    await waitForText(page, 'Back on the team.')
     assert.ok(api.writes.some((w) => w.path.endsWith('/reactivate')))
     await page.close()
   })
 
   test('deactivate asks first and names the consequence', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
-    await go('/people')
+    await go('/people?view=accounts')
     await waitForText(page, 'Priya Desai')
     await clickNth(page, 'More actions', 0) // Priya's row, the first
-    await click(page, 'Deactivate', 'button')
-    await waitForText(page, 'Owner inactive')
+    await click(page, 'Remove from team', 'button')
+    await waitForText(page, 'Owner left the team')
     assert.equal(api.writes.filter((w) => w.path.endsWith('/deactivate')).length, 0, 'nothing sent yet')
-    await click(page, 'Deactivate Priya Desai')
-    await waitForText(page, 'User deactivated.')
+    await click(page, 'Remove Priya Desai')
+    await waitForText(page, 'Removed from the team.')
     await page.close()
   })
 })
@@ -154,18 +171,18 @@ describe('projects', () => {
     const { page, go } = await app.open(PHONE, { role: 'moderator' })
     await go('/projects')
     await waitForText(page, 'Pune Retail Drive')
-    assert.equal(await visibleButtons(page, 'New project'), 0)
-    assert.equal(await visibleButtons(page, 'Join a project'), 0)
+    assert.equal(await visibleButtons(page, 'New campaign'), 0)
+    assert.equal(await visibleButtons(page, 'Join a campaign'), 0)
     await page.close()
   })
 
   test('super admin creates a project and lands on it', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
     await go('/projects')
-    await click(page, 'New project')
+    await click(page, 'New campaign')
     await fill(page, 'Name', 'New Drive')
-    await click(page, 'Create project')
-    await waitForText(page, 'Project created.')
+    await click(page, 'Create campaign')
+    await waitForText(page, 'Campaign created.')
     const b = bodyOf(api, '/projects')
     assert.equal(b.name, 'New Drive')
     assert.equal(b.type, 'online')
@@ -210,7 +227,7 @@ describe('projects', () => {
     const menus = await page.$$('button[aria-label="More actions"]')
     await menus[1].evaluate((b) => b.click())
     await waitForText(page, 'View their day')
-    assert.equal(await visibleButtons(page, 'Remove from project'), 0)
+    assert.equal(await visibleButtons(page, 'Remove from campaign'), 0)
     assert.equal(await visibleButtons(page, 'Set target'), 0, "another moderator's target is the Super Admin's to set")
     await page.close()
   })
@@ -219,20 +236,20 @@ describe('projects', () => {
     const { page, go, api } = await app.open(PHONE, { role: 'moderator' })
     await go(`/projects/${ids.online}?tab=leads`)
     await waitForText(page, 'Asha Patil')
-    await click(page, 'Reassign') // enters selection mode
+    await click(page, 'Assign') // enters selection mode
     const rows = await page.$$('[role=checkbox]')
     assert.equal(rows.length, 4)
     await rows[0].evaluate((r) => r.click())
     await rows[1].evaluate((r) => r.click())
     await waitForText(page, '2 selected')
-    await click(page, 'Reassign 2')
-    await waitForText(page, 'Reassign 2 leads')
+    await click(page, 'Assign 2')
+    await waitForText(page, 'Assign 2 leads')
     await click(page, 'Choose a person', 'button[aria-haspopup=listbox]')
-    await click(page, 'PDPriya DesaiSales Person', '[role=option]') // initials + name + role line
+    await click(page, 'PDPriya DesaiSales rep', '[role=option]') // initials + name + role line
     await page.waitForSelector('textarea')
     await page.type('textarea', 'Priya covers this area now.')
-    await click(page, 'Reassign', 'button')
-    await waitForText(page, '2 leads reassigned.')
+    await click(page, 'Assign', 'button')
+    await waitForText(page, '2 leads assigned.')
     const b = bodyOf(api, '/leads/reassign')
     assert.equal(b.leadIds.length, 2)
     assert.equal(b.toUserId, ids.priya)
@@ -243,11 +260,11 @@ describe('projects', () => {
   test('closing a project asks first and explains what happens', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
     await go(`/projects/${ids.online}?tab=settings`)
-    await click(page, 'Close project', 'button span.text-title-sm') // the row's title, not its subtitle
-    await waitForText(page, 'Pending transfers are rejected')
+    await click(page, 'Close campaign', 'button span.text-title-sm') // the row's title, not its subtitle
+    await waitForText(page, 'Handover requests are rejected')
     assert.equal(api.writes.filter((w) => w.path.endsWith('/close')).length, 0)
-    await click(page, 'Close project', '[role=dialog] button')
-    await waitForText(page, 'Project closed. It is now read-only.')
+    await click(page, 'Close campaign', '[role=dialog] button')
+    await waitForText(page, 'Campaign closed. It can still be viewed, but not changed.')
     await page.close()
   })
 })
@@ -260,16 +277,19 @@ describe('single lead admin actions', () => {
     await go(`/leads/${lead}`)
     await waitForText(page, 'Asha Patil')
     await clickNth(page, 'More actions', 0)
-    await click(page, 'Reassign', 'button')
-    await waitForText(page, 'Reassign 1 lead')
+    await click(page, 'Assign to…', 'button')
+    await waitForText(page, 'Assign 1 lead')
     await click(page, 'Choose a person', 'button[aria-haspopup=listbox]')
     const options = await page.$$eval('[role=option]', (o) => o.map((e) => e.textContent))
     assert.ok(options.length > 0 && options.every((t) => !t.includes('Ravi')), 'current owner not offered')
-    await click(page, options.find((t) => t.includes('Priya')), '[role=option]')
-    await page.waitForSelector('textarea')
-    await page.type('textarea', 'Moving to the area owner.')
-    await click(page, 'Reassign', 'button')
-    await waitForText(page, '1 lead reassigned.')
+    await click(
+      page,
+      options.find((t) => t.includes('Priya')),
+      '[role=option]',
+    )
+    await fill(page, 'Reason', 'Moving to the area owner.') // the lead page also has the team-notes box
+    await click(page, 'Assign', 'button')
+    await waitForText(page, '1 lead assigned.')
     const w = api.writes.find((x) => x.path === `/leads/${lead}/reassign`)
     assert.deepEqual(JSON.parse(w.body), { toUserId: ids.priya, reason: 'Moving to the area owner.' })
     await page.close()
@@ -280,7 +300,7 @@ describe('single lead admin actions', () => {
     await t.go(`/leads/${lead}`)
     await waitForText(t.page, 'Asha Patil')
     await clickNth(t.page, 'More actions', 0)
-    await waitForText(t.page, 'Reassign')
+    await waitForText(t.page, 'Assign to…')
     assert.equal(await visibleButtons(t.page, 'Delete lead'), 0, 'moderator has no delete')
     await t.page.close()
 
@@ -300,18 +320,18 @@ describe('single lead admin actions', () => {
   test('super admin can delete a history entry; others cannot', async () => {
     const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
     await go(`/leads/${lead}`)
-    await waitForText(page, 'Delete entry')
-    await click(page, 'Delete entry', 'button')
-    await waitForText(page, 'A correct entry has to be logged again.')
-    await click(page, 'Delete entry', '[role=dialog] button')
-    await waitForText(page, 'Deleted successfully.')
+    await waitForText(page, 'Delete follow-up')
+    await click(page, 'Delete follow-up', 'button')
+    await waitForText(page, 'A correct follow-up has to be logged again.')
+    await click(page, 'Delete follow-up', '[role=dialog] button')
+    await waitForText(page, 'Removed.')
     assert.ok(api.writes.some((w) => w.method === 'DELETE' && w.path.startsWith('/entries/')))
     await page.close()
 
     const mod = await app.open(PHONE, { role: 'moderator' })
     await mod.go(`/leads/${lead}`)
     await waitForText(mod.page, 'History')
-    assert.equal(await visibleButtons(mod.page, 'Delete entry'), 0)
+    assert.equal(await visibleButtons(mod.page, 'Delete follow-up'), 0)
     await mod.page.close()
   })
 })
@@ -320,7 +340,7 @@ describe('roles and navigation', () => {
   test('super admin gets Dashboard, Projects, People, Transfers in the bar', async () => {
     const { page, go } = await app.open(PHONE, { role: 'super_admin' })
     await go('/')
-    await waitForText(page, 'Dashboard')
+    await waitForText(page, 'Sales overview')
     // Rail and drawer are in the DOM but hidden on a phone: only the visible bar counts.
     const hrefs = await page.$$eval('nav[aria-label=Main] a', (as) => as.filter((a) => a.getClientRects().length).map((a) => a.getAttribute('href')))
     assert.deepEqual(hrefs, ['/dashboard', '/projects', '/people', '/transfers', '/more'])
