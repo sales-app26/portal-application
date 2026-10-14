@@ -1092,6 +1092,33 @@ Errors: unknown or removed offer 404 "We couldn't find this offer."; percent out
 
 ---
 
+## 3c. Training (`09_training.sql`, `modules/training/*`)
+
+Courses live in a library (Super Admin); each campaign attaches courses and may add its own lessons (its admins). Lesson `kind`: `video` (YouTube link + optional checks), `document` (PDF/image in the private bucket, or a link), `card` (Markdown), `quiz`, `roleplay` (practice pitch with an AI owner, via Claude). `step`: `watch · practise · prove · field · library`.
+
+| Method & path | Who | Notes |
+|---|---|---|
+| `GET /training/courses` | SA (all), moderator (published) | `CourseDto[]` |
+| `POST /training/courses` · `PATCH/DELETE /training/courses/:id` | SA | Delete hides and detaches; progress stays |
+| `GET /training/courses/:id` | SA; moderator if published | `{ course, lessons: LessonDto[] }`, answers and hidden role-play instructions included |
+| `POST /training/courses/:id/items` | SA | `CreateLessonDto { kind, step?, title, summary?, sort?, required?, minutes?, payload }` |
+| `GET/PATCH/DELETE /training/items/:id` | SA; a campaign lesson's admins | |
+| `POST /training/items/:id/file` | same | multipart `file`: PDF, JPG, PNG, WebP ≤ 20 MB |
+| `GET/PUT /projects/:id/training/courses` | campaign admins | PUT `{ courseIds }` replaces the list; published courses only |
+| `GET/POST /projects/:id/training/items` | campaign admins | campaign-only lessons |
+| `GET /projects/:id/training` | members, SA | `CampaignTrainingDto`: syllabus with my progress, `certifiedAt`, `roleplayLeftToday`. No answers |
+| `GET /projects/:id/training/board` | campaign admins | every member × lessons, best scores, recent pitches |
+| `POST /training/items/:id/progress` | members | `{ projectId, percent?, positionSeconds?, done? }`: video ≥ 90% or `done` (no checks); document/card `done` |
+| `POST /training/items/:id/attempts` | members | `{ projectId, answers }` for a quiz (3 tries/day until passed) or a video's checks (all right) |
+| `GET /training/items/:id/file?projectId=` | members | short-lived signed link |
+| `POST /training/items/:id/roleplay` | members | `{ projectId }` starts a pitch (`ROLEPLAY_DAILY_LIMIT` a day); the owner speaks first |
+| `GET /training/items/:id/roleplay?projectId=` | members | my pitches for the lesson |
+| `GET /roleplay/:id` | its rep, campaign admins | |
+| `POST /roleplay/:id/turns` | its rep | `{ message }` (≤ 800 chars), at most `ROLEPLAY_MAX_TURNS` |
+| `POST /roleplay/:id/finish` | its rep | coach score 0–100 + feedback; ≥ pass score completes the lesson |
+
+Finishing the last required lesson writes a certificate once and sends the campaign's managers a `training` notification (link `/projects/:id?tab=training`). Role-play answers `422` when `ANTHROPIC_API_KEY` is empty, `429` past the daily cap, `502` when Claude can't answer (nothing is saved, resend).
+
 ## 4. Door-to-door visit flow
 
 **Step 1: get a capture token.** Call `POST /api/v1/visits/capture-token` (SP or MOD, no body) when the camera opens, and **again on every retake**.

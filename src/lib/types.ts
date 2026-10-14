@@ -269,7 +269,7 @@ export interface LeadComment {
   canResolve: boolean
 }
 
-export type NotificationKind = 'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover'
+export type NotificationKind = 'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover' | 'training'
 
 export interface AppNotification {
   id: string
@@ -622,4 +622,196 @@ export interface Offer {
   endsOn: string | null
   /** False once the sales head ends it. */
   active: boolean
+}
+
+// ---------------------------------------------------------------- training
+
+export type TrainingKind = 'video' | 'document' | 'card' | 'quiz' | 'roleplay'
+export type TrainingStep = 'watch' | 'practise' | 'prove' | 'field' | 'library'
+
+export interface Course {
+  id: string
+  title: string
+  description: string | null
+  published: boolean
+  lessonCount: number
+  campaignCount: number
+  updatedAt: string
+}
+
+export interface QuizQuestion {
+  id: string
+  text: string
+  options: string[]
+  /** Only in the admin's full lesson, never in a rep's. */
+  answer?: number
+  explanation?: string | null
+}
+
+export interface RoleplayPersona {
+  name: string
+  shop: string
+  city: string
+  about: string
+}
+
+/** A lesson in full, for admins to edit (answers and hidden instructions included). */
+export interface Lesson {
+  id: string
+  courseId: string | null
+  projectId: string | null
+  step: TrainingStep
+  kind: TrainingKind
+  title: string
+  summary: string | null
+  sort: number
+  required: boolean
+  minutes: number | null
+  payload: Record<string, unknown>
+  hasFile: boolean
+}
+
+export interface CourseDetail {
+  course: Course
+  lessons: Lesson[]
+}
+
+export interface LessonProgress {
+  percent: number
+  positionSeconds: number | null
+  bestScore: number | null
+  attempts: number
+  completedAt: string | null
+}
+
+export interface VideoContent {
+  youtubeId: string
+  thumbnailUrl: string
+  startSeconds: number | null
+  endSeconds: number | null
+  checks: QuizQuestion[]
+}
+export interface DocumentContent {
+  link: string | null
+  note: string | null
+  fileName: string | null
+  contentType: string | null
+  sizeBytes: number | null
+  hasFile: boolean
+}
+export interface CardContent {
+  markdown: string
+}
+export interface QuizContent {
+  passPercent: number
+  questions: QuizQuestion[]
+}
+export interface RoleplayContent {
+  persona: RoleplayPersona
+  brief: string
+  language: 'en' | 'hinglish'
+  rubric: string[]
+  passScore: number
+}
+
+/** A lesson as a rep sees it: no answers. `content` follows `kind`. */
+export interface LearnerLesson {
+  id: string
+  courseId: string | null
+  kind: TrainingKind
+  step: TrainingStep
+  title: string
+  summary: string | null
+  minutes: number | null
+  required: boolean
+  content: Record<string, unknown>
+  progress: LessonProgress
+}
+
+export interface CampaignTraining {
+  projectId: string
+  projectName: string
+  canManage: boolean
+  certifiedAt: string | null
+  requiredCount: number
+  doneCount: number
+  percent: number
+  roleplayEnabled: boolean
+  roleplayLeftToday: number
+  courses: { id: string; title: string; description: string | null; lessons: LearnerLesson[] }[]
+  campaignLessons: LearnerLesson[]
+}
+
+export interface GradedAnswer {
+  questionId: string
+  correct: boolean
+  answer: number
+  explanation: string | null
+}
+
+export interface AttemptResult {
+  score: number
+  passed: boolean
+  results: GradedAnswer[]
+  progress: LessonProgress
+  attemptsLeftToday: number | null
+  certifiedNow: boolean
+}
+
+export interface LessonDone {
+  progress: LessonProgress
+  certifiedNow: boolean
+}
+
+export interface RoleplayTurn {
+  role: 'rep' | 'owner'
+  text: string
+  at: string
+}
+
+export interface RoleplayFeedback {
+  summary: string
+  strengths: string[]
+  improvements: string[]
+  criteria: { criterion: string; met: boolean; note: string }[]
+}
+
+export interface RoleplaySession {
+  id: string
+  itemId: string
+  projectId: string
+  userId: string
+  userName: string
+  lessonTitle: string
+  persona: RoleplayPersona
+  turns: RoleplayTurn[]
+  repTurns: number
+  maxTurns: number
+  finished: boolean
+  score: number | null
+  passScore: number
+  passed: boolean | null
+  feedback: RoleplayFeedback | null
+  startedAt: string
+  finishedAt: string | null
+  certifiedNow: boolean
+}
+
+export interface TrainingBoard {
+  lessons: { id: string; title: string; kind: TrainingKind; required: boolean }[]
+  members: {
+    userId: string
+    name: string
+    role: UserRole
+    doneCount: number
+    requiredCount: number
+    percent: number
+    certifiedAt: string | null
+    quizBest: number | null
+    practiceBest: number | null
+    practiceCount: number
+    lastActivityAt: string | null
+    completedLessonIds: string[]
+  }[]
+  recentPitches: { id: string; userId: string; userName: string; lessonTitle: string; score: number | null; startedAt: string; finishedAt: string | null }[]
 }

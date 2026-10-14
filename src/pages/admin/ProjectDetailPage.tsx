@@ -6,6 +6,7 @@ import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { BackupPicker } from '@/features/team/BackupPicker'
 import { TemplatesManager } from '@/features/team/TemplatesManager'
+import { CampaignTrainingTab } from '@/features/training/CampaignTrainingTab'
 import { LeaveForm } from '@/features/team/LeaveForm'
 import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -28,14 +29,14 @@ import { formatDate, ROLE_LABEL, STATUS_LABEL, STATUSES } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import type { LeadStatus, Member, Project } from '@/lib/types'
 
-type Tab = 'members' | 'leads' | 'messages' | 'settings'
+type Tab = 'members' | 'leads' | 'training' | 'messages' | 'settings'
 
 export function ProjectDetailPage() {
   const { id } = useParams()
   const me = useMe()
   const isSuper = me.role === 'super_admin'
   const [params, setParams] = useSearchParams()
-  const tab = (['members', 'leads', 'messages', 'settings'] as const).find((t) => t === params.get('tab') && (t !== 'settings' || isSuper)) ?? 'members'
+  const tab = (['members', 'leads', 'training', 'messages', 'settings'] as const).find((t) => t === params.get('tab') && (t !== 'settings' || isSuper)) ?? 'members'
   const project = useProjectDetail(id)
   const p = project.data
   const notFound = project.error instanceof ApiError && project.error.code === 'NOT_FOUND'
@@ -67,6 +68,7 @@ export function ProjectDetailPage() {
             options={[
               { value: 'members', label: `Team · ${p.memberCount}` },
               { value: 'leads', label: `Leads · ${p.leadCount}` },
+              { value: 'training', label: 'Training' },
               { value: 'messages', label: 'Messages' },
               ...(isSuper ? [{ value: 'settings' as Tab, label: 'Settings' }] : []),
             ]}
@@ -74,6 +76,7 @@ export function ProjectDetailPage() {
           />
           {tab === 'members' && <MembersTab project={p} />}
           {tab === 'leads' && <LeadsTab project={p} />}
+          {tab === 'training' && <CampaignTrainingTab project={p} />}
           {tab === 'messages' && <TemplatesManager projectId={p.id} canEdit={p.status === 'active'} />}
           {tab === 'settings' && isSuper && <SettingsTab project={p} />}
         </div>

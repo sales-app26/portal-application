@@ -72,6 +72,12 @@ export const ICONS = {
   mention: ['at'],
   templates: ['comments'],
   shield: ['shield-check'],
+  learn: ['graduation-cap'],
+  play: ['circle-play', 'circle-play-fill'],
+  book: ['book-open'],
+  quiz: ['square-check'],
+  microphone: ['microphone'],
+  bulb: ['bulb'],
 }
 
 const symbol = (id, file) => {

@@ -467,6 +467,75 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     },
   ]
   const templates = []
+  // Training: one course with a field card, a video with a check, a 2-question quiz and a practice pitch.
+  const training = {
+    course: { id: 'course-1', title: 'Frostique: core sales training', description: 'How to sell Frostique.', published: true, lessonCount: 4, campaignCount: 1, updatedAt: iso() },
+    lessons: [
+      { id: 'les-card', courseId: 'course-1', kind: 'card', step: 'field', title: 'The 25-minute visit', summary: 'Five steps, every visit.', minutes: 2, required: true, content: { markdown: '## The visit\n\n1. **Hook**\n2. **Discovery**' } },
+      {
+        id: 'les-video',
+        courseId: 'course-1',
+        kind: 'video',
+        step: 'watch',
+        title: 'Frostique in 90 seconds',
+        summary: null,
+        minutes: 2,
+        required: true,
+        content: { youtubeId: 'aqz-KE-bpKQ', thumbnailUrl: '', startSeconds: null, endSeconds: null, checks: [{ id: 'c1', text: 'What does Frostique take as commission?', options: ['Nothing', '25%'] }] },
+      },
+      {
+        id: 'les-quiz',
+        courseId: 'course-1',
+        kind: 'quiz',
+        step: 'prove',
+        title: 'The rep quiz',
+        summary: null,
+        minutes: 5,
+        required: true,
+        content: {
+          passPercent: 50,
+          questions: [
+            { id: 'q1', text: 'A shop has 3 branches. Which plan?', options: ['Growth', 'Pro'] },
+            { id: 'q2', text: 'Where does the demo start?', options: ['On their phone', 'On your laptop'] },
+          ],
+        },
+      },
+      {
+        id: 'les-pitch',
+        courseId: 'course-1',
+        kind: 'roleplay',
+        step: 'practise',
+        title: 'Pitch Ravi: single bakery',
+        summary: null,
+        minutes: 8,
+        required: true,
+        content: { persona: { name: 'Ravi Shinde', shop: 'Shinde Cake House', city: 'Pune', about: 'On Zomato.' }, brief: 'Get Ravi to start a free trial.', language: 'hinglish', rubric: ['Asked how orders come in'], passScore: 70 },
+      },
+    ],
+    answers: { 'les-video': [0], 'les-quiz': [1, 0] },
+    explanations: { q1: 'More than one branch means Pro.', q2: 'Phone first.', c1: 'No commission.' },
+    done: {},
+    best: {},
+    pitch: null,
+  }
+  const lessonProgress = (id) => ({ percent: training.done[id] ? 100 : 0, positionSeconds: null, bestScore: training.best[id] ?? null, attempts: 0, completedAt: training.done[id] ?? null })
+  const campaignTraining = (projectId) => {
+    const lessons = training.lessons.map((l) => ({ ...l, progress: lessonProgress(l.id) }))
+    const done = lessons.filter((l) => l.progress.completedAt).length
+    return {
+      projectId,
+      projectName: 'Pune Retail Drive',
+      canManage: role !== 'sales_person',
+      certifiedAt: done === lessons.length ? iso() : null,
+      requiredCount: lessons.length,
+      doneCount: done,
+      percent: Math.round((done / lessons.length) * 100),
+      roleplayEnabled: true,
+      roleplayLeftToday: 3,
+      courses: [{ id: 'course-1', title: training.course.title, description: training.course.description, lessons }],
+      campaignLessons: [],
+    }
+  }
   const roster = () => [
     {
       user: { id: ids.priya, name: 'Priya Desai', phone: '9811111111', email: 'priya@example.test' },
@@ -802,6 +871,80 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       return ok(t, 'Ready message saved.', 201)
     }
     if ((m = p.match(/^\/templates\/([^/]+)$/))) return ok(templates[0] ?? null, 'Ready message saved.')
+    if ((m = p.match(/^\/projects\/([^/]+)\/training$/))) return ok(campaignTraining(m[1]))
+    if ((m = p.match(/^\/projects\/([^/]+)\/training\/board$/)))
+      return ok({
+        lessons: training.lessons.map(({ id, title, kind, required }) => ({ id, title, kind, required })),
+        members: [
+          { userId: ids.me, name: 'Ravi Kumar', role: 'sales_person', doneCount: 4, requiredCount: 4, percent: 100, certifiedAt: iso(), quizBest: 100, practiceBest: 82, practiceCount: 2, lastActivityAt: iso(), completedLessonIds: [] },
+          { userId: ids.priya, name: 'Priya Desai', role: 'sales_person', doneCount: 1, requiredCount: 4, percent: 25, certifiedAt: null, quizBest: null, practiceBest: null, practiceCount: 0, lastActivityAt: iso(), completedLessonIds: [] },
+        ],
+        recentPitches: [{ id: 'pitch-1', userId: ids.me, userName: 'Ravi Kumar', lessonTitle: 'Pitch Ravi: single bakery', score: 82, startedAt: iso(), finishedAt: iso() }],
+      })
+    if ((m = p.match(/^\/projects\/([^/]+)\/training\/courses$/))) return ok(method === 'PUT' ? [training.course] : [training.course], method === 'PUT' ? 'Campaign training updated.' : undefined)
+    if ((m = p.match(/^\/projects\/([^/]+)\/training\/items$/))) return method === 'POST' ? ok({ id: 'les-local', ...json() }, 'Lesson saved.', 201) : ok([])
+    if (p === '/training/courses') return method === 'POST' ? ok({ ...training.course, id: 'course-2', ...json(), published: false, lessonCount: 0, campaignCount: 0 }, 'Course saved.', 201) : ok([training.course])
+    if ((m = p.match(/^\/training\/courses\/([^/]+)$/)))
+      return ok({ course: training.course, lessons: training.lessons.map((l) => ({ ...l, projectId: null, sort: 0, payload: l.content, hasFile: false })) })
+    if ((m = p.match(/^\/training\/items\/([^/]+)\/progress$/))) {
+      training.done[m[1]] = iso()
+      return ok({ progress: lessonProgress(m[1]), certifiedNow: false })
+    }
+    if ((m = p.match(/^\/training\/items\/([^/]+)\/attempts$/))) {
+      const lesson = training.lessons.find((l) => l.id === m[1])
+      const qs = lesson.kind === 'quiz' ? lesson.content.questions : lesson.content.checks
+      const key = training.answers[m[1]]
+      const given = json().answers
+      const results = qs.map((q, i) => ({ questionId: q.id, correct: given[i] === key[i], answer: key[i], explanation: training.explanations[q.id] ?? null }))
+      const score = Math.round((results.filter((r) => r.correct).length / qs.length) * 100)
+      const passed = score >= (lesson.kind === 'quiz' ? lesson.content.passPercent : 100)
+      if (passed) training.done[m[1]] = iso()
+      training.best[m[1]] = Math.max(training.best[m[1]] ?? 0, score)
+      return ok({ score, passed, results, progress: lessonProgress(m[1]), attemptsLeftToday: lesson.kind === 'quiz' ? 2 : null, certifiedNow: false })
+    }
+    if ((m = p.match(/^\/training\/items\/([^/]+)\/roleplay$/))) {
+      if (method === 'GET') return ok([])
+      training.pitch = {
+        id: 'pitch-2',
+        itemId: m[1],
+        projectId: ids.online,
+        userId: ids.me,
+        userName: 'Ravi Kumar',
+        lessonTitle: 'Pitch Ravi: single bakery',
+        persona: { name: 'Ravi Shinde', shop: 'Shinde Cake House', city: 'Pune', about: 'On Zomato.' },
+        turns: [{ role: 'owner', text: 'Haan bolo, kya bechne aaye ho?', at: iso() }],
+        repTurns: 0,
+        maxTurns: 16,
+        finished: false,
+        score: null,
+        passScore: 70,
+        passed: null,
+        feedback: null,
+        startedAt: iso(),
+        finishedAt: null,
+        certifiedNow: false,
+      }
+      return ok(training.pitch, undefined, 201)
+    }
+    if ((m = p.match(/^\/roleplay\/([^/]+)\/turns$/))) {
+      const pitch = training.pitch
+      pitch.turns = [...pitch.turns, { role: 'rep', text: json().message, at: iso() }, { role: 'owner', text: 'Zomato pe toh customer already hain. Phir yeh kyun?', at: iso() }]
+      pitch.repTurns += 1
+      return ok({ ...pitch })
+    }
+    if ((m = p.match(/^\/roleplay\/([^/]+)\/finish$/))) {
+      const pitch = training.pitch
+      Object.assign(pitch, {
+        finished: true,
+        score: 82,
+        passed: true,
+        finishedAt: iso(),
+        feedback: { summary: 'You asked about his orders first. Good.', strengths: [], improvements: ['Ask for the trial earlier.'], criteria: [{ criterion: 'Asked how orders come in', met: true, note: 'Asked about Zomato orders.' }] },
+      })
+      training.done[pitch.itemId] = iso()
+      return ok({ ...pitch })
+    }
+    if ((m = p.match(/^\/roleplay\/([^/]+)$/))) return ok(training.pitch ?? { ...training.lessons[3], id: m[1] })
     if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)\/backup$/))) return ok(null, 'Backup updated.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/request-by-phone$/))) return ok(transfers[0], 'Request sent. The lead moves to you once a manager approves it.', 201)
 

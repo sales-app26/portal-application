@@ -68,6 +68,12 @@ export type IconName =
   | 'mention'
   | 'templates'
   | 'shield'
+  | 'learn'
+  | 'play'
+  | 'book'
+  | 'quiz'
+  | 'microphone'
+  | 'bulb'
 
 interface IconProps {
   name: IconName

@@ -98,6 +98,8 @@ export const router = createBrowserRouter([
               { path: 'whats-new', lazy: async () => ({ Component: (await import('@/pages/misc/WhatsNewPage')).WhatsNewPage }) },
 
               { path: 'day', lazy: async () => ({ Component: (await import('@/pages/timeline/MyDayPage')).MyDayPage }) },
+              { path: 'learn', lazy: async () => ({ Component: (await import('@/pages/training/LearnPage')).LearnPage }) },
+              { path: 'learn/:lessonId', lazy: async () => ({ Component: (await import('@/pages/training/LessonPage')).LessonPage }) },
               { path: 'entries/:id', lazy: async () => ({ Component: (await import('@/pages/timeline/EntryPage')).EntryPage }) },
               {
                 path: 'leads',
@@ -137,6 +139,8 @@ export const router = createBrowserRouter([
                 children: [
                   { path: 'versions', lazy: async () => ({ Component: (await import('@/pages/admin/VersionsPage')).VersionsPage }) },
                   { path: 'plans-offers', lazy: async () => ({ Component: (await import('@/pages/admin/PlansOffersPage')).PlansOffersPage }) },
+                  { path: 'training', lazy: async () => ({ Component: (await import('@/pages/training/TrainingLibraryPage')).TrainingLibraryPage }) },
+                  { path: 'training/courses/:id', lazy: async () => ({ Component: (await import('@/pages/training/TrainingLibraryPage')).CourseDetailPage }) },
                 ],
               },
               { path: '*', element: <NotFound /> },

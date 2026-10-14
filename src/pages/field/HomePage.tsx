@@ -12,6 +12,7 @@ import { useCovering } from '@/features/team/queries'
 import { Icon } from '@/icons'
 import { formatDate } from '@/lib/format'
 import { TargetCard } from '@/features/leads/TargetCard'
+import { TrainingReminder } from '@/features/training/TrainingReminder'
 import { useProject } from '@/features/projects/ProjectContext'
 import { ProjectSwitcher } from '@/features/projects/ProjectSwitcher'
 import { ProntteraMark } from '@/components/brand/Logo'
@@ -101,6 +102,7 @@ export function HomePage() {
         </div>
 
         <div className="flex flex-col gap-4">
+          {!closed && <TrainingReminder projectId={project.id} />}
           {me.onLeave && (
             <div className="flex items-start gap-3 rounded-2xl bg-accent-soft px-4 py-3 text-accent-soft-foreground">
               <Icon name="leave" size={20} className="mt-0.5 flex-none" />

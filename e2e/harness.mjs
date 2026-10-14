@@ -43,6 +43,8 @@ export async function startApp() {
       const url = new URL(req.url())
       // Map tiles: a blank tile, so tests never touch the network.
       if (url.hostname === 'tile.openstreetmap.org') return req.respond({ status: 200, contentType: 'image/png', body: TILE })
+      // YouTube: blocked, so the training player falls back to its plain embed without touching the network.
+      if (/(^|\.)youtube(-nocookie)?\.com$/.test(url.hostname)) return req.respond({ status: 404, contentType: 'text/plain', body: 'blocked in tests' })
       if (!url.pathname.startsWith('/api/v1/')) return req.continue()
       let body = null
       if (req.hasPostData()) body = req.postData() ?? (await req.fetchPostData().catch(() => null))

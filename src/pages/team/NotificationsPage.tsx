@@ -20,6 +20,7 @@ const KIND: Record<NotificationKind, { icon: IconName; tone: string }> = {
   comment: { icon: 'comment', tone: 'bg-default text-ink' },
   feedback: { icon: 'thumbs-up', tone: 'bg-warning-soft text-ink' },
   leave_cover: { icon: 'leave', tone: 'bg-default text-ink' },
+  training: { icon: 'learn', tone: 'bg-success-soft text-up' },
 }
 
 /** Everything that needs the person: transfers, mentions, help, feedback, cover duty. */

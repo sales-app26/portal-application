@@ -21,6 +21,8 @@ const versions: NavItem = { to: '/versions', label: 'What’s new', icon: 'timel
 const plansOffers: NavItem = { to: '/plans-offers', label: 'Plans & offers', icon: 'goal' }
 const performance: NavItem = { to: '/performance', label: 'Performance', icon: 'statistics' }
 const profile: NavItem = { to: '/profile', label: 'Profile', icon: 'user-male-circle' }
+const learn: NavItem = { to: '/learn', label: 'Learn', icon: 'learn' }
+const trainingLibrary: NavItem = { to: '/training', label: 'Training library', icon: 'learn' }
 export const moreItem: NavItem = { to: '/more', label: 'More', icon: 'menu-2' }
 
 /**
@@ -29,9 +31,9 @@ export const moreItem: NavItem = { to: '/more', label: 'More', icon: 'menu-2' }
  * drawer show bar + more flat, so nothing is nested on a laptop.
  */
 export const NAV: Record<UserRole, { bar: NavItem[]; more: NavItem[] }> = {
-  sales_person: { bar: [home, leads, day, performance, profile], more: [] },
-  moderator: { bar: [home, leads, dashboard, transfers, moreItem], more: [day, performance, team, projects, profile] },
-  super_admin: { bar: [dashboard, projects, people, transfers, moreItem], more: [versions, plansOffers, profile] },
+  sales_person: { bar: [home, leads, learn, day, moreItem], more: [performance, profile] },
+  moderator: { bar: [home, leads, dashboard, transfers, moreItem], more: [learn, day, performance, team, projects, profile] },
+  super_admin: { bar: [dashboard, projects, people, transfers, moreItem], more: [trainingLibrary, versions, plansOffers, profile] },
 }
 
 export function flatNav(role: UserRole): NavItem[] {
