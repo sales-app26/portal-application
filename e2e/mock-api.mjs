@@ -366,9 +366,64 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   const scorecardRows = (projectId) => {
     const base = { workingDays: 13, leaveDays: 0, handoversAsked: 0, handoversReceived: 0, lostLeads: 2, topLostReason: 'price', isActive: true, campaigns: ['Pune Retail Drive'] }
     const rows = [
-      { ...base, user: { id: ids.priya, name: 'Priya Desai' }, leadsAdded: 12, followUps: 40, visits: 14, activeDays: 12, dealsWon: 6, wonRevenue: 14994, conversionPercent: 75, avgDaysToWin: 8, target: 10, achieved: 6, targetPercent: 60, overdueNow: 1, openNow: 18 },
-      { ...base, user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' }, leadsAdded: 9, followUps: 55, visits: 20, activeDays: 11, leaveDays: 2, workingDays: 11, dealsWon: 2, wonRevenue: 4998, conversionPercent: 33, avgDaysToWin: 12.5, target: null, achieved: 2, targetPercent: null, overdueNow: 4, openNow: 9, topLostReason: 'competitor', lostLeads: 4 },
-      { ...base, user: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Sunil Patil' }, leadsAdded: 5, followUps: 45, visits: 2, activeDays: 9, dealsWon: 4, wonRevenue: 9996, conversionPercent: 67, avgDaysToWin: 9, target: 10, achieved: 4, targetPercent: 40, overdueNow: 0, openNow: 6, campaigns: ['Kondhwa Door-to-door'], topLostReason: null, lostLeads: 0 },
+      {
+        ...base,
+        user: { id: ids.priya, name: 'Priya Desai' },
+        leadsAdded: 12,
+        followUps: 40,
+        visits: 14,
+        activeDays: 12,
+        dealsWon: 6,
+        wonRevenue: 14994,
+        conversionPercent: 75,
+        avgDaysToWin: 8,
+        target: 10,
+        achieved: 6,
+        targetPercent: 60,
+        overdueNow: 1,
+        openNow: 18,
+      },
+      {
+        ...base,
+        user: { id: '99999999-9999-4999-8999-999999999999', name: 'Karan Mehta' },
+        leadsAdded: 9,
+        followUps: 55,
+        visits: 20,
+        activeDays: 11,
+        leaveDays: 2,
+        workingDays: 11,
+        dealsWon: 2,
+        wonRevenue: 4998,
+        conversionPercent: 33,
+        avgDaysToWin: 12.5,
+        target: null,
+        achieved: 2,
+        targetPercent: null,
+        overdueNow: 4,
+        openNow: 9,
+        topLostReason: 'competitor',
+        lostLeads: 4,
+      },
+      {
+        ...base,
+        user: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Sunil Patil' },
+        leadsAdded: 5,
+        followUps: 45,
+        visits: 2,
+        activeDays: 9,
+        dealsWon: 4,
+        wonRevenue: 9996,
+        conversionPercent: 67,
+        avgDaysToWin: 9,
+        target: 10,
+        achieved: 4,
+        targetPercent: 40,
+        overdueNow: 0,
+        openNow: 6,
+        campaigns: ['Kondhwa Door-to-door'],
+        topLostReason: null,
+        lostLeads: 0,
+      },
     ]
     return projectId ? rows.filter((r) => r.campaigns.some((c) => projects.find((x) => x.id === projectId)?.name === c)) : rows
   }
@@ -381,7 +436,16 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     { plan: 'pro', monthlyPrice: null },
   ]
   const offers = [
-    { id: 'eeeeeee1-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Diwali offer', couponCode: 'DIWALI10', discountType: 'percent', discountValue: 10, startsOn: null, endsOn: null, active: true },
+    {
+      id: 'eeeeeee1-eeee-4eee-8eee-eeeeeeeeeeee',
+      name: 'Diwali offer',
+      couponCode: 'DIWALI10',
+      discountType: 'percent',
+      discountValue: 10,
+      startsOn: null,
+      endsOn: null,
+      active: true,
+    },
     { id: 'eeeeeee2-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Monsoon', couponCode: null, discountType: 'amount', discountValue: 500, startsOn: null, endsOn: null, active: false },
   ]
   const offerLive = (o) => o.active && (!o.startsOn || o.startsOn <= today) && (!o.endsOn || o.endsOn >= today)
@@ -471,7 +535,17 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   const training = {
     course: { id: 'course-1', title: 'Frostique: core sales training', description: 'How to sell Frostique.', published: true, lessonCount: 4, campaignCount: 1, updatedAt: iso() },
     lessons: [
-      { id: 'les-card', courseId: 'course-1', kind: 'card', step: 'field', title: 'The 25-minute visit', summary: 'Five steps, every visit.', minutes: 2, required: true, content: { markdown: '## The visit\n\n1. **Hook**\n2. **Discovery**' } },
+      {
+        id: 'les-card',
+        courseId: 'course-1',
+        kind: 'card',
+        step: 'field',
+        title: 'The 25-minute visit',
+        summary: 'Five steps, every visit.',
+        minutes: 2,
+        required: true,
+        content: { markdown: '## The visit\n\n1. **Hook**\n2. **Discovery**' },
+      },
       {
         id: 'les-video',
         courseId: 'course-1',
@@ -481,7 +555,13 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         summary: null,
         minutes: 2,
         required: true,
-        content: { youtubeId: 'aqz-KE-bpKQ', thumbnailUrl: '', startSeconds: null, endSeconds: null, checks: [{ id: 'c1', text: 'What does Frostique take as commission?', options: ['Nothing', '25%'] }] },
+        content: {
+          youtubeId: 'aqz-KE-bpKQ',
+          thumbnailUrl: '',
+          startSeconds: null,
+          endSeconds: null,
+          checks: [{ id: 'c1', text: 'What does Frostique take as commission?', options: ['Nothing', '25%'] }],
+        },
       },
       {
         id: 'les-quiz',
@@ -509,27 +589,87 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         summary: null,
         minutes: 8,
         required: true,
-        content: { persona: { name: 'Ravi Shinde', shop: 'Shinde Cake House', city: 'Pune', about: 'On Zomato.' }, brief: 'Get Ravi to start a free trial.', language: 'hinglish', rubric: ['Asked how orders come in'], passScore: 70 },
+        content: {
+          persona: { name: 'Ravi Shinde', shop: 'Shinde Cake House', city: 'Pune', about: 'On Zomato.' },
+          brief: 'Get Ravi to start a free trial.',
+          language: 'hinglish',
+          rubric: ['Asked how orders come in'],
+          passScore: 70,
+        },
+      },
+      {
+        id: 'les-tutorial',
+        courseId: 'course-1',
+        kind: 'playlist',
+        step: 'tutorial',
+        title: 'Frostique app tutorial',
+        summary: 'The app, module by module.',
+        minutes: 25,
+        required: false,
+        content: {
+          playlistId: 'PLfrostiqueAppTutorial',
+          items: ['The big picture', 'Getting started', 'Your storefront'].map((t, i) => ({
+            youtubeId: `tutorial00${i + 1}`,
+            title: `${i + 1} · ${t}`,
+            thumbnailUrl: `https://i.ytimg.com/vi/tutorial00${i + 1}/hqdefault.jpg`,
+          })),
+        },
+      },
+      {
+        id: 'les-doc',
+        courseId: 'course-1',
+        kind: 'document',
+        step: 'library',
+        title: 'Frostique sales playbook',
+        summary: null,
+        minutes: null,
+        required: false,
+        content: {
+          link: null,
+          note: 'Look things up. No need to read it all.',
+          fileName: 'Frostique Sales Playbook.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 1200,
+          hasFile: true,
+        },
+      },
+      {
+        id: 'les-link',
+        courseId: 'course-1',
+        kind: 'document',
+        step: 'library',
+        title: 'Plans and prices',
+        summary: null,
+        minutes: null,
+        required: false,
+        content: { link: 'https://docs.google.com/document/d/1AbCdEfGh/edit?usp=sharing', note: null, fileName: null, contentType: null, sizeBytes: null, hasFile: false },
       },
     ],
     answers: { 'les-video': [0], 'les-quiz': [1, 0] },
     explanations: { q1: 'More than one branch means Pro.', q2: 'Phone first.', c1: 'No commission.' },
     done: {},
     best: {},
+    watched: {},
     pitch: null,
   }
-  const lessonProgress = (id) => ({ percent: training.done[id] ? 100 : 0, positionSeconds: null, bestScore: training.best[id] ?? null, attempts: 0, completedAt: training.done[id] ?? null })
+  const lessonProgress = (id) => {
+    const modules = training.lessons.find((l) => l.id === id)?.content.items ?? []
+    const watched = training.watched[id] ?? {}
+    const partial = modules.length ? Math.round((modules.filter((x) => (watched[x.youtubeId] ?? 0) >= 90).length / modules.length) * 100) : 0
+    return { percent: training.done[id] ? 100 : partial, positionSeconds: null, bestScore: training.best[id] ?? null, attempts: 0, completedAt: training.done[id] ?? null, watched }
+  }
   const campaignTraining = (projectId) => {
     const lessons = training.lessons.map((l) => ({ ...l, progress: lessonProgress(l.id) }))
-    const done = lessons.filter((l) => l.progress.completedAt).length
+    const required = lessons.filter((l) => l.required)
+    const done = required.filter((l) => l.progress.completedAt).length
     return {
       projectId,
       projectName: 'Pune Retail Drive',
       canManage: role !== 'sales_person',
-      certifiedAt: done === lessons.length ? iso() : null,
-      requiredCount: lessons.length,
+      certifiedAt: done === required.length ? iso() : null,
+      requiredCount: required.length,
       doneCount: done,
-      percent: Math.round((done / lessons.length) * 100),
+      percent: Math.round((done / required.length) * 100),
       roleplayEnabled: true,
       roleplayLeftToday: 3,
       courses: [{ id: 'course-1', title: training.course.title, description: training.course.description, lessons }],
@@ -761,16 +901,56 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         // A full month: the 10 latest wins and 5 notes, as the API sends at most.
         recentWins: [
           { leadId: ids.lead, leadName: 'Asha Patil', businessName: 'Patil Sweets', projectName: 'Pune Retail Drive', plan: 'growth', dealValue: 2499, wonAt: iso() },
-          { leadId: '22222222-2222-4222-8222-222222222222', leadName: 'Neha Joshi', businessName: null, projectName: 'Pune Retail Drive', plan: 'pro', dealValue: 4999, wonAt: iso() },
-          ...Array.from({ length: 8 }, (_, i) => ({ leadId: `w${i}`, leadName: `Bakery ${i + 1}`, businessName: `Sweet Spot ${i + 1}`, projectName: 'Pune Retail Drive', plan: 'growth', dealValue: 1999, wonAt: iso() })),
+          {
+            leadId: '22222222-2222-4222-8222-222222222222',
+            leadName: 'Neha Joshi',
+            businessName: null,
+            projectName: 'Pune Retail Drive',
+            plan: 'pro',
+            dealValue: 4999,
+            wonAt: iso(),
+          },
+          ...Array.from({ length: 8 }, (_, i) => ({
+            leadId: `w${i}`,
+            leadName: `Bakery ${i + 1}`,
+            businessName: `Sweet Spot ${i + 1}`,
+            projectName: 'Pune Retail Drive',
+            plan: 'growth',
+            dealValue: 1999,
+            wonAt: iso(),
+          })),
         ],
         weekdays: [8, 9, 7, 10, 6, 3, 0].map((followUps, weekday) => ({ weekday, followUps, visits: Math.floor(followUps / 3) })),
         feedback: {
           count: 5,
           recent: [
-            { id: 'f1', body: 'Great visit notes, keep the photos clear.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: 'e1', createdAt: iso() },
-            { id: 'f2', body: 'Call back within two days after a demo.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: 'e2', createdAt: iso() },
-            ...[3, 4, 5].map((i) => ({ id: `f${i}`, body: 'Good follow-up. Next time, show the billing screen and the daily sales report before talking price, and leave the brochure with the owner so the family can see it too.', author: { id: ids.modOther, name: 'Farah Khan' }, leadId: ids.lead, leadName: 'Asha Patil', entryId: `e${i}`, createdAt: iso() })),
+            {
+              id: 'f1',
+              body: 'Great visit notes, keep the photos clear.',
+              author: { id: ids.modOther, name: 'Farah Khan' },
+              leadId: ids.lead,
+              leadName: 'Asha Patil',
+              entryId: 'e1',
+              createdAt: iso(),
+            },
+            {
+              id: 'f2',
+              body: 'Call back within two days after a demo.',
+              author: { id: ids.modOther, name: 'Farah Khan' },
+              leadId: ids.lead,
+              leadName: 'Asha Patil',
+              entryId: 'e2',
+              createdAt: iso(),
+            },
+            ...[3, 4, 5].map((i) => ({
+              id: `f${i}`,
+              body: 'Good follow-up. Next time, show the billing screen and the daily sales report before talking price, and leave the brochure with the owner so the family can see it too.',
+              author: { id: ids.modOther, name: 'Farah Khan' },
+              leadId: ids.lead,
+              leadName: 'Asha Patil',
+              entryId: `e${i}`,
+              createdAt: iso(),
+            })),
           ],
         },
       })
@@ -876,17 +1056,59 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       return ok({
         lessons: training.lessons.map(({ id, title, kind, required }) => ({ id, title, kind, required })),
         members: [
-          { userId: ids.me, name: 'Ravi Kumar', role: 'sales_person', doneCount: 4, requiredCount: 4, percent: 100, certifiedAt: iso(), quizBest: 100, practiceBest: 82, practiceCount: 2, lastActivityAt: iso(), completedLessonIds: [] },
-          { userId: ids.priya, name: 'Priya Desai', role: 'sales_person', doneCount: 1, requiredCount: 4, percent: 25, certifiedAt: null, quizBest: null, practiceBest: null, practiceCount: 0, lastActivityAt: iso(), completedLessonIds: [] },
+          {
+            userId: ids.me,
+            name: 'Ravi Kumar',
+            role: 'sales_person',
+            doneCount: 4,
+            requiredCount: 4,
+            percent: 100,
+            certifiedAt: iso(),
+            quizBest: 100,
+            practiceBest: 82,
+            practiceCount: 2,
+            lastActivityAt: iso(),
+            completedLessonIds: [],
+          },
+          {
+            userId: ids.priya,
+            name: 'Priya Desai',
+            role: 'sales_person',
+            doneCount: 1,
+            requiredCount: 4,
+            percent: 25,
+            certifiedAt: null,
+            quizBest: null,
+            practiceBest: null,
+            practiceCount: 0,
+            lastActivityAt: iso(),
+            completedLessonIds: [],
+          },
         ],
         recentPitches: [{ id: 'pitch-1', userId: ids.me, userName: 'Ravi Kumar', lessonTitle: 'Pitch Ravi: single bakery', score: 82, startedAt: iso(), finishedAt: iso() }],
       })
-    if ((m = p.match(/^\/projects\/([^/]+)\/training\/courses$/))) return ok(method === 'PUT' ? [training.course] : [training.course], method === 'PUT' ? 'Campaign training updated.' : undefined)
+    if ((m = p.match(/^\/projects\/([^/]+)\/training\/courses$/)))
+      return ok(method === 'PUT' ? [training.course] : [training.course], method === 'PUT' ? 'Campaign training updated.' : undefined)
     if ((m = p.match(/^\/projects\/([^/]+)\/training\/items$/))) return method === 'POST' ? ok({ id: 'les-local', ...json() }, 'Lesson saved.', 201) : ok([])
-    if (p === '/training/courses') return method === 'POST' ? ok({ ...training.course, id: 'course-2', ...json(), published: false, lessonCount: 0, campaignCount: 0 }, 'Course saved.', 201) : ok([training.course])
+    if (p === '/training/courses')
+      return method === 'POST'
+        ? ok({ ...training.course, id: 'course-2', ...json(), published: false, lessonCount: 0, campaignCount: 0 }, 'Course saved.', 201)
+        : ok([training.course])
+    if ((m = p.match(/^\/training\/courses\/([^/]+)\/items$/)))
+      return ok({ id: 'les-new', courseId: m[1], projectId: null, sort: 0, hasFile: false, summary: null, ...json() }, 'Lesson saved.', 201)
     if ((m = p.match(/^\/training\/courses\/([^/]+)$/)))
       return ok({ course: training.course, lessons: training.lessons.map((l) => ({ ...l, projectId: null, sort: 0, payload: l.content, hasFile: false })) })
+    if ((m = p.match(/^\/training\/items\/([^/]+)\/file$/))) return ok({ url: '/api/v1/__files/playbook.pdf', fileName: 'Frostique Sales Playbook.pdf' })
+    if (p === '/__files/playbook.pdf') return { status: 200, raw: tinyPdf(['Frostique sales playbook', 'Objections and answers']), headers: { 'content-type': 'application/pdf' } }
     if ((m = p.match(/^\/training\/items\/([^/]+)\/progress$/))) {
+      const { moduleId, percent, done } = json()
+      const modules = training.lessons.find((l) => l.id === m[1])?.content.items ?? []
+      if (moduleId) {
+        const w = (training.watched[m[1]] ??= {})
+        w[moduleId] = Math.max(w[moduleId] ?? 0, done ? 100 : (percent ?? 0))
+        if (modules.every((x) => (w[x.youtubeId] ?? 0) >= 90)) training.done[m[1]] = iso()
+        return ok({ progress: lessonProgress(m[1]), certifiedNow: false })
+      }
       training.done[m[1]] = iso()
       return ok({ progress: lessonProgress(m[1]), certifiedNow: false })
     }
@@ -939,7 +1161,12 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         score: 82,
         passed: true,
         finishedAt: iso(),
-        feedback: { summary: 'You asked about his orders first. Good.', strengths: [], improvements: ['Ask for the trial earlier.'], criteria: [{ criterion: 'Asked how orders come in', met: true, note: 'Asked about Zomato orders.' }] },
+        feedback: {
+          summary: 'You asked about his orders first. Good.',
+          strengths: [],
+          improvements: ['Ask for the trial earlier.'],
+          criteria: [{ criterion: 'Asked how orders come in', met: true, note: 'Asked about Zomato orders.' }],
+        },
       })
       training.done[pitch.itemId] = iso()
       return ok({ ...pitch })
@@ -1079,4 +1306,27 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   }
 
   return { handle, writes, calls, me }
+}
+
+/** A real, minimal PDF with one line of text per page, so the in-app reader can be tested. */
+function tinyPdf(lines) {
+  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', null, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
+  const kids = []
+  for (const line of lines) {
+    const stream = `BT /F1 24 Tf 72 720 Td (${line}) Tj ET`
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${objects.length} 0 R >>`)
+    kids.push(`${objects.length} 0 R`)
+  }
+  objects[1] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`
+  let out = '%PDF-1.4\n'
+  const offsets = objects.map((o, i) => {
+    const at = out.length
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`
+    return at
+  })
+  const xref = out.length
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((n) => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}`
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return out
 }

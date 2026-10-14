@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Page } from '@/components/layout/Page'
-import { Button } from '@/components/ui/Button'
+import { Button, IconButton } from '@/components/ui/Button'
 import { EmptyState, ErrorState, ProgressBar, Skeleton, Tag } from '@/components/ui/Display'
 import { LazyMarkdown } from '@/components/ui/LazyMarkdown'
 import { isAppleTouch, useSpeech } from '@/features/leads/useSpeech'
 import { useProject } from '@/features/projects/ProjectContext'
 import { allLessons, invalidateTraining, KIND_LABEL, trainingKeys, useCampaignTraining, useMyPitches } from '@/features/training/queries'
+import { DocumentViewer } from '@/features/training/DocumentViewer'
 import { YouTubePlayer } from '@/features/training/YouTubePlayer'
 import { Icon } from '@/icons'
 import { api, ApiError } from '@/lib/api'
@@ -21,6 +22,7 @@ import type {
   DocumentContent,
   LearnerLesson,
   LessonDone,
+  PlaylistContent,
   QuizContent,
   QuizQuestion,
   RoleplayContent,
@@ -44,7 +46,7 @@ export function LessonPage() {
       ) : !lesson || !project ? (
         <EmptyState icon="learn" title="Lesson not found" body="It may have been removed, or it belongs to another campaign. Check the campaign in Learn." />
       ) : (
-        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5">
+        <div className={cn('mx-auto flex w-full flex-col gap-5', lesson.kind === 'playlist' ? 'max-w-[1120px]' : 'max-w-[760px]')}>
           <div className="flex flex-wrap items-center gap-2">
             <Tag tone="accent">{KIND_LABEL[lesson.kind]}</Tag>
             {lesson.minutes && <Tag>{lesson.minutes} min</Tag>}
@@ -53,6 +55,7 @@ export function LessonPage() {
           </div>
           {lesson.summary && <p className="text-body-md text-body">{lesson.summary}</p>}
           {lesson.kind === 'video' && <VideoLesson lesson={lesson} projectId={project.id} />}
+          {lesson.kind === 'playlist' && <PlaylistLesson lesson={lesson} projectId={project.id} />}
           {lesson.kind === 'document' && <DocumentLesson lesson={lesson} projectId={project.id} />}
           {lesson.kind === 'card' && <CardLesson lesson={lesson} projectId={project.id} />}
           {lesson.kind === 'quiz' && <QuizLesson lesson={lesson} projectId={project.id} />}
@@ -66,22 +69,23 @@ export function LessonPage() {
 }
 
 /** The one place a finished campaign is celebrated. */
-function celebrate(certifiedNow: boolean) {
+function celebrate(certifiedNow: boolean, quiet = false) {
   if (!certifiedNow) return
-  haptic.success()
+  if (!quiet) haptic.success()
   toast.success('You’re certified for this campaign. Well done!', { duration: 6000 })
 }
 
 function useMarkProgress(lesson: LearnerLesson, projectId: string) {
   const qc = useQueryClient()
-  return async (body: { percent?: number; positionSeconds?: number; done?: boolean }, quiet = false) => {
+  return async (body: { percent?: number; positionSeconds?: number; done?: boolean; moduleId?: string }, quiet = false) => {
     try {
       const res = await api<LessonDone>(`/training/items/${lesson.id}/progress`, { method: 'POST', body: { projectId, ...body } })
       if (res.progress.completedAt && !lesson.progress.completedAt) {
-        haptic.success()
+        // Phones only buzz after a tap; a lesson finished by reading or watching just says so.
+        if (!quiet) haptic.success()
         if (!res.certifiedNow) toast.success('Lesson done.')
       }
-      celebrate(res.certifiedNow)
+      celebrate(res.certifiedNow, quiet)
       invalidateTraining(qc)
       return res
     } catch (err) {
@@ -166,55 +170,168 @@ function DoneNote({ text }: { text: string }) {
   )
 }
 
+// ---------------------------------------------------------------- playlist (the app tutorial)
+
+const MODULE_DONE = 90
+
+/**
+ * A YouTube playlist watched module by module inside the app: the player, then the modules
+ * with what's watched. A module counts at 90%; the lesson is done when all of them are. When
+ * one ends, the next plays. A playlist YouTube didn't list plays whole in YouTube's player.
+ */
+function PlaylistLesson({ lesson, projectId }: { lesson: LearnerLesson; projectId: string }) {
+  const c = lesson.content as unknown as PlaylistContent
+  const mark = useMarkProgress(lesson, projectId)
+  const done = !!lesson.progress.completedAt
+  const [watched, setWatched] = useState<Record<string, number>>(lesson.progress.watched ?? {})
+  const [current, setCurrent] = useState(() =>
+    Math.max(
+      0,
+      c.items.findIndex((m) => ((lesson.progress.watched ?? {})[m.youtubeId] ?? 0) < MODULE_DONE),
+    ),
+  )
+  const [autoplay, setAutoplay] = useState(false)
+  const lastSent = useRef({ at: 0, percent: 0 })
+
+  if (c.items.length === 0) {
+    return (
+      <>
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
+          <iframe
+            className="absolute inset-0 size-full"
+            src={`https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(c.playlistId)}&rel=0&playsinline=1`}
+            title={lesson.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+        {done ? (
+          <DoneNote text="Watched." />
+        ) : (
+          <Button className="self-start" icon="checkmark" onClick={() => void mark({ done: true })}>
+            I’ve watched it all
+          </Button>
+        )}
+        {done && <NextButton />}
+      </>
+    )
+  }
+
+  const module = c.items[current]
+  const seen = (id: string) => watched[id] ?? 0
+  const count = c.items.filter((m) => seen(m.youtubeId) >= MODULE_DONE).length
+
+  const play = (index: number, auto = true) => {
+    lastSent.current = { at: 0, percent: 0 }
+    setAutoplay(auto)
+    setCurrent(index)
+  }
+
+  const onProgress = (p: number, position: number) => {
+    const id = module.youtubeId
+    const before = seen(id)
+    setWatched((w) => ({ ...w, [id]: Math.max(w[id] ?? 0, p) }))
+    const now = Date.now()
+    const crossed = before < MODULE_DONE && p >= MODULE_DONE
+    if (crossed || (now - lastSent.current.at > 20_000 && p > lastSent.current.percent && p > before)) {
+      lastSent.current = { at: now, percent: p }
+      void mark({ moduleId: id, percent: p, positionSeconds: position }, true)
+    }
+  }
+
+  const markModule = () => {
+    setWatched((w) => ({ ...w, [module.youtubeId]: 100 }))
+    void mark({ moduleId: module.youtubeId, done: true })
+    if (current < c.items.length - 1) play(current + 1, false)
+  }
+
+  return (
+    <div className="flex flex-col gap-4 large:grid large:grid-cols-[minmax(0,1fr)_360px] large:items-start">
+      <div className="flex flex-col gap-3">
+        <YouTubePlayer
+          key={module.youtubeId}
+          youtubeId={module.youtubeId}
+          title={module.title}
+          startSeconds={null}
+          endSeconds={null}
+          autoplay={autoplay}
+          onProgress={onProgress}
+          onEnded={() => current < c.items.length - 1 && play(current + 1)}
+        />
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-caption text-muted">
+              Module {current + 1} of {c.items.length}
+            </p>
+            <p className="text-title-md">{module.title}</p>
+          </div>
+          <IconButton icon="back" label="Previous module" disabled={current === 0} onClick={() => play(current - 1, false)} />
+          <IconButton icon="forward" label="Next module" disabled={current === c.items.length - 1} onClick={() => play(current + 1, false)} />
+        </div>
+        {seen(module.youtubeId) < MODULE_DONE && (
+          <Button variant="secondary" size="sm" icon="checkmark" className="self-start" onClick={markModule}>
+            I’ve watched this module
+          </Button>
+        )}
+        {done ? <DoneNote text="Every module watched." /> : <ProgressBar value={count} max={c.items.length} label="Modules watched" size="sm" />}
+        {done && <NextButton />}
+      </div>
+
+      <section aria-label="Modules" className="card card--default gap-0 overflow-hidden rounded-2xl p-0 large:max-h-[calc(100dvh-160px)] large:overflow-y-auto">
+        <p className="border-b border-separator px-4 py-3 text-title-sm">
+          {count} of {c.items.length} watched
+        </p>
+        <ol>
+          {c.items.map((m, i) => {
+            const pct = seen(m.youtubeId)
+            const isDone = pct >= MODULE_DONE
+            return (
+              <li key={m.youtubeId} className="border-b border-separator last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => play(i)}
+                  aria-current={i === current ? 'true' : undefined}
+                  className={cn('pressable flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-default expanded:hover:bg-default', i === current && 'bg-accent-soft')}
+                >
+                  <span className="relative aspect-video w-24 flex-none overflow-hidden rounded-lg bg-black">
+                    <img src={m.thumbnailUrl} alt="" loading="lazy" className="size-full object-cover" />
+                    {pct > 0 && !isDone && (
+                      <span className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
+                        <span className="block h-full bg-primary" style={{ width: `${pct}%` }} />
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-caption text-muted">{i === current ? 'Now playing' : `Module ${i + 1}`}</span>
+                    <span className="line-clamp-2 block text-body-md font-medium">{m.title}</span>
+                  </span>
+                  {isDone ? <Icon name="ok" size={20} className="flex-none text-up" aria-label="Watched" /> : null}
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      </section>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------- document
 
 function DocumentLesson({ lesson, projectId }: { lesson: LearnerLesson; projectId: string }) {
   const c = lesson.content as unknown as DocumentContent
   const mark = useMarkProgress(lesson, projectId)
-  const [opening, setOpening] = useState(false)
   const done = !!lesson.progress.completedAt
 
-  const openFile = async () => {
-    // Open the tab inside the tap, or phones block it as a pop-up; point it at the file once we have the link.
-    const tab = window.open('', '_blank')
-    setOpening(true)
-    try {
-      const { url } = await api<{ url: string }>(`/training/items/${lesson.id}/file`, { query: { projectId } })
-      if (tab) tab.location.href = url
-      else window.location.href = url
-      if (!done) void mark({ done: true }, true)
-    } catch (err) {
-      tab?.close()
-      handleFormError(err)
-    } finally {
-      setOpening(false)
-    }
-  }
-
   return (
-    <section className="card card--default gap-4 rounded-2xl p-5">
+    <>
       {c.note && <p className="text-body-md text-body">{c.note}</p>}
       {!c.hasFile && !c.link ? (
-        <p className="text-body-md text-body">This document isn’t uploaded yet. Check back soon.</p>
+        <p className="card card--default rounded-2xl p-5 text-body-md text-body">This document isn’t uploaded yet. Check back soon.</p>
       ) : (
-        <div className="flex flex-wrap gap-3">
-          {c.hasFile && (
-            <Button icon="book" loading={opening} onClick={() => void openFile()}>
-              Open {c.contentType === 'application/pdf' ? 'PDF' : 'file'}
-              {c.sizeBytes ? ` · ${Math.max(1, Math.round(c.sizeBytes / 1024 / 1024))} MB` : ''}
-            </Button>
-          )}
-          {c.link && (
-            <Button variant="secondary" icon="share" asChild>
-              <a href={c.link} target="_blank" rel="noreferrer" onClick={() => !done && void mark({ done: true }, true)}>
-                Open link
-              </a>
-            </Button>
-          )}
-        </div>
+        <DocumentViewer lessonId={lesson.id} projectId={projectId} title={lesson.title} content={c} onOpened={() => !done && void mark({ done: true }, true)} />
       )}
-      {done ? <DoneNote text="Opened." /> : null}
-    </section>
+    </>
   )
 }
 
@@ -266,17 +383,7 @@ function QuizLesson({ lesson, projectId }: { lesson: LearnerLesson; projectId: s
       </section>
     )
   }
-  return (
-    <QuestionSet
-      title={lesson.title}
-      questions={c.questions}
-      lesson={lesson}
-      projectId={projectId}
-      passLabel="Passed."
-      onDone={() => setStarted(false)}
-      oneAtATime
-    />
-  )
+  return <QuestionSet title={lesson.title} questions={c.questions} lesson={lesson} projectId={projectId} passLabel="Passed." onDone={() => setStarted(false)} oneAtATime />
 }
 
 /**
@@ -506,7 +613,8 @@ function RoleplayLesson({ lesson, projectId, enabled, leftToday }: { lesson: Lea
           </ul>
         </details>
         <p className="text-body-sm text-muted">
-          {c.language === 'hinglish' ? 'The owner speaks Hinglish. ' : ''}Pass mark {c.passScore}. {enabled ? `${leftToday} practice ${leftToday === 1 ? 'pitch' : 'pitches'} left today.` : ''}
+          {c.language === 'hinglish' ? 'The owner speaks Hinglish. ' : ''}Pass mark {c.passScore}.{' '}
+          {enabled ? `${leftToday} practice ${leftToday === 1 ? 'pitch' : 'pitches'} left today.` : ''}
         </p>
         {enabled ? (
           <Button className="self-start" icon="microphone" loading={starting} disabled={leftToday === 0} onClick={() => void start()}>
@@ -522,7 +630,11 @@ function RoleplayLesson({ lesson, projectId, enabled, leftToday }: { lesson: Lea
           <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {past.map((s) => (
               <li key={s.id} className="border-b border-separator last:border-b-0">
-                <button type="button" onClick={() => setSession(s)} className="pressable flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left active:bg-default expanded:hover:bg-default">
+                <button
+                  type="button"
+                  onClick={() => setSession(s)}
+                  className="pressable flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left active:bg-default expanded:hover:bg-default"
+                >
                   <span className={cn('min-w-12 text-title-md tabular-nums', s.passed ? 'text-up' : s.score === null ? 'text-muted' : 'text-ink')}>
                     {s.score === null ? '–' : s.score}
                   </span>
@@ -602,11 +714,7 @@ function PitchChat({ session, onChange, onClose }: { session: RoleplaySession; o
             </p>
           </div>
         ))}
-        {sending && (
-          <p className="self-start rounded-2xl rounded-bl-md bg-surface px-4 py-2.5 text-body-sm text-muted">
-            {session.persona.name.split(' ')[0]} is thinking…
-          </p>
-        )}
+        {sending && <p className="self-start rounded-2xl rounded-bl-md bg-surface px-4 py-2.5 text-body-sm text-muted">{session.persona.name.split(' ')[0]} is thinking…</p>}
         <div ref={bottom} />
       </div>
 
@@ -640,7 +748,12 @@ function PitchChat({ session, onChange, onClose }: { session: RoleplaySession; o
                 Send
               </Button>
               {canSpeak && (
-                <Button variant={speech.listening ? 'danger-soft' : 'soft'} icon="microphone" disabled={full || sending} onClick={() => (speech.listening ? speech.stop() : speech.start())}>
+                <Button
+                  variant={speech.listening ? 'danger-soft' : 'soft'}
+                  icon="microphone"
+                  disabled={full || sending}
+                  onClick={() => (speech.listening ? speech.stop() : speech.start())}
+                >
                   {speech.listening ? 'Stop' : 'Speak'}
                 </Button>
               )}

@@ -18,9 +18,7 @@ export function TrainingReminder({ projectId }: { projectId: string }) {
         <Icon name="learn" size={20} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="text-title-sm">
-          {t.doneCount === 0 ? 'Start your training' : `Finish your training: ${left} ${left === 1 ? 'lesson' : 'lessons'} left`}
-        </span>
+        <span className="text-title-sm">{t.doneCount === 0 ? 'Start your training' : `Finish your training: ${left} ${left === 1 ? 'lesson' : 'lessons'} left`}</span>
         <ProgressBar value={t.doneCount} max={t.requiredCount} label="Training progress" size="sm" />
       </span>
       <Icon name="chevron-right" size={18} className="flex-none text-muted" />

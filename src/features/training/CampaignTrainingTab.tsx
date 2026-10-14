@@ -95,7 +95,11 @@ function ProgressBoard({ project }: { project: Project }) {
           <ul className="card card--default gap-0 overflow-hidden rounded-2xl p-0">
             {b.recentPitches.map((p) => (
               <li key={p.id} className="border-b border-separator last:border-b-0">
-                <button type="button" onClick={() => setPitchId(p.id)} className="pressable flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left active:bg-default expanded:hover:bg-default">
+                <button
+                  type="button"
+                  onClick={() => setPitchId(p.id)}
+                  className="pressable flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left active:bg-default expanded:hover:bg-default"
+                >
                   <span className="min-w-10 text-title-md tabular-nums">{p.score ?? '–'}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-title-sm">{p.userName}</span>
@@ -121,7 +125,13 @@ function PitchReview({ id, onClose }: { id: string; onClose: () => void }) {
   const pitch = usePitch(id)
   const s: RoleplaySession | undefined = pitch.data
   return (
-    <ResponsiveOverlay open onOpenChange={(o) => !o && onClose()} title={s ? `${s.userName} · ${s.score ?? 'not scored'}` : 'Practice pitch'} description={s?.lessonTitle} variant="form">
+    <ResponsiveOverlay
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={s ? `${s.userName} · ${s.score ?? 'not scored'}` : 'Practice pitch'}
+      description={s?.lessonTitle}
+      variant="form"
+    >
       {pitch.isLoading ? (
         <ListSkeleton rows={3} />
       ) : pitch.isError ? (

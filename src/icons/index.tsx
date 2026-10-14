@@ -74,6 +74,12 @@ export type IconName =
   | 'quiz'
   | 'microphone'
   | 'bulb'
+  | 'playlist'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'expand'
+  | 'collapse'
+  | 'external'
 
 interface IconProps {
   name: IconName

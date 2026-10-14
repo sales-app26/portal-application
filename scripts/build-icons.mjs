@@ -78,6 +78,12 @@ export const ICONS = {
   quiz: ['square-check'],
   microphone: ['microphone'],
   bulb: ['bulb'],
+  playlist: ['square-list-ul'],
+  'zoom-in': ['magnifier-plus'],
+  'zoom-out': ['magnifier-minus'],
+  expand: ['chevrons-expand-up-right'],
+  collapse: ['chevrons-collapse-up-right'],
+  external: ['arrow-up-right-from-square'],
 }
 
 const symbol = (id, file) => {

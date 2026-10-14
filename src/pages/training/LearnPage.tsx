@@ -57,9 +57,7 @@ export function LearnPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-caption-strong tracking-wide uppercase opacity-80">{t.projectName}</p>
-                <p className="mt-1 text-display-sm font-semibold">
-                  {t.certifiedAt ? 'Certified' : `${t.doneCount} of ${t.requiredCount} done`}
-                </p>
+                <p className="mt-1 text-display-sm font-semibold">{t.certifiedAt ? 'Certified' : `${t.doneCount} of ${t.requiredCount} done`}</p>
               </div>
               <span className="flex size-12 flex-none items-center justify-center rounded-full bg-white/15">
                 <Icon name={t.certifiedAt ? 'approval' : 'learn'} size={26} />
@@ -112,12 +110,7 @@ function LessonRow({ lesson, roleplayOff }: { lesson: LearnerLesson; roleplayOff
   return (
     <li className="border-b border-separator last:border-b-0">
       <Link to={`/learn/${lesson.id}`} className="pressable flex min-h-16 items-center gap-3 px-4 py-3 active:bg-default expanded:hover:bg-default">
-        <span
-          className={cn(
-            'flex size-10 flex-none items-center justify-center rounded-full',
-            done ? 'bg-success-soft text-up' : 'bg-accent-soft text-primary',
-          )}
-        >
+        <span className={cn('flex size-10 flex-none items-center justify-center rounded-full', done ? 'bg-success-soft text-up' : 'bg-accent-soft text-primary')}>
           <Icon name={done ? 'checkmark' : KIND_ICON[lesson.kind]} size={20} />
         </span>
         <span className="min-w-0 flex-1">

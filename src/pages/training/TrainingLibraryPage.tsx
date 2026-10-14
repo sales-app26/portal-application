@@ -23,7 +23,8 @@ export function TrainingLibraryPage() {
     <Page title="Training library" cta={{ label: 'New course', icon: 'plus-math', onClick: () => setCreating(true) }}>
       <div className="flex flex-col gap-4 expanded:max-w-[900px]">
         <p className="max-w-2xl text-body-md text-body">
-          Build a course once: videos from YouTube, PDFs, field cards, a quiz and practice pitches. Publish it, then each campaign chooses it under <strong>Campaigns → Training</strong>.
+          Build a course once: videos from YouTube, PDFs, field cards, a quiz and practice pitches. Publish it, then each campaign chooses it under{' '}
+          <strong>Campaigns → Training</strong>.
         </p>
         {courses.isLoading ? (
           <ListSkeleton rows={3} />
@@ -168,7 +169,9 @@ export function CourseDetailPage() {
               variant={d.course.published ? 'secondary' : 'primary'}
               className="self-start"
               icon={d.course.published ? 'invisible' : 'approval'}
-              onClick={() => void patchCourse({ published: !d.course.published }, d.course.published ? 'Course is a draft again.' : 'Course published. Campaigns can choose it now.')}
+              onClick={() =>
+                void patchCourse({ published: !d.course.published }, d.course.published ? 'Course is a draft again.' : 'Course published. Campaigns can choose it now.')
+              }
             >
               {d.course.published ? 'Unpublish' : 'Publish'}
             </Button>
@@ -209,18 +212,15 @@ export function CourseDetailPage() {
               </section>
             )
           })}
-          {d.lessons.length === 0 && <EmptyState icon="play" title="No lessons yet" body="Add a video, a practice pitch, the quiz or a field card." className="card card--default rounded-2xl" />}
+          {d.lessons.length === 0 && (
+            <EmptyState icon="play" title="No lessons yet" body="Add a video, a practice pitch, the quiz or a field card." className="card card--default rounded-2xl" />
+          )}
         </div>
       ) : null}
 
       {editingCourse && d && <CourseForm course={d.course} onClose={() => setEditingCourse(false)} />}
       {editing && d && (
-        <LessonForm
-          owner={{ courseId: d.course.id }}
-          lesson={editing === 'new' ? null : editing}
-          nextSort={(d.lessons.length + 1) * 10}
-          onClose={() => setEditing(null)}
-        />
+        <LessonForm owner={{ courseId: d.course.id }} lesson={editing === 'new' ? null : editing} nextSort={(d.lessons.length + 1) * 10} onClose={() => setEditing(null)} />
       )}
       <Confirm
         open={!!removing}

@@ -14,11 +14,12 @@ import { haptic } from '@/lib/haptics'
 import type { Lesson, QuizQuestion, TrainingKind, TrainingStep } from '@/lib/types'
 import { invalidateTraining, KIND_ICON, KIND_LABEL, STEPS } from './queries'
 
-const DEFAULT_STEP: Record<TrainingKind, TrainingStep> = { video: 'watch', document: 'library', card: 'field', quiz: 'prove', roleplay: 'practise' }
+const DEFAULT_STEP: Record<TrainingKind, TrainingStep> = { video: 'watch', playlist: 'tutorial', document: 'library', card: 'field', quiz: 'prove', roleplay: 'practise' }
 
 const KIND_HELP: Record<TrainingKind, string> = {
   video: 'Paste a YouTube link (unlisted is fine). Add a quick check so reps prove they watched.',
-  document: 'Upload a PDF or image (up to 20 MB), or link to one.',
+  playlist: 'Paste a YouTube playlist link. The app lists its videos as modules and reps watch them here, one by one.',
+  document: 'Upload a PDF or image (up to 20 MB), or link to one. Reps read it inside the app.',
   card: 'Short text for the field kit: steps, answers, what to say.',
   quiz: 'Questions with one right answer each. Reps see the explanation after they submit.',
   roleplay: 'A shop owner the AI plays. Reps pitch them and get scored on your checklist.',
@@ -33,6 +34,8 @@ interface Props {
   nextSort: number
   onClose: () => void
 }
+
+type PlaylistModule = { youtubeId: string; title: string }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const emptyQuestion = (): QuizQuestion => ({ id: crypto.randomUUID().slice(0, 8), text: '', options: ['', ''], answer: 0, explanation: '' })
@@ -54,6 +57,10 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
   const [url, setUrl] = useState(lesson?.kind === 'video' ? `https://youtu.be/${str(p.youtubeId)}` : '')
   const [startSeconds, setStartSeconds] = useState(p.startSeconds ? String(p.startSeconds) : '')
   const [endSeconds, setEndSeconds] = useState(p.endSeconds ? String(p.endSeconds) : '')
+  // playlist
+  const [playlistUrl, setPlaylistUrl] = useState(lesson?.kind === 'playlist' ? `https://www.youtube.com/playlist?list=${str(p.playlistId)}` : '')
+  const [modules, setModules] = useState<PlaylistModule[]>(Array.isArray(p.items) ? (p.items as PlaylistModule[]) : [])
+  const [refreshing, setRefreshing] = useState(false)
   // document
   const [link, setLink] = useState(str(p.link))
   const [note, setNote] = useState(str(p.note))
@@ -86,6 +93,8 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
     switch (kind) {
       case 'video':
         return { url: url.trim(), startSeconds: int(startSeconds), endSeconds: int(endSeconds), checks: qs }
+      case 'playlist':
+        return { url: playlistUrl.trim(), items: modules.map((m) => ({ ...m, title: m.title.trim() })) }
       case 'document':
         return { link: link.trim() || null, note: note.trim() || null }
       case 'card':
@@ -122,11 +131,7 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
         step: step ?? DEFAULT_STEP[kind],
         payload: payload(),
       }
-      const path = lesson
-        ? `/training/items/${lesson.id}`
-        : 'courseId' in owner
-          ? `/training/courses/${owner.courseId}/items`
-          : `/projects/${owner.projectId}/training/items`
+      const path = lesson ? `/training/items/${lesson.id}` : 'courseId' in owner ? `/training/courses/${owner.courseId}/items` : `/projects/${owner.projectId}/training/items`
       const saved = await apiWithMessage<Lesson>(path, { method: lesson ? 'PATCH' : 'POST', body: lesson ? body : { ...body, kind, sort: nextSort } })
       if (kind === 'document' && file) {
         const form = new FormData()
@@ -144,12 +149,30 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
     }
   }
 
+  /** Reads the playlist again from YouTube: new videos appear, titles reset to YouTube's. */
+  const refreshModules = async () => {
+    if (!lesson) return
+    setRefreshing(true)
+    try {
+      const res = await apiWithMessage<Lesson>(`/training/items/${lesson.id}`, { method: 'PATCH', body: { payload: { url: playlistUrl.trim(), refresh: true } } })
+      const items = Array.isArray(res.data.payload.items) ? (res.data.payload.items as PlaylistModule[]) : []
+      setModules(items)
+      invalidateTraining(qc)
+      if (items.length > 0) toast.success(`${items.length} modules from YouTube.`)
+      else toast.error('YouTube didn’t list this playlist. Is it public or unlisted?')
+    } catch (err) {
+      handleFormError(err)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   if (!kind) {
     return (
       <ResponsiveOverlay open onOpenChange={(o) => !o && onClose()} title="Add a lesson" variant="choice">
         <ChoiceList<TrainingKind>
           label="Kind of lesson"
-          options={(['video', 'roleplay', 'quiz', 'card', 'document'] as TrainingKind[]).map((k) => ({
+          options={(['video', 'playlist', 'roleplay', 'quiz', 'card', 'document'] as TrainingKind[]).map((k) => ({
             value: k,
             label: KIND_LABEL[k],
             description: KIND_HELP[k],
@@ -188,12 +211,64 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
 
         {kind === 'video' && (
           <>
-            <TextField label="YouTube link" inputMode="url" placeholder="https://youtu.be/…" value={url} onChange={(e) => setUrl(e.target.value)} hint="Upload as Unlisted on YouTube and paste the link." />
+            <TextField
+              label="YouTube link"
+              inputMode="url"
+              placeholder="https://youtu.be/…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              hint="Upload as Unlisted on YouTube and paste the link."
+            />
             <div className="grid grid-cols-2 gap-3">
               <TextField label="Start at (seconds)" optional inputMode="numeric" value={startSeconds} onChange={(e) => setStartSeconds(e.target.value.replace(/\D/g, ''))} />
-              <TextField label="Stop at (seconds)" optional inputMode="numeric" value={endSeconds} onChange={(e) => setEndSeconds(e.target.value.replace(/\D/g, ''))} hint="Cut one long video into short lessons." />
+              <TextField
+                label="Stop at (seconds)"
+                optional
+                inputMode="numeric"
+                value={endSeconds}
+                onChange={(e) => setEndSeconds(e.target.value.replace(/\D/g, ''))}
+                hint="Cut one long video into short lessons."
+              />
             </div>
             <QuestionsEditor title="Quick check after the video" questions={questions} onChange={setQuestions} max={5} optional />
+          </>
+        )}
+
+        {kind === 'playlist' && (
+          <>
+            <TextField
+              label="YouTube playlist link"
+              inputMode="url"
+              placeholder="https://www.youtube.com/playlist?list=…"
+              value={playlistUrl}
+              onChange={(e) => setPlaylistUrl(e.target.value)}
+              hint="Public or unlisted. Its videos become the modules, in the playlist’s order (up to 15)."
+            />
+            {lesson ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="label text-[15px] font-semibold text-ink">Modules</span>
+                  <Button size="sm" variant="secondary" icon="refresh" loading={refreshing} onClick={() => void refreshModules()}>
+                    Refresh from YouTube
+                  </Button>
+                </div>
+                {modules.length === 0 ? (
+                  <p className="text-body-sm text-body">YouTube didn’t list this playlist, so reps get YouTube’s own player and mark it watched.</p>
+                ) : (
+                  modules.map((m, i) => (
+                    <TextField
+                      key={m.youtubeId}
+                      label={`Module ${i + 1}`}
+                      maxLength={200}
+                      value={m.title}
+                      onChange={(e) => setModules(modules.map((x, k) => (k === i ? { ...x, title: e.target.value } : x)))}
+                    />
+                  ))
+                )}
+              </div>
+            ) : (
+              <p className="text-body-sm text-body">The modules are read from YouTube when you save. You can rename them after.</p>
+            )}
           </>
         )}
 
@@ -201,7 +276,13 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
           <>
             <div className="flex flex-col gap-1.5">
               <span className="label text-[15px] font-semibold text-ink">File</span>
-              <input ref={fileInput} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
               <div className="flex flex-wrap items-center gap-3">
                 <Button variant="secondary" icon="download" onClick={() => fileInput.current?.click()}>
                   {file || lesson?.hasFile ? 'Replace file' : 'Choose PDF or image'}
@@ -251,7 +332,14 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
               onChange={(e) => setOwnerInstructions(e.target.value)}
               hint="Only the AI sees this: their numbers, worries to raise, when they agree. Include what’s true about the product so the coach can catch wrong promises."
             />
-            <TextField label="The owner’s first line" optional maxLength={600} value={opener} onChange={(e) => setOpener(e.target.value)} hint="Leave empty and the AI greets the rep in character." />
+            <TextField
+              label="The owner’s first line"
+              optional
+              maxLength={600}
+              value={opener}
+              onChange={(e) => setOpener(e.target.value)}
+              hint="Leave empty and the AI greets the rep in character."
+            />
             <Segmented<'en' | 'hinglish'>
               label="Language"
               value={language}
@@ -329,13 +417,7 @@ function QuestionsEditor({
       {questions.map((q, i) => (
         <div key={q.id} className="flex flex-col gap-3 rounded-2xl border border-border p-3">
           <div className="flex items-start gap-2">
-            <TextField
-              containerClassName="flex-1"
-              label={`Question ${i + 1}`}
-              maxLength={400}
-              value={q.text}
-              onChange={(e) => update(i, { text: e.target.value })}
-            />
+            <TextField containerClassName="flex-1" label={`Question ${i + 1}`} maxLength={400} value={q.text} onChange={(e) => update(i, { text: e.target.value })} />
             <IconButton icon="trash" label={`Remove question ${i + 1}`} onClick={() => onChange(questions.filter((_, k) => k !== i))} className="mt-7" />
           </div>
           <div role="radiogroup" aria-label={`Right answer for question ${i + 1}`} className="flex flex-col gap-2">
@@ -347,7 +429,10 @@ function QuestionsEditor({
                   aria-checked={q.answer === j}
                   aria-label={`Answer ${j + 1} is right`}
                   onClick={() => update(i, { answer: j })}
-                  className={cn('flex size-8 flex-none items-center justify-center rounded-full border-2', q.answer === j ? 'border-up bg-up text-white' : 'border-border text-transparent')}
+                  className={cn(
+                    'flex size-8 flex-none items-center justify-center rounded-full border-2',
+                    q.answer === j ? 'border-up bg-up text-white' : 'border-border text-transparent',
+                  )}
                 >
                   <Icon name="checkmark" size={16} />
                 </button>

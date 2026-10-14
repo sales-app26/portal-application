@@ -1092,9 +1092,9 @@ Errors: unknown or removed offer 404 "We couldn't find this offer."; percent out
 
 ---
 
-## 3c. Training (`09_training.sql`, `modules/training/*`)
+## 3c. Training (`09_training.sql`, `10_training_playlists.sql`, `modules/training/*`)
 
-Courses live in a library (Super Admin); each campaign attaches courses and may add its own lessons (its admins). Lesson `kind`: `video` (YouTube link + optional checks), `document` (PDF/image in the private bucket, or a link), `card` (Markdown), `quiz`, `roleplay` (practice pitch with an AI owner, via Claude). `step`: `watch · practise · prove · field · library`.
+Courses live in a library (Super Admin); each campaign attaches courses and may add its own lessons (its admins). Lesson `kind`: `video` (YouTube link + optional checks), `playlist` (a YouTube playlist link; its videos are the modules, read from YouTube's public feed when saved, or when the payload says `refresh: true`), `document` (PDF/image in the private bucket, or a link), `card` (Markdown), `quiz`, `roleplay` (practice pitch with an AI owner, via Claude). `step`: `watch · tutorial · practise · prove · field · library`. Documents and links are shown inside the app (pdf.js, image, or a frame), never in a new tab.
 
 | Method & path | Who | Notes |
 |---|---|---|
@@ -1108,7 +1108,7 @@ Courses live in a library (Super Admin); each campaign attaches courses and may 
 | `GET/POST /projects/:id/training/items` | campaign admins | campaign-only lessons |
 | `GET /projects/:id/training` | members, SA | `CampaignTrainingDto`: syllabus with my progress, `certifiedAt`, `roleplayLeftToday`. No answers |
 | `GET /projects/:id/training/board` | campaign admins | every member × lessons, best scores, recent pitches |
-| `POST /training/items/:id/progress` | members | `{ projectId, percent?, positionSeconds?, done? }`: video ≥ 90% or `done` (no checks); document/card `done` |
+| `POST /training/items/:id/progress` | members | `{ projectId, percent?, positionSeconds?, done?, moduleId? }`: video ≥ 90% or `done` (no checks); document/card `done`; playlist per module (`moduleId`, kept in `progress.watched`), done when every module ≥ 90%, or `done` when YouTube listed none |
 | `POST /training/items/:id/attempts` | members | `{ projectId, answers }` for a quiz (3 tries/day until passed) or a video's checks (all right) |
 | `GET /training/items/:id/file?projectId=` | members | short-lived signed link |
 | `POST /training/items/:id/roleplay` | members | `{ projectId }` starts a pitch (`ROLEPLAY_DAILY_LIMIT` a day); the owner speaks first |

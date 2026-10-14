@@ -95,6 +95,70 @@ describe('a rep learns', () => {
   })
 })
 
+describe('watching and reading inside the app', () => {
+  test('the app tutorial plays module by module, with what’s watched', async () => {
+    const { page, go, api, errors } = await app.open(PHONE)
+    await go('/learn')
+    await waitForText(page, 'How the app works')
+    await go('/learn/les-tutorial')
+    await waitForText(page, 'Module 1 of 3')
+    // YouTube is blocked in tests, so each module falls back to the plain embed.
+    await page.waitForSelector('iframe[src*="youtube-nocookie.com/embed/tutorial001"]', { timeout: 5000 })
+    const rows = await page.$$eval('section[aria-label=Modules] li', (li) => li.map((x) => x.innerText))
+    assert.equal(rows.length, 3)
+    assert.ok(rows[1].includes('2 · Getting started'))
+
+    await click(page, 'I’ve watched this module')
+    await waitForText(page, 'Module 2 of 3')
+    assert.deepEqual(bodyOf(api, '/training/items/les-tutorial/progress'), { projectId: ids.online, moduleId: 'tutorial001', done: true })
+    await waitForText(page, '1 of 3 watched')
+
+    await clickContaining(page, '3 · Your storefront', 'section[aria-label=Modules] button')
+    await waitForText(page, 'Module 3 of 3')
+    await page.waitForSelector('iframe[src*="embed/tutorial003"][src*="autoplay=1"]', { timeout: 5000 })
+    assert.ok(await noSideScroll(page), 'no sideways scroll on a phone')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('a PDF reads inside the lesson, page by page, never in a new tab', async () => {
+    const { page, go, api, errors } = await app.open(LAPTOP)
+    const tabs = (await page.browser().pages()).length
+    await go('/learn/les-doc')
+    await waitForText(page, 'Page 1 of 2', 15000)
+    assert.equal(await page.$$eval('[data-page] canvas', (c) => c.length), 2, 'both pages drawn')
+    assert.deepEqual(bodyOf(api, '/training/items/les-doc/progress'), { projectId: ids.online, done: true })
+
+    await click(page, 'Zoom in')
+    await waitForText(page, '125%')
+    await click(page, 'Full screen')
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('section[aria-label="Frostique Sales Playbook.pdf"]')).position === 'fixed', { timeout: 3000 })
+    await page.keyboard.press('Escape')
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('section[aria-label="Frostique Sales Playbook.pdf"]')).position !== 'fixed', { timeout: 3000 })
+    assert.equal((await page.browser().pages()).length, tabs, 'no new tab opened')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('a PDF fits a phone', async () => {
+    const { page, go } = await app.open(PHONE)
+    await go('/learn/les-doc')
+    await waitForText(page, 'Page 1 of 2', 15000)
+    assert.ok(await noSideScroll(page), 'no sideways scroll on a phone')
+    await page.close()
+  })
+
+  test('a Google Doc link shows in a frame, with a way out if a site refuses', async () => {
+    const { page, go, api } = await app.open(PHONE)
+    await go('/learn/les-link')
+    await page.waitForSelector('iframe[src="https://docs.google.com/document/d/1AbCdEfGh/preview"]', { timeout: 5000 })
+    assert.ok((await text(page)).includes('Open it in the browser'))
+    await page.waitForFunction(() => true)
+    assert.deepEqual(bodyOf(api, '/training/items/les-link/progress'), { projectId: ids.online, done: true })
+    await page.close()
+  })
+})
+
 describe('managers and the sales head', () => {
   test('a campaign’s Training tab shows who is certified, and its lessons', async () => {
     const { page, go } = await app.open(LAPTOP, { role: 'moderator' })
@@ -121,6 +185,24 @@ describe('managers and the sales head', () => {
     for (const lesson of ['The 25-minute visit', 'Frostique in 90 seconds', 'The rep quiz', 'Pitch Ravi: single bakery']) {
       assert.ok((await text(page)).includes(lesson), lesson)
     }
+    await page.close()
+  })
+
+  test('the sales head adds the app tutorial by pasting only the playlist link', async () => {
+    const { page, go, api } = await app.open(LAPTOP, { role: 'super_admin' })
+    await go('/training/courses/course-1')
+    await waitForText(page, 'Frostique app tutorial')
+    await click(page, 'Add lesson')
+    await clickContaining(page, 'Paste a YouTube playlist link', '[role=option], button')
+    await waitForText(page, 'YouTube playlist link')
+    await page.type('input[placeholder="e.g. The 25-minute visit"]', 'Frostique app tutorial')
+    await page.type('input[placeholder^="https://www.youtube.com/playlist"]', 'https://www.youtube.com/playlist?list=PLfrostiqueAppTutorial')
+    await click(page, 'Save lesson')
+    await waitForText(page, 'Lesson added.')
+    const body = bodyOf(api, '/training/courses/course-1/items')
+    assert.equal(body.kind, 'playlist')
+    assert.equal(body.step, 'tutorial')
+    assert.deepEqual(body.payload, { url: 'https://www.youtube.com/playlist?list=PLfrostiqueAppTutorial', items: [] })
     await page.close()
   })
 })

@@ -58,6 +58,10 @@ interface Props {
   resumeAt?: number | null
   /** How far through (0–100) and where, every few seconds while playing and on pause or end. */
   onProgress: (percent: number, positionSeconds: number) => void
+  /** Played to the end (a playlist moves on to its next module). */
+  onEnded?: () => void
+  /** Start playing at once: the next module of a playlist. */
+  autoplay?: boolean
 }
 
 /**
@@ -65,13 +69,15 @@ interface Props {
  * lesson can count as done at 90%. Videos never pass through our servers. If YouTube's
  * player script can't load, it falls back to the plain embed and the rep marks it done.
  */
-export function YouTubePlayer({ youtubeId, title, startSeconds, endSeconds, resumeAt, onProgress }: Props) {
+export function YouTubePlayer({ youtubeId, title, startSeconds, endSeconds, resumeAt, onProgress, onEnded, autoplay }: Props) {
   const id = `yt-${useId().replace(/[^a-z0-9]/gi, '')}`
   const [fallback, setFallback] = useState(false)
   const report = useRef(onProgress)
+  const ended = useRef(onEnded)
   useEffect(() => {
     report.current = onProgress
-  }, [onProgress])
+    ended.current = onEnded
+  }, [onProgress, onEnded])
 
   useEffect(() => {
     let player: YTPlayer | null = null
@@ -99,6 +105,7 @@ export function YouTubePlayer({ youtubeId, title, startSeconds, endSeconds, resu
             rel: 0,
             playsinline: 1,
             modestbranding: 1,
+            ...(autoplay ? { autoplay: 1 } : {}),
             start: Math.max(start, resumeAt && resumeAt > start ? resumeAt : start),
             ...(endSeconds ? { end: endSeconds } : {}),
           },
@@ -106,8 +113,10 @@ export function YouTubePlayer({ youtubeId, title, startSeconds, endSeconds, resu
             onStateChange: (e) => {
               window.clearInterval(timer)
               if (e.data === YT.PlayerState.PLAYING) timer = window.setInterval(tick, 5_000)
-              if (e.data === YT.PlayerState.ENDED && player) report.current(100, Math.round(player.getCurrentTime()))
-              else if (e.data === YT.PlayerState.PAUSED) tick()
+              if (e.data === YT.PlayerState.ENDED && player) {
+                report.current(100, Math.round(player.getCurrentTime()))
+                ended.current?.()
+              } else if (e.data === YT.PlayerState.PAUSED) tick()
             },
           },
         })
@@ -123,9 +132,9 @@ export function YouTubePlayer({ youtubeId, title, startSeconds, endSeconds, resu
         /* already gone */
       }
     }
-  }, [id, youtubeId, startSeconds, endSeconds, resumeAt])
+  }, [id, youtubeId, startSeconds, endSeconds, resumeAt, autoplay])
 
-  const src = `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&playsinline=1${startSeconds ? `&start=${startSeconds}` : ''}${endSeconds ? `&end=${endSeconds}` : ''}`
+  const src = `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&playsinline=1${startSeconds ? `&start=${startSeconds}` : ''}${endSeconds ? `&end=${endSeconds}` : ''}${autoplay ? '&autoplay=1' : ''}`
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
       {fallback ? (

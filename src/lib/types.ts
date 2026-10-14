@@ -269,7 +269,8 @@ export interface LeadComment {
   canResolve: boolean
 }
 
-export type NotificationKind = 'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover' | 'training'
+export type NotificationKind =
+  'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover' | 'training'
 
 export interface AppNotification {
   id: string
@@ -626,8 +627,8 @@ export interface Offer {
 
 // ---------------------------------------------------------------- training
 
-export type TrainingKind = 'video' | 'document' | 'card' | 'quiz' | 'roleplay'
-export type TrainingStep = 'watch' | 'practise' | 'prove' | 'field' | 'library'
+export type TrainingKind = 'video' | 'playlist' | 'document' | 'card' | 'quiz' | 'roleplay'
+export type TrainingStep = 'watch' | 'tutorial' | 'practise' | 'prove' | 'field' | 'library'
 
 export interface Course {
   id: string
@@ -682,6 +683,8 @@ export interface LessonProgress {
   bestScore: number | null
   attempts: number
   completedAt: string | null
+  /** A playlist's modules watched, by YouTube id → percent. */
+  watched: Record<string, number>
 }
 
 export interface VideoContent {
@@ -690,6 +693,11 @@ export interface VideoContent {
   startSeconds: number | null
   endSeconds: number | null
   checks: QuizQuestion[]
+}
+/** A YouTube playlist, its modules listed by the API (empty when YouTube didn't list them). */
+export interface PlaylistContent {
+  playlistId: string
+  items: { youtubeId: string; title: string; thumbnailUrl: string }[]
 }
 export interface DocumentContent {
   link: string | null

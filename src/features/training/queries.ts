@@ -67,8 +67,9 @@ export function invalidateTraining(qc: QueryClient) {
 /** Every lesson of a campaign, in the order a rep meets them. */
 export const allLessons = (t: CampaignTraining): LearnerLesson[] => [...t.courses.flatMap((c) => c.lessons), ...t.campaignLessons]
 
-export const STEPS: { value: TrainingStep; label: string; blurb: string; icon: 'play' | 'microphone' | 'quiz' | 'bulb' | 'book' }[] = [
+export const STEPS: { value: TrainingStep; label: string; blurb: string; icon: 'play' | 'playlist' | 'microphone' | 'quiz' | 'bulb' | 'book' }[] = [
   { value: 'watch', label: 'Watch', blurb: 'Short videos, a quick check after each.', icon: 'play' },
+  { value: 'tutorial', label: 'Tutorial', blurb: 'How the app works, module by module.', icon: 'playlist' },
   { value: 'practise', label: 'Practise', blurb: 'Pitch an AI shop owner and get a score.', icon: 'microphone' },
   { value: 'prove', label: 'Prove', blurb: 'The quiz that earns your certificate.', icon: 'quiz' },
   { value: 'field', label: 'Field kit', blurb: 'Open these during a visit.', icon: 'bulb' },
@@ -77,6 +78,7 @@ export const STEPS: { value: TrainingStep; label: string; blurb: string; icon: '
 
 export const KIND_LABEL: Record<string, string> = {
   video: 'Video',
+  playlist: 'Playlist',
   document: 'Document',
   card: 'Card',
   quiz: 'Quiz',
@@ -85,6 +87,7 @@ export const KIND_LABEL: Record<string, string> = {
 
 export const KIND_ICON = {
   video: 'play',
+  playlist: 'playlist',
   document: 'book',
   card: 'bulb',
   quiz: 'quiz',
