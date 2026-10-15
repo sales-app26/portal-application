@@ -149,7 +149,14 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
     }
   }
 
-  /** Reads the playlist again from YouTube: new videos appear, titles reset to YouTube's. */
+  /** Swaps a module with its neighbour; saved with the lesson. */
+  const moveModule = (i: number, dir: -1 | 1) => {
+    const next = [...modules]
+    ;[next[i], next[i + dir]] = [next[i + dir], next[i]]
+    setModules(next)
+  }
+
+  /** Reads the playlist again from YouTube: your order stays, new videos join at the end, titles come from YouTube. */
   const refreshModules = async () => {
     if (!lesson) return
     setRefreshing(true)
@@ -242,7 +249,7 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
               placeholder="https://www.youtube.com/playlist?list=…"
               value={playlistUrl}
               onChange={(e) => setPlaylistUrl(e.target.value)}
-              hint="Public or unlisted. Its videos become the modules, in the playlist’s order (up to 15)."
+              hint="Public or unlisted. Its videos become the modules (up to 15); you can change their order after saving."
             />
             {lesson ? (
               <div className="flex flex-col gap-3">
@@ -255,15 +262,30 @@ export function LessonForm({ owner, lesson, nextSort, onClose }: Props) {
                 {modules.length === 0 ? (
                   <p className="text-body-sm text-body">YouTube didn’t list this playlist, so reps get YouTube’s own player and mark it watched.</p>
                 ) : (
-                  modules.map((m, i) => (
-                    <TextField
-                      key={m.youtubeId}
-                      label={`Module ${i + 1}`}
-                      maxLength={200}
-                      value={m.title}
-                      onChange={(e) => setModules(modules.map((x, k) => (k === i ? { ...x, title: e.target.value } : x)))}
-                    />
-                  ))
+                  <>
+                    <p className="text-body-sm text-body">Reps watch them in this order. Rename a module, or use the arrows to move it.</p>
+                    <ol aria-label="Modules" className="flex flex-col gap-3">
+                      {modules.map((m, i) => (
+                        <li key={m.youtubeId} className="flex items-start gap-1">
+                          <TextField
+                            containerClassName="flex-1"
+                            label={`Module ${i + 1}`}
+                            maxLength={200}
+                            value={m.title}
+                            onChange={(e) => setModules(modules.map((x, k) => (k === i ? { ...x, title: e.target.value } : x)))}
+                          />
+                          <IconButton icon="collapse-arrow" label={`Move module ${i + 1} up`} disabled={i === 0} onClick={() => moveModule(i, -1)} className="mt-7" />
+                          <IconButton
+                            icon="expand-arrow"
+                            label={`Move module ${i + 1} down`}
+                            disabled={i === modules.length - 1}
+                            onClick={() => moveModule(i, 1)}
+                            className="mt-7"
+                          />
+                        </li>
+                      ))}
+                    </ol>
+                  </>
                 )}
               </div>
             ) : (

@@ -188,6 +188,25 @@ describe('managers and the sales head', () => {
     await page.close()
   })
 
+  test('the sales head rearranges the tutorial’s modules', async () => {
+    const { page, go, api } = await app.open(LAPTOP, { role: 'super_admin' })
+    await go('/training/courses/course-1')
+    await clickContaining(page, 'Frostique app tutorial', 'button')
+    await waitForText(page, 'Reps watch them in this order')
+    await click(page, 'Move module 3 up')
+    await click(page, 'Move module 1 down')
+    const order = await page.$$eval('ol[aria-label=Modules] input', (els) => els.map((e) => e.value))
+    assert.deepEqual(order, ['3 · Your storefront', '1 · The big picture', '2 · Getting started'])
+    await click(page, 'Save lesson')
+    await waitForText(page, 'Lesson saved.')
+    const body = bodyOf(api, '/training/items/les-tutorial', 'PATCH')
+    assert.deepEqual(
+      body.payload.items.map((m) => m.youtubeId),
+      ['tutorial003', 'tutorial001', 'tutorial002'],
+    )
+    await page.close()
+  })
+
   test('the sales head adds the app tutorial by pasting only the playlist link', async () => {
     const { page, go, api } = await app.open(LAPTOP, { role: 'super_admin' })
     await go('/training/courses/course-1')

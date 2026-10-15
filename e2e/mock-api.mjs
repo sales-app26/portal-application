@@ -1098,6 +1098,21 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       return ok({ id: 'les-new', courseId: m[1], projectId: null, sort: 0, hasFile: false, summary: null, ...json() }, 'Lesson saved.', 201)
     if ((m = p.match(/^\/training\/courses\/([^/]+)$/)))
       return ok({ course: training.course, lessons: training.lessons.map((l) => ({ ...l, projectId: null, sort: 0, payload: l.content, hasFile: false })) })
+    if ((m = p.match(/^\/training\/items\/([^/]+)$/)) && method === 'PATCH') {
+      const l = training.lessons.find((x) => x.id === m[1])
+      return ok(
+        {
+          ...l,
+          projectId: null,
+          sort: 0,
+          hasFile: false,
+          payload: { ...l?.content, ...json().payload },
+          ...json(),
+          ...(json().payload ? { payload: { ...l?.content, ...json().payload } } : {}),
+        },
+        'Lesson saved.',
+      )
+    }
     if ((m = p.match(/^\/training\/items\/([^/]+)\/file$/))) return ok({ url: '/api/v1/__files/playbook.pdf', fileName: 'Frostique Sales Playbook.pdf' })
     if (p === '/__files/playbook.pdf') return { status: 200, raw: tinyPdf(['Frostique sales playbook', 'Objections and answers']), headers: { 'content-type': 'application/pdf' } }
     if ((m = p.match(/^\/training\/items\/([^/]+)\/progress$/))) {
