@@ -3,6 +3,7 @@ import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
 import { telHref } from '@/lib/contact'
 import { rememberContact } from '@/lib/contactPrompt'
+import { leadTitle } from '@/lib/format'
 import { WhatsAppSheet, type ContactLead } from './WhatsAppSheet'
 
 /** A chat bubble with a handset: reads as "WhatsApp" next to the green fill without copying the logo. */
@@ -31,20 +32,20 @@ export function ContactButtons({ lead, size = 40, className }: { lead: ContactLe
     <span className={cn('flex flex-none items-center gap-2', className)}>
       <a
         href={telHref(lead.phone)}
-        aria-label={`Call ${lead.name}`}
+        aria-label={`Call ${leadTitle(lead)}`}
         title="Call"
         style={style}
         className={cn(round, 'bg-primary/10 text-primary active:bg-primary/20')}
         onClick={(e) => {
           e.stopPropagation()
-          rememberContact({ leadId: lead.id, name: lead.name, kind: 'call' })
+          rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'call' })
         }}
       >
         <Icon name="phone" size={20} />
       </a>
       <button
         type="button"
-        aria-label={`WhatsApp ${lead.name}`}
+        aria-label={`WhatsApp ${leadTitle(lead)}`}
         title="WhatsApp"
         style={style}
         className={cn(round, 'bg-[#25d366]/12 text-[#128c4a] active:bg-[#25d366]/25 dark:text-[#3ddc84]')}

@@ -26,7 +26,7 @@ const SORTS: { value: LeadSort; label: string; short: string }[] = [
   { value: 'next_follow_up', label: 'Next follow-up first', short: 'Next follow-up' },
   { value: 'updated', label: 'Recently active', short: 'Recently active' },
   { value: 'created', label: 'Newest first', short: 'Newest' },
-  { value: 'name', label: 'Name, A to Z', short: 'Name' },
+  { value: 'name', label: 'Business name, A to Z', short: 'Name' },
   { value: 'value', label: 'Highest deal value', short: 'Value' },
   { value: 'activity', label: 'Untouched longest', short: 'Untouched' },
 ]

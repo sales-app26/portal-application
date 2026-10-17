@@ -24,7 +24,7 @@ import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import { ago, formatDateTime, formatPhone, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
+import { ago, formatDateTime, formatPhone, leadPerson, leadTitle, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { dealOf } from '@/lib/deal'
 import { ChatIcon } from '@/features/leads/ContactActions'
@@ -61,7 +61,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   const p = d?.permissions
   const actions = d && p && (
     <ActionMenu
-      title={d.name}
+      title={leadTitle(d)}
       items={[
         { label: 'Change status', icon: 'synchronize', onSelect: () => setForm('status'), hidden: !p.canChangeStatus },
         { label: 'Edit lead', icon: 'edit', onSelect: () => setForm('edit'), hidden: !p.canEdit },
@@ -93,7 +93,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
       <Confirm
         open={form === 'delete'}
         onOpenChange={(o) => setForm(o ? 'delete' : null)}
-        title={`Delete ${d.name}?`}
+        title={`Delete ${leadTitle(d)}?`}
         body="The lead disappears everywhere, its phone number can be added again, and a win no longer counts toward the target. This can't be undone from the app."
         confirmLabel="Delete lead"
         loading={deleting}
@@ -138,7 +138,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <Page title={d?.name ?? 'Lead'} back="/leads" actions={actions} cta={cta} heroTitle>
+    <Page title={d ? leadTitle(d) : 'Lead'} back="/leads" actions={actions} cta={cta} heroTitle>
       {body}
       {forms}
     </Page>
@@ -150,7 +150,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
   const qc = useQueryClient()
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
   const [deletingEntry, setDeletingEntry] = useState(false)
-  const mine = lead.owner.id === me.id
+  const mine = lead.owner?.id === me.id
   const deal = dealOf(lead)
   const [showOlder, setShowOlder] = useState(false)
   const [chat, setChat] = useState(false)
@@ -166,10 +166,10 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
   return (
     <div className="flex flex-col gap-6 expanded:max-w-[720px]">
       <header className="flex items-start gap-4">
-        <Avatar name={lead.name} size={56} />
+        <Avatar name={leadTitle(lead)} size={56} />
         <div className="min-w-0 flex-1">
-          <h2 className="text-title-md break-words">{lead.name}</h2>
-          {lead.businessName && <p className="text-body-md text-body">{lead.businessName}</p>}
+          <h2 className="text-title-md break-words">{leadTitle(lead)}</h2>
+          {leadPerson(lead) && <p className="text-body-md text-body">{leadPerson(lead)}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {lead.permissions.canChangeStatus ? (
               <button
@@ -198,7 +198,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       <div className="flex gap-3">
         <QuickAction
           href={telHref(lead.phone)}
-          onClick={() => lead.permissions.canLogFollowUp && rememberContact({ leadId: lead.id, name: lead.name, kind: 'call' })}
+          onClick={() => lead.permissions.canLogFollowUp && rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'call' })}
           icon={<Icon name="phone" />}
           label="Call"
           sub={formatPhone(lead.phone)}
@@ -227,6 +227,13 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       )}
       <PinnedNote lead={lead} />
 
+      {!lead.owner && (
+        <Notice icon="swap" title="Not assigned yet">
+          {lead.permissions.canReassign
+            ? 'This lead came in from a bulk upload. Assign it to someone on the team so they can start working on it.'
+            : 'This lead came in from a bulk upload and is waiting to be assigned.'}
+        </Notice>
+      )}
       {lead.pendingTransfer && (
         <Notice icon="swap" title={`Handover to ${lead.pendingTransfer.toUser.name} is waiting for approval`}>
           {lead.pendingTransfer.reason}
@@ -259,7 +266,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
             chevron={lead.permissions.canLogFollowUp}
           />
         )}
-        {!mine && <ListRow icon="user-male-circle" title={lead.owner.name} subtitle="Owner" />}
+        {!mine && <ListRow icon="user-male-circle" title={lead.owner?.name ?? 'Not assigned'} subtitle="Owner" />}
         {lead.convertedAt && <ListRow icon="ok" title={formatDateTime(lead.convertedAt)} subtitle={lead.convertedBy ? `Won by ${lead.convertedBy.name}` : 'Won'} />}
         <ListRow
           icon="briefcase"
@@ -407,7 +414,7 @@ function ReassignLead({ lead, open, onOpenChange }: { lead: LeadDetail; open: bo
       projectId={lead.projectId}
       leadIds={[lead.id]}
       members={members.data ?? []}
-      excludeUserId={lead.owner.id}
+      excludeUserId={lead.owner?.id}
       open={open}
       onOpenChange={onOpenChange}
       onDone={() => {}}

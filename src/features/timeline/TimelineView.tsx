@@ -5,7 +5,7 @@ import { FilterChips } from '@/components/ui/Choice'
 import { EmptyState, ErrorState, ListSkeleton, Skeleton } from '@/components/ui/Display'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { useWindowClass } from '@/hooks/useWindowClass'
-import { plural, todayIST } from '@/lib/format'
+import { leadTitle, plural, todayIST } from '@/lib/format'
 import type { Entry, TimelineEntry } from '@/lib/types'
 import { DateStrip } from './DateStrip'
 import { EditEntryForm } from './EditEntryForm'
@@ -134,7 +134,7 @@ export function TimelineView({ userId }: { userId?: string }) {
         </>
       )}
 
-      <PhotoViewer entry={photo} title={photo?.lead.name} onClose={() => setPhoto(null)} />
+      <PhotoViewer entry={photo} title={photo ? leadTitle(photo.lead) : undefined} onClose={() => setPhoto(null)} />
       {editing && <EditEntryForm entry={editing} open onOpenChange={(o) => !o && setEditing(null)} />}
     </>
   )

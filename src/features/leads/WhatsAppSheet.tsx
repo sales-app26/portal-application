@@ -2,18 +2,22 @@ import { useMe } from '@/auth/AuthProvider'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { whatsappHref } from '@/lib/contact'
 import { rememberContact } from '@/lib/contactPrompt'
+import { leadTitle } from '@/lib/format'
 import { useTemplates } from '@/features/team/queries'
 
 export interface ContactLead {
   id: string
-  name: string
+  /** The person at the business, when known. */
+  name: string | null
   phone: string
-  businessName?: string | null
+  businessName: string | null
   /** Picks the project's own messages, when its manager wrote some. */
   projectId?: string
 }
 
 const first = (name: string) => name.trim().split(/\s+/)[0] ?? name
+/** How a message greets the client: their first name, or "there" when no one is named. */
+const greet = (name: string | null) => (name?.trim() ? first(name) : 'there')
 
 /** Messages reps send again and again, with the client's and the rep's names filled in. */
 function templates(client: string, rep: string) {
@@ -36,12 +40,12 @@ export function WhatsAppSheet({ open, onOpenChange, lead, prompt = true }: { ope
   const project = useTemplates(open ? lead.projectId : undefined)
   const fill = (body: string) =>
     body
-      .replaceAll('{client}', first(lead.name))
+      .replaceAll('{client}', greet(lead.name))
       .replaceAll('{rep}', first(me.name))
       .replaceAll('{business}', lead.businessName ?? 'your shop')
-  const messages = project.data?.length ? project.data.map((t) => ({ label: t.label, text: fill(t.body) })) : templates(first(lead.name), first(me.name))
+  const messages = project.data?.length ? project.data.map((t) => ({ label: t.label, text: fill(t.body) })) : templates(greet(lead.name), first(me.name))
   const sent = () => {
-    if (prompt) rememberContact({ leadId: lead.id, name: lead.name, kind: 'whatsapp' })
+    if (prompt) rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'whatsapp' })
     onOpenChange(false)
   }
   const href = (text?: string) => `${whatsappHref(lead.phone)}${text ? `?text=${encodeURIComponent(text)}` : ''}`
@@ -50,7 +54,7 @@ export function WhatsAppSheet({ open, onOpenChange, lead, prompt = true }: { ope
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={`WhatsApp ${lead.name}`}
+      title={`WhatsApp ${leadTitle(lead)}`}
       description="Pick a message. You can edit it in WhatsApp before sending."
       variant="choice"
     >

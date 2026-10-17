@@ -109,8 +109,8 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
     try {
       const fields = {
         clientRequestId: requestId,
-        name: v.name.trim(),
-        businessName: v.businessName.trim() || undefined,
+        businessName: v.businessName.trim(),
+        name: v.name.trim() || undefined,
         phone: normalizePhone(v.phone) ?? v.phone,
         notes: v.notes.trim() || undefined,
         status: v.status ?? undefined,
@@ -177,14 +177,13 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
           </legend>
           <TextField
             label="Shop or business name"
-            optional
             autoComplete="organization"
             autoCapitalize="words"
             enterKeyHint="next"
             error={formState.errors.businessName?.message}
             {...register('businessName')}
           />
-          <TextField label="Contact person" autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
+          <TextField label="Owner or manager name" optional autoComplete="off" autoCapitalize="words" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
           <div className="flex flex-col gap-1.5">
             <TextField
               label="Phone"

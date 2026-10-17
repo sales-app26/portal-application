@@ -233,8 +233,9 @@ function LeadsTab({ project }: { project: Project }) {
   const list = useLeadList(project.id, {
     search: q || undefined,
     status: status === 'all' ? null : status,
-    ownerId: owner !== 'all' && owner !== 'unavailable' ? owner : undefined,
+    ownerId: owner !== 'all' && owner !== 'unavailable' && owner !== 'unassigned' ? owner : undefined,
     ownerUnavailable: owner === 'unavailable',
+    unassigned: owner === 'unassigned',
   })
   const leads = list.data?.pages.flatMap((pg) => pg.items) ?? []
   const toggle = (id: string) => setPicked((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)))
@@ -289,14 +290,18 @@ function LeadsTab({ project }: { project: Project }) {
       )}
       {!empty && (
         <div className="flex flex-col gap-2">
-          {ownerOptions.length > 1 && (
-            <FilterChips
-              label="Owner"
-              value={owner}
-              onChange={setOwner}
-              options={[{ value: 'all', label: 'Everyone' }, ...ownerOptions, { value: 'unavailable', label: 'Owner left or removed' }]}
-            />
-          )}
+          {/* Not assigned: leads a bulk upload left for later. Select them, then Assign to hand them out. */}
+          <FilterChips
+            label="Owner"
+            value={owner}
+            onChange={setOwner}
+            options={[
+              { value: 'all', label: 'Everyone' },
+              { value: 'unassigned', label: 'Not assigned' },
+              ...(ownerOptions.length > 1 ? ownerOptions : []),
+              { value: 'unavailable', label: 'Owner left or removed' },
+            ]}
+          />
           <FilterChips
             label="Status"
             value={status}

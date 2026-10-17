@@ -10,6 +10,8 @@ export interface LeadListFilter {
   /** Admins: one owner, or leads whose owner is inactive or removed. */
   ownerId?: string
   ownerUnavailable?: boolean
+  /** Admins: leads not assigned to anyone yet (left by a bulk upload). */
+  unassigned?: boolean
   due?: LeadDue
   /** Open leads untouched for 14+ days. */
   cold?: boolean
@@ -48,6 +50,7 @@ export function useLeadList(projectId: string | undefined, f: LeadListFilter) {
           sort: f.sort,
           ownerId: f.ownerId,
           ownerUnavailable: f.ownerUnavailable ? 'true' : undefined,
+          unassigned: f.unassigned ? 'true' : undefined,
           due: f.due,
           cold: f.cold ? 'true' : undefined,
           coveringFor: f.coveringFor,

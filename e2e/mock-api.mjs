@@ -1227,6 +1227,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
         imported: dryRun ? 0 : 4,
         duplicates: 1,
         invalid: 1,
+        unassigned: 0,
         byOwner: picked.map((name, i) => ({
           user: { id: users.find((u) => u.name === name)?.id ?? ids.priya, name },
           count: i === 0 ? Math.ceil(4 / picked.length) : Math.floor(4 / picked.length),

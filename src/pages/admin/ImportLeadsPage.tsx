@@ -18,22 +18,29 @@ import { haptic } from '@/lib/haptics'
 import type { ImportResult, Member } from '@/lib/types'
 
 const MAX_BYTES = 1024 * 1024
-const COLUMNS = ['name', 'phone', 'business_name', 'location', 'notes', 'owner_email']
+// The business first: it is required. `name` (the owner or manager) is optional.
+const COLUMNS = ['business_name', 'phone', 'name', 'location', 'notes', 'owner_email']
 
 type Step = 'form' | 'preview' | 'done'
-/** review: check the file, then pick a person per lead on screen. single: the whole file goes to one person. */
-type Mode = 'review' | 'single'
+/**
+ * review: check the file, then pick a person per lead on screen (or leave some for later).
+ * single: the whole file goes to one person.
+ * later: add them now, assign later from the campaign's Not assigned leads.
+ */
+type Mode = 'review' | 'single' | 'later'
 
 const downloadTemplate = () =>
   saveCsv('leads-sample-sheet.csv', COLUMNS, [
-    ['Asha Patil', '98765 43210', 'Patil General Store', 'Wanowrie', 'Likes calls after 4 pm', ''],
-    ['Imran Shaikh', '9123456780', '', 'Kondhwa', '', 'priya@yourcompany.com'],
+    ['Patil General Store', '98765 43210', 'Asha Patil', 'Wanowrie', 'Likes calls after 4 pm', ''],
+    ['Shaikh Bakers', '9123456780', '', 'Kondhwa', '', 'priya@yourcompany.com'],
   ])
 
 /**
- * Bulk import from a CSV (admins). Two ways to hand leads out:
+ * Bulk import from a CSV (admins). Three ways to hand leads out:
  * - review: check the file, see every lead, assign them on screen (one by one or in bulk), then import;
- * - single: the whole file goes to one person.
+ *   any left unpicked go in unassigned;
+ * - single: the whole file goes to one person;
+ * - later: add them all unassigned (except rows whose owner_email names someone), to hand out later.
  * Nothing is saved until the last step, and a file can be run twice safely.
  */
 export function ImportLeadsPage() {
@@ -118,7 +125,6 @@ export function ImportLeadsPage() {
   }
 
   const importable = result?.importable ?? 0
-  const unassigned = mode === 'review' && result ? result.rows.filter((r) => !assignments[r.row]).length : 0
 
   const cta =
     step === 'form'
@@ -131,10 +137,10 @@ export function ImportLeadsPage() {
         }
       : step === 'preview'
         ? {
-            label: !importable ? 'Nothing to add' : unassigned ? `Assign ${unassigned} more` : `Add ${plural(importable, 'lead')}`,
+            label: !importable ? 'Nothing to add' : `Add ${plural(importable, 'lead')}`,
             icon: 'download' as const,
             onClick: () => void run(false),
-            disabled: !importable || unassigned > 0,
+            disabled: !importable,
             loading: busy,
           }
         : { label: 'View leads', icon: 'contacts' as const, onClick: () => navigate(back) }
@@ -164,6 +170,12 @@ export function ImportLeadsPage() {
                   body="See every lead in the sheet, then pick a person for each one, or for many at once."
                 />
                 <ModeRow selected={mode === 'single'} onSelect={() => setMode('single')} title="All to one person" body="Every lead in the sheet goes to the person you pick." />
+                <ModeRow
+                  selected={mode === 'later'}
+                  onSelect={() => setMode('later')}
+                  title="Assign later"
+                  body="Add the leads now. They wait under Not assigned in the campaign's leads until you hand them out."
+                />
               </ListGroup>
               {mode === 'single' &&
                 (people.length === 0 ? (
@@ -202,12 +214,19 @@ export function ImportLeadsPage() {
                 </p>
               )}
               <p className="text-body-sm text-body">
-                Put these headings on the top line, then one lead on each line below. <b>name</b> and <b>phone</b> are needed. You can also add <b>business_name</b>,{' '}
+                Put these headings on the top line, then one lead on each line below. <b>business_name</b> and <b>phone</b> are needed. You can also add <b>name</b> (the owner
+                or manager, if you know it),{' '}
                 <b>location</b>, <b>notes</b>
                 {mode === 'review' && (
                   <>
                     {' '}
                     and <b>owner_email</b> (fills in who gets that lead; you can still change it)
+                  </>
+                )}
+                {mode === 'later' && (
+                  <>
+                    {' '}
+                    and <b>owner_email</b> (that lead goes straight to that person)
                   </>
                 )}
                 .
@@ -317,6 +336,7 @@ function AssignStep({
         </p>
         <p className="text-body-sm text-body">
           {result.total} {result.total === 1 ? 'line' : 'lines'} in the sheet. Pick leads, then choose who gets them. Nothing is saved until you add them.
+          {unassigned.length > 0 && ' Leads you leave unassigned are added too, under Not assigned, to hand out later.'}
         </p>
         <Counts result={result} />
         {byOwner.length > 0 && <ByOwner result={{ ...result, byOwner }} />}
@@ -356,7 +376,7 @@ function AssignStep({
                   type="button"
                   role="checkbox"
                   aria-checked={selected}
-                  aria-label={`Select ${r.name}`}
+                  aria-label={`Select ${r.businessName}`}
                   onClick={() => toggle(r.row)}
                   className={cn(
                     'flex size-6 flex-none items-center justify-center rounded-full border-2',
@@ -366,14 +386,14 @@ function AssignStep({
                   {selected && <Icon name="checkmark" size={16} />}
                 </button>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-title-sm">{r.name}</span>
+                  <span className="block truncate text-title-sm">{r.businessName}</span>
                   <span className="block truncate text-caption text-body">
                     <span className="tabular-nums">{formatPhone(r.phone)}</span> · {r.location}
-                    {r.businessName && ` · ${r.businessName}`}
+                    {r.name && ` · ${r.name}`}
                   </span>
                 </span>
                 <Picker
-                  label={`Who gets ${r.name}`}
+                  label={`Who gets ${r.businessName}`}
                   value={owner ?? null}
                   options={options}
                   onChange={(v) => onChange({ ...assignments, [r.row]: v })}
@@ -434,7 +454,7 @@ function OwnerRow({ member, selected, onToggle }: { member: Member; selected: bo
 const reportCsv = (r: ImportResult) =>
   saveCsv(
     'leads-not-added.csv',
-    ['row', 'kind', 'name', 'phone', 'reason'],
+    ['row', 'kind', 'lead', 'phone', 'reason'],
     r.problems.map((p) => [p.row, p.kind, p.name, p.phone, p.reason]),
   )
 
@@ -501,6 +521,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
         </p>
         <p className="text-body-sm text-body">
           {result.total} {result.total === 1 ? 'line' : 'lines'} in the sheet. Nothing has been saved yet.
+          {result.unassigned > 0 && ` ${plural(result.unassigned, 'lead')} will wait under Not assigned until you hand ${result.unassigned === 1 ? 'it' : 'them'} out.`}
         </p>
         <Counts result={result} />
       </div>
@@ -519,9 +540,10 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
             {result.sample.map((s) => (
               <li key={s.row} className="flex items-center gap-3 border-b border-hairline-soft px-4 py-3 last:border-b-0">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-title-sm">{s.name}</span>
+                  <span className="block truncate text-title-sm">{s.businessName}</span>
                   <span className="block truncate text-caption text-body">
                     <span className="tabular-nums">{formatPhone(s.phone)}</span> · {s.location}
+                    {s.name && ` · ${s.name}`}
                   </span>
                 </span>
                 <span className="flex-none text-caption text-muted">{s.owner?.name}</span>
@@ -549,7 +571,13 @@ function Done({ result, projectId, onAgain }: { result: ImportResult; projectId:
           {plural(result.imported, 'lead')} added
         </p>
         <p className="text-body-sm text-body">
-          Each person finds theirs in <b>My leads</b>, as New.
+          {result.unassigned < result.imported && <>Each person finds theirs in <b>My leads</b>, as New. </>}
+          {result.unassigned > 0 && (
+            <>
+              {plural(result.unassigned, 'lead')} {result.unassigned === 1 ? 'is' : 'are'} waiting under <b>Not assigned</b> in the campaign's leads: tap Select, pick them and{' '}
+              tap <b>Assign</b> to hand them out.
+            </>
+          )}
           {result.duplicates + result.invalid > 0 && ` ${plural(result.duplicates + result.invalid, 'line')} ${result.duplicates + result.invalid === 1 ? 'was' : 'were'} skipped.`}
         </p>
         <Counts result={result} />

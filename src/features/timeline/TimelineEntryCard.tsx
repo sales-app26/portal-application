@@ -6,7 +6,7 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { formatTime, REASON_LABEL, relativeDay } from '@/lib/format'
+import { formatTime, leadPerson, leadTitle, REASON_LABEL, relativeDay } from '@/lib/format'
 import type { TimelineEntry } from '@/lib/types'
 
 interface Props {
@@ -43,8 +43,8 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
         </div>
 
         <Link to={`/leads/${entry.lead.id}`} className="mt-0.5 block min-w-0 truncate text-title-sm active:underline">
-          {entry.lead.name}
-          {entry.lead.businessName && <span className="font-normal text-body"> · {entry.lead.businessName}</span>}
+          {leadTitle(entry.lead)}
+          {leadPerson(entry.lead) && <span className="font-normal text-body"> · {leadPerson(entry.lead)}</span>}
         </Link>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -15,7 +15,7 @@ import { Icon } from '@/icons'
 import { dealSentence, PLAN_LABEL } from '@/lib/deal'
 import { Picker } from '@/components/ui/Picker'
 import { ApiError, apiWithMessage } from '@/lib/api'
-import { formatPhone, normalizePhone, relativeDay } from '@/lib/format'
+import { formatPhone, leadPerson, leadTitle, normalizePhone, relativeDay } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import type { EntrySaveResult, LeadDetail, LeadSource } from '@/lib/types'
@@ -164,7 +164,7 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
       open={open}
       onOpenChange={onOpenChange}
       title="Log follow-up"
-      description={lead.businessName ? `${lead.name} · ${lead.businessName}` : lead.name}
+      description={[leadTitle(lead), leadPerson(lead)].filter(Boolean).join(' · ')}
       variant="form"
       dirty={(formState.isDirty || !!proof) && !saving}
       footer={
@@ -367,8 +367,9 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
 // ---------------------------------------------------------------- edit lead
 
 const editSchema = z.object({
-  name: z.string().trim().min(1, 'Enter the client name.').max(120),
-  businessName: z.string().trim().max(160),
+  // The business is required, the person there is not (many leads have no name yet).
+  businessName: z.string().trim().min(1, 'Enter the business name.').max(160),
+  name: z.string().trim().max(120),
   phone: z
     .string()
     .trim()
@@ -383,8 +384,8 @@ type EditValues = z.input<typeof editSchema>
 export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
   const qc = useQueryClient()
   const defaults = (): EditValues => ({
-    name: lead.name,
     businessName: lead.businessName ?? '',
+    name: lead.name ?? '',
     phone: formatPhone(lead.phone),
     notes: lead.notes ?? '',
     location: lead.location.name,
@@ -402,8 +403,8 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
     // Only changed fields: the API re-checks the phone for duplicates when it is sent.
     const body: Record<string, string | number | null | undefined> = {}
     const d = formState.dirtyFields
-    if (d.name) body.name = v.name.trim()
-    if (d.businessName) body.businessName = v.businessName.trim() || null
+    if (d.businessName) body.businessName = v.businessName.trim()
+    if (d.name) body.name = v.name.trim() || null
     if (d.phone) body.phone = normalizePhone(v.phone) ?? v.phone
     if (d.notes) body.notes = v.notes.trim() || null
     if (d.location) body.location = v.location.trim().replace(/\s+/g, ' ')
@@ -424,7 +425,7 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['name', 'businessName', 'phone', 'notes', 'location', ...DEAL_FIELDS, 'source'])
+      handleFormError(err, setError, ['businessName', 'name', 'phone', 'notes', 'location', ...DEAL_FIELDS, 'source'])
     }
   })
 
@@ -442,8 +443,8 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
       }
     >
       <form id="edit-lead" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-2">
-        <TextField label="Name" autoCapitalize="words" error={formState.errors.name?.message} {...register('name')} />
-        <TextField label="Business name" optional autoCapitalize="words" error={formState.errors.businessName?.message} {...register('businessName')} />
+        <TextField label="Business name" autoCapitalize="words" error={formState.errors.businessName?.message} {...register('businessName')} />
+        <TextField label="Owner or manager name" optional autoCapitalize="words" error={formState.errors.name?.message} {...register('name')} />
         <TextField label="Phone" type="tel" inputMode="tel" prefix="+91" error={formState.errors.phone?.message} {...register('phone')} />
         <Controller
           control={control}
@@ -477,7 +478,7 @@ export function RequestTransferForm({ open, onOpenChange, lead }: FormProps) {
   const me = useMe()
   const helpers = useSaveHelpers(lead, onOpenChange)
   const members = useMembers(lead.projectId, open)
-  const candidates = (members.data ?? []).filter((m) => m.isActive && m.userIsActive && m.userId !== lead.owner.id && m.userId !== me.id)
+  const candidates = (members.data ?? []).filter((m) => m.isActive && m.userIsActive && m.userId !== lead.owner?.id && m.userId !== me.id)
   const { register, control, handleSubmit, formState, reset, setError } = useForm<TransferValues>({
     resolver: zodResolver(transferSchema),
     mode: 'onBlur',

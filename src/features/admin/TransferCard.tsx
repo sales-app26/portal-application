@@ -8,7 +8,7 @@ import { TextAreaField } from '@/components/ui/Field'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, leadPerson, leadTitle } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import type { Transfer } from '@/lib/types'
@@ -47,8 +47,8 @@ export function TransferCard({ t }: { t: Transfer }) {
     <li className="card card--default gap-0 rounded-2xl p-4 expanded:p-5">
       <div className="flex items-start justify-between gap-3">
         <Link to={`/leads/${t.lead.id}`} className="min-w-0 active:underline">
-          <p className="truncate text-title-sm">{t.lead.name}</p>
-          <p className="truncate text-body-sm text-body">{[t.lead.businessName, t.lead.projectName].filter(Boolean).join(' · ')}</p>
+          <p className="truncate text-title-sm">{leadTitle(t.lead)}</p>
+          <p className="truncate text-body-sm text-body">{[leadPerson(t.lead), t.lead.projectName].filter(Boolean).join(' · ')}</p>
         </Link>
         <Tag tone={t.status === 'approved' ? 'up' : t.status === 'rejected' ? 'down' : 'ink'} className="flex-none capitalize">
           {t.status}
@@ -56,7 +56,7 @@ export function TransferCard({ t }: { t: Transfer }) {
       </div>
 
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-md">
-        <span className="font-semibold">{t.fromUser.name}</span>
+        <span className="font-semibold">{t.fromUser?.name ?? 'Not assigned'}</span>
         <Icon name="forward" size={16} className="text-muted" />
         <span className="font-semibold">{t.toUser.name}</span>
       </p>
@@ -94,7 +94,7 @@ export function TransferCard({ t }: { t: Transfer }) {
         open={rejecting}
         onOpenChange={setRejecting}
         title="Reject handover"
-        description={`${t.lead.name}: ${t.fromUser.name} → ${t.toUser.name}`}
+        description={`${leadTitle(t.lead)}: ${t.fromUser?.name ?? 'Not assigned'} → ${t.toUser.name}`}
         variant="short"
         dirty={note.length > 0 && !rejectBusy}
         footer={

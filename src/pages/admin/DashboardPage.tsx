@@ -15,7 +15,7 @@ import { Icon, type IconName } from '@/icons'
 import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { downloadCsv } from '@/lib/download'
-import { formatDate, formatDateTime, formatPhone, plural, REASON_LABEL, rupees, rupeesShort, SOURCE_LABEL, STATUS_DOT, STATUS_LABEL, todayIST } from '@/lib/format'
+import { formatDate, formatDateTime, formatPhone, leadPerson, leadTitle, plural, REASON_LABEL, rupees, rupeesShort, SOURCE_LABEL, STATUS_DOT, STATUS_LABEL, todayIST } from '@/lib/format'
 import { haptic } from '@/lib/haptics'
 import type { AttentionKind, Dashboard, FunnelStage } from '@/lib/types'
 import { BarList } from '@/components/charts/BarList'
@@ -288,10 +288,12 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
               {d.conversionsThisWeek.map((c) => (
                 <li key={c.leadId}>
                   <Link to={`/leads/${c.leadId}`} className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-surface-secondary">
-                    <Avatar name={c.leadName} size={36} />
+                    <Avatar name={leadTitle({ name: c.leadName, businessName: c.businessName })} size={36} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-title-sm">{c.leadName}</span>
-                      <span className="block truncate text-caption text-muted">{[c.businessName, c.projectName].filter(Boolean).join(' · ')}</span>
+                      <span className="block truncate text-title-sm">{leadTitle({ name: c.leadName, businessName: c.businessName })}</span>
+                      <span className="block truncate text-caption text-muted">
+                        {[leadPerson({ name: c.leadName, businessName: c.businessName }), c.projectName].filter(Boolean).join(' · ')}
+                      </span>
                       <span className="block truncate text-caption text-body">
                         {c.convertedBy.name} · {formatDateTime(c.convertedAt)}
                         {c.via === 'status_change' && ' · set by hand'} · <span className="tabular-nums">{formatPhone(c.phone)}</span>

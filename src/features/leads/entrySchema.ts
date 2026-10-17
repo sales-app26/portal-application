@@ -138,8 +138,9 @@ export type FollowUpValues = z.input<typeof followUpSchema>
 
 export const leadSchema = z
   .object({
-    name: z.string().trim().min(1, 'Enter the client name.').max(120),
-    businessName: z.string().trim().max(160),
+    // The business is required, the person there is not (many leads have no name yet).
+    businessName: z.string().trim().min(1, 'Enter the shop or business name.').max(160),
+    name: z.string().trim().max(120),
     phone: z.string().trim().refine((v) => normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
     notes: z.string().trim().max(2000),
     source: z.string().nullable(),

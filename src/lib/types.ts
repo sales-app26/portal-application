@@ -170,21 +170,24 @@ export interface PlaceName {
 }
 
 export interface TimelineEntry extends Entry {
-  lead: { id: string; name: string; businessName: string | null }
+  lead: { id: string; name: string | null; businessName: string | null }
   project: { id: string; name: string; type: ProjectType; status: ProjectStatus }
 }
 
 export interface LeadSummary {
   id: string
   projectId: string
-  name: string
+  /** The owner or manager, when known. */
+  name: string | null
+  /** Required on new leads; null only on older ones saved before that. */
   businessName: string | null
   phone: string
   status: LeadStatus
   nextFollowUpDate: string | null
   overdueDays: number | null
   location: PersonRef
-  owner: PersonRef & { isActive: boolean }
+  /** Null: not assigned yet (a bulk upload left it for an admin to hand out). */
+  owner: (PersonRef & { isActive: boolean }) | null
   ownerTag: LeadOwnerTag | null
   convertedAt: string | null
   hasPendingTransfer: boolean
@@ -329,8 +332,9 @@ export interface EntrySaveResult {
 
 export interface Transfer {
   id: string
-  lead: { id: string; name: string; businessName: string | null; projectId: string; projectName: string }
-  fromUser: PersonRef
+  lead: { id: string; name: string | null; businessName: string | null; projectId: string; projectName: string }
+  /** Null: the lead was assigned from Not assigned. */
+  fromUser: PersonRef | null
   toUser: PersonRef
   requestedBy: PersonRef
   reason: string
@@ -418,7 +422,7 @@ export interface Dashboard {
   leadsByStatus: { status: LeadStatus; count: number }[]
   conversionsThisWeek: {
     leadId: string
-    leadName: string
+    leadName: string | null
     businessName: string | null
     phone: string
     projectName: string
@@ -469,6 +473,8 @@ export interface ImportResult {
   imported: number
   duplicates: number
   invalid: number
+  /** Leads no one gets yet: added unassigned, to hand out later. */
+  unassigned: number
   byOwner: { user: PersonRef; count: number }[]
   problems: ImportProblem[]
   problemsTruncated: boolean
@@ -479,9 +485,10 @@ export interface ImportResult {
 
 export interface ImportRow {
   row: number
-  name: string
+  /** The owner or manager, if the sheet gave one. */
+  name: string | null
   phone: string
-  businessName: string | null
+  businessName: string
   location: string
   /** Null in a review until someone is picked. */
   owner: PersonRef | null
@@ -593,7 +600,7 @@ export interface RepReview {
   lostReasons: { reason: LostReason | 'unspecified'; count: number }[]
   sources: { source: LeadSource | 'unspecified'; count: number }[]
   planMix: { plan: string; count: number; revenue: number }[]
-  recentWins: { leadId: string; leadName: string; businessName: string | null; projectName: string; plan: string | null; dealValue: number | null; wonAt: string }[]
+  recentWins: { leadId: string; leadName: string | null; businessName: string | null; projectName: string; plan: string | null; dealValue: number | null; wonAt: string }[]
   /** Monday = 0 … Sunday = 6. */
   weekdays: { weekday: number; followUps: number; visits: number }[]
   feedback: {

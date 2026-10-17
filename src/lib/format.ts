@@ -152,3 +152,16 @@ export function rupeesShort(n: number): string {
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`
 }
+
+/**
+ * A lead's title: its business name, or the person's name on older leads saved before a
+ * business name was required.
+ */
+export function leadTitle(lead: { name: string | null; businessName: string | null }): string {
+  return lead.businessName ?? lead.name ?? ''
+}
+
+/** The person at the business, when the title is the business and someone is named. */
+export function leadPerson(lead: { name: string | null; businessName: string | null }): string | null {
+  return lead.businessName ? lead.name : null
+}

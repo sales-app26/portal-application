@@ -4,12 +4,14 @@ import { Avatar, Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
 import { dealOf } from '@/lib/deal'
-import { plural, relativeDay } from '@/lib/format'
+import { leadPerson, leadTitle, plural, relativeDay } from '@/lib/format'
 import type { LeadSummary } from '@/lib/types'
 import { ContactButtons } from './ContactActions'
 
 /** "Overdue 2 days", "Next: Tomorrow", "Owner inactive"… the one thing to know about when. */
 export function LeadWhen({ lead }: { lead: LeadSummary }) {
+  // Left by a bulk upload: waiting for an admin to hand it out.
+  if (!lead.owner) return <Tag>Not assigned</Tag>
   if (lead.ownerTag) return <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner left the team' : 'Owner removed'}</Tag>
   if (lead.overdueDays) return <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag>
   if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDay(lead.nextFollowUpDate)}</span>
@@ -26,7 +28,8 @@ function DealValue({ lead }: { lead: LeadSummary }) {
   )
 }
 
-const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [lead.businessName, lead.location.name, showOwner ? lead.owner.name : null].filter(Boolean).join(' · ')
+/** Under the business name: the person there (if known), the area, and the owner on admin lists. */
+const secondaryLine = (lead: LeadSummary, showOwner?: boolean) => [leadPerson(lead), lead.location.name, showOwner ? (lead.owner?.name ?? null) : null].filter(Boolean).join(' · ')
 
 /**
  * Lead row (UX-COMPONENTS.md §4.6).
@@ -47,6 +50,7 @@ export function LeadRow({
   onToggle?: () => void
   contact?: boolean
 }) {
+  const title = leadTitle(lead)
   const secondary = secondaryLine(lead, showOwner)
 
   // Selection mode (bulk reassign): the whole row toggles instead of navigating.
@@ -66,7 +70,7 @@ export function LeadRow({
           {selected && <Icon name="checkmark" size={16} />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-title-sm">{lead.name}</span>
+          <span className="truncate text-title-sm">{title}</span>
           <span className="truncate text-body-sm text-body">{secondary}</span>
         </span>
         <span className="flex flex-none flex-col items-end gap-1">
@@ -80,9 +84,9 @@ export function LeadRow({
     return (
       <div className="flex items-center border-b border-separator transition-colors last:border-b-0 hover:bg-surface-secondary has-[a[aria-current=page]]:expanded:bg-accent-soft">
         <NavLink to={`/leads/${lead.id}`} className="flex min-h-[84px] min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4">
-          <Avatar name={lead.name} className="hidden medium:flex" />
+          <Avatar name={title} className="hidden medium:flex" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-title-sm">{lead.name}</span>
+            <span className="truncate text-title-sm">{title}</span>
             {secondary && <span className="truncate text-body-sm text-body">{secondary}</span>}
             <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <StatusChip status={lead.status} size="sm" />
@@ -105,9 +109,9 @@ export function LeadRow({
         )
       }
     >
-      <Avatar name={lead.name} />
+      <Avatar name={title} />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-title-sm">{lead.name}</span>
+        <span className="truncate text-title-sm">{title}</span>
         <span className="truncate text-body-sm text-body">{secondary}</span>
         <DealValue lead={lead} />
       </span>

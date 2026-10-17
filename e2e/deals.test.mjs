@@ -182,7 +182,7 @@ describe('the Won deal', () => {
     const { page, go, api } = await app.open(PHONE)
     await go('/home')
     await click(page, 'Add lead')
-    await fill(page, 'Contact person', 'New Client')
+    await fill(page, 'Shop or business name', 'New Client')
     await fill(page, 'Phone', '98765 43210')
     await fill(page, 'Location', 'Kondhwa')
     await waitForText(page, 'Expected deal')
