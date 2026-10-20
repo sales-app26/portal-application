@@ -370,10 +370,11 @@ const editSchema = z.object({
   // The business is required, the person there is not (many leads have no name yet).
   businessName: z.string().trim().min(1, 'Enter the business name.').max(160),
   name: z.string().trim().max(120),
+  // Empty only for a lead uploaded without a number; onSubmit keeps a number once there is one.
   phone: z
     .string()
     .trim()
-    .refine((v) => normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
+    .refine((v) => v === '' || normalizePhone(v) !== null, 'Enter a 10-digit Indian mobile number.'),
   notes: z.string().trim().max(2000),
   location: followUpShape.location,
   ...dealShape,
@@ -386,7 +387,7 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
   const defaults = (): EditValues => ({
     businessName: lead.businessName ?? '',
     name: lead.name ?? '',
-    phone: formatPhone(lead.phone),
+    phone: lead.phone ? formatPhone(lead.phone) : '',
     notes: lead.notes ?? '',
     location: lead.location.name,
     ...dealDefaults(lead),
@@ -405,7 +406,11 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
     const d = formState.dirtyFields
     if (d.businessName) body.businessName = v.businessName.trim()
     if (d.name) body.name = v.name.trim() || null
-    if (d.phone) body.phone = normalizePhone(v.phone) ?? v.phone
+    if (d.phone && v.phone.trim()) body.phone = normalizePhone(v.phone) ?? v.phone
+    else if (d.phone && lead.phone) {
+      setError('phone', { message: 'Enter a 10-digit Indian mobile number.' })
+      return
+    }
     if (d.notes) body.notes = v.notes.trim() || null
     if (d.location) body.location = v.location.trim().replace(/\s+/g, ' ')
     // Any change to the deal sends it whole: the API replaces the deal as one.
@@ -445,7 +450,7 @@ export function EditLeadForm({ open, onOpenChange, lead }: FormProps) {
       <form id="edit-lead" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-2">
         <TextField label="Business name" autoCapitalize="words" error={formState.errors.businessName?.message} {...register('businessName')} />
         <TextField label="Owner or manager name" optional autoCapitalize="words" error={formState.errors.name?.message} {...register('name')} />
-        <TextField label="Phone" type="tel" inputMode="tel" prefix="+91" error={formState.errors.phone?.message} {...register('phone')} />
+        <TextField label="Phone" optional={!lead.phone} type="tel" inputMode="tel" prefix="+91" error={formState.errors.phone?.message} {...register('phone')} />
         <Controller
           control={control}
           name="location"

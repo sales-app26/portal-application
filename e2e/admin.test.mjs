@@ -299,6 +299,28 @@ describe('projects', () => {
     await waitForText(page, 'Campaign closed. It can still be viewed, but not changed.')
     await page.close()
   })
+
+  test('deleting a campaign needs its name typed, then leaves for the campaign list', async () => {
+    const { page, go, api, errors } = await app.open(PHONE, { role: 'super_admin' })
+    await go(`/projects/${ids.online}?tab=settings`)
+    await click(page, 'Delete campaign', 'button span.text-title-sm')
+    await waitForText(page, 'Nobody can get it back')
+    const deleteButton = () =>
+      page.evaluate(() => [...document.querySelectorAll('[role=dialog] button')].find((b) => b.textContent.trim() === 'Delete for good')?.disabled)
+    assert.equal(await deleteButton(), true, 'nothing typed yet')
+    await fill(page, "Type the campaign's name to confirm", 'Pune Retail')
+    assert.equal(await deleteButton(), true, 'only part of the name')
+    await fill(page, "Type the campaign's name to confirm", '   drive ') // now "Pune Retail   drive "
+    assert.equal(await deleteButton(), false, 'case and spaces do not matter')
+    assert.equal(api.writes.filter((w) => w.path.endsWith('/delete')).length, 0)
+    await click(page, 'Delete for good', '[role=dialog] button')
+    await waitForText(page, 'Campaign deleted, with all its leads, visits and photos.')
+    const sent = api.writes.find((w) => w.path === `/projects/${ids.online}/delete`)
+    assert.equal(JSON.parse(sent.body).confirmName, 'Pune Retail   drive ')
+    await page.waitForFunction(() => location.pathname === '/projects')
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
 })
 
 describe('single lead admin actions', () => {

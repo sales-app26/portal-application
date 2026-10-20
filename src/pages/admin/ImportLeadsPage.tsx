@@ -18,7 +18,7 @@ import { haptic } from '@/lib/haptics'
 import type { ImportResult, Member } from '@/lib/types'
 
 const MAX_BYTES = 1024 * 1024
-// The business first: it is required. `name` (the owner or manager) is optional.
+// The business first: it is the only one required. `phone` and `name` (the owner or manager) are optional.
 const COLUMNS = ['business_name', 'phone', 'name', 'location', 'notes', 'owner_email']
 
 type Step = 'form' | 'preview' | 'done'
@@ -33,6 +33,7 @@ const downloadTemplate = () =>
   saveCsv('leads-sample-sheet.csv', COLUMNS, [
     ['Patil General Store', '98765 43210', 'Asha Patil', 'Wanowrie', 'Likes calls after 4 pm', ''],
     ['Shaikh Bakers', '9123456780', '', 'Kondhwa', '', 'priya@yourcompany.com'],
+    ['Joshi Medicals', '', '', 'Kondhwa', 'No number yet', ''],
   ])
 
 /**
@@ -214,8 +215,8 @@ export function ImportLeadsPage() {
                 </p>
               )}
               <p className="text-body-sm text-body">
-                Put these headings on the top line, then one lead on each line below. <b>business_name</b> and <b>phone</b> are needed. You can also add <b>name</b> (the owner
-                or manager, if you know it),{' '}
+                Put these headings on the top line, then one lead on each line below. Only <b>business_name</b> is needed. You can also add <b>phone</b> (leave it empty if you
+                don't have the number yet), <b>name</b> (the owner or manager, if you know it),{' '}
                 <b>location</b>, <b>notes</b>
                 {mode === 'review' && (
                   <>
@@ -388,7 +389,7 @@ function AssignStep({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title-sm">{r.businessName}</span>
                   <span className="block truncate text-caption text-body">
-                    <span className="tabular-nums">{formatPhone(r.phone)}</span> · {r.location}
+                    {r.phone ? <span className="tabular-nums">{formatPhone(r.phone)}</span> : 'No phone'} · {r.location}
                     {r.name && ` · ${r.name}`}
                   </span>
                 </span>
@@ -542,7 +543,7 @@ function Preview({ result, onBack }: { result: ImportResult; onBack: () => void 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title-sm">{s.businessName}</span>
                   <span className="block truncate text-caption text-body">
-                    <span className="tabular-nums">{formatPhone(s.phone)}</span> · {s.location}
+                    {s.phone ? <span className="tabular-nums">{formatPhone(s.phone)}</span> : 'No phone'} · {s.location}
                     {s.name && ` · ${s.name}`}
                   </span>
                 </span>

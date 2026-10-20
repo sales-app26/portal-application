@@ -16,13 +16,15 @@ import { FilterChips, Segmented } from '@/components/ui/Choice'
 import { Avatar, EmptyState, ErrorState, ListSkeleton, Skeleton, Tag } from '@/components/ui/Display'
 import { ListGroup, ListRow } from '@/components/ui/ListRow'
 import { LoadMore } from '@/components/ui/LoadMore'
-import { Confirm } from '@/components/ui/Overlay'
+import { Confirm, ResponsiveOverlay } from '@/components/ui/Overlay'
+import { TextField } from '@/components/ui/Field'
 import { AddMemberForm, ReassignForm, SetTargetForm } from '@/features/admin/MemberForms'
 import { ProjectForm } from '@/features/admin/ProjectForm'
 import { invalidateProjects, projectMembersKey, useProjectDetail, useProjectMembers } from '@/features/admin/queries'
 import { LeadRow } from '@/features/leads/LeadRow'
 import { invalidateLeadData, useLeadList } from '@/features/leads/queries'
 import { useDebounced } from '@/hooks/useDebounced'
+import { settleOverlays } from '@/hooks/useOverlayHistory'
 import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { formatDate, ROLE_LABEL, STATUS_LABEL, STATUSES } from '@/lib/format'
@@ -378,6 +380,7 @@ function SettingsTab({ project }: { project: Project }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [confirm, setConfirm] = useState<'close' | 'reopen' | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [busy, setBusy] = useState(false)
   const closed = project.status === 'closed'
 
@@ -410,6 +413,16 @@ function SettingsTab({ project }: { project: Project }) {
           onClick={() => setConfirm(closed ? 'reopen' : 'close')}
         />
       </ListGroup>
+      <ListGroup>
+        <ListRow
+          icon="trash"
+          title="Delete campaign"
+          subtitle="Erases it for good, with every lead, visit and photo."
+          destructive
+          onClick={() => setDeleting(true)}
+        />
+      </ListGroup>
+      <DeleteCampaign project={project} open={deleting} onOpenChange={setDeleting} />
       <ProjectForm open={editing} onOpenChange={setEditing} project={project} />
       <Confirm
         open={confirm === 'close'}
@@ -429,7 +442,84 @@ function SettingsTab({ project }: { project: Project }) {
         onConfirm={() => run('reopen')}
         loading={busy}
       />
-      <p className="text-caption text-muted">{ROLE_LABEL.super_admin}s can see every campaign. A campaign can't be deleted, only closed.</p>
+      <p className="text-caption text-muted">
+        {ROLE_LABEL.super_admin}s can see every campaign. To stop work but keep the records, close the campaign instead of deleting it.
+      </p>
     </section>
+  )
+}
+
+/** Deleting for good: the Sales head types the campaign's name again, as the API checks it too. */
+function DeleteCampaign({ project, open, onOpenChange }: { project: Project; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const same = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
+  const matches = same(typed) === same(project.name)
+
+  const close = (o: boolean) => {
+    if (busy) return
+    if (!o) {
+      setTyped('')
+      setError(undefined)
+    }
+    onOpenChange(o)
+  }
+
+  const remove = async () => {
+    setBusy(true)
+    try {
+      const { message } = await apiWithMessage(`/projects/${project.id}/delete`, { method: 'POST', body: { confirmName: typed } })
+      toast.success(message)
+      invalidateProjects(qc)
+      invalidateLeadData(qc)
+      void qc.invalidateQueries({ queryKey: ['transfers'] })
+      void qc.invalidateQueries({ queryKey: ['notifications'] })
+      onOpenChange(false)
+      // Let the sheet step back out of history first, or that step would cancel this one.
+      await settleOverlays()
+      // Replace: Back must not return to a campaign that no longer exists.
+      void navigate('/projects', { replace: true })
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message)
+      else handleFormError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ResponsiveOverlay
+      open={open}
+      onOpenChange={close}
+      title={`Delete ${project.name}?`}
+      variant="short"
+      footer={
+        <Button variant="danger" size="lg" block disabled={!matches} loading={busy} onClick={() => void remove()}>
+          Delete for good
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-5 pt-2">
+        <p className="text-body-md text-body">
+          This erases the campaign and everything in it: every lead, visit, photo, comment and handover, the team and targets, ready messages, its own
+          lessons and everyone's progress on them. Nobody can get it back, not even from the app's records.
+        </p>
+        <TextField
+          label="Type the campaign's name to confirm"
+          hint={project.name}
+          autoComplete="off"
+          autoCapitalize="off"
+          value={typed}
+          error={error}
+          onChange={(e) => {
+            setTyped(e.target.value)
+            setError(undefined)
+          }}
+        />
+      </div>
+    </ResponsiveOverlay>
   )
 }

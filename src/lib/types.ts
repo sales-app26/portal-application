@@ -181,7 +181,7 @@ export interface LeadSummary {
   name: string | null
   /** Required on new leads; null only on older ones saved before that. */
   businessName: string | null
-  phone: string
+  phone: string | null
   status: LeadStatus
   nextFollowUpDate: string | null
   overdueDays: number | null
@@ -424,7 +424,7 @@ export interface Dashboard {
     leadId: string
     leadName: string | null
     businessName: string | null
-    phone: string
+    phone: string | null
     projectName: string
     convertedBy: PersonRef
     currentOwner: PersonRef
@@ -487,7 +487,7 @@ export interface ImportRow {
   row: number
   /** The owner or manager, if the sheet gave one. */
   name: string | null
-  phone: string
+  phone: string | null
   businessName: string
   location: string
   /** Null in a review until someone is picked. */

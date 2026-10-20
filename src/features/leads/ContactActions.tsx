@@ -28,6 +28,8 @@ const round = 'pressable inline-flex flex-none items-center justify-center round
 export function ContactButtons({ lead, size = 40, className }: { lead: ContactLead; size?: number; className?: string }) {
   const [chat, setChat] = useState(false)
   const style = { width: size, height: size }
+  // Uploaded without a number: nothing to call or message yet.
+  if (!lead.phone) return null
   return (
     <span className={cn('flex flex-none items-center gap-2', className)}>
       <a

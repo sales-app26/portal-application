@@ -296,7 +296,13 @@ function DashboardBody({ d, filter }: { d: Dashboard; filter: DashboardFilter })
                       </span>
                       <span className="block truncate text-caption text-body">
                         {c.convertedBy.name} · {formatDateTime(c.convertedAt)}
-                        {c.via === 'status_change' && ' · set by hand'} · <span className="tabular-nums">{formatPhone(c.phone)}</span>
+                        {c.via === 'status_change' && ' · set by hand'}
+                        {c.phone && (
+                          <>
+                            {' · '}
+                            <span className="tabular-nums">{formatPhone(c.phone)}</span>
+                          </>
+                        )}
                       </span>
                     </span>
                     <Icon name="chevron-right" size={20} className="text-muted-soft" />

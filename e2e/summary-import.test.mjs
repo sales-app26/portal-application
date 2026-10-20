@@ -145,15 +145,15 @@ describe('bulk import', () => {
     await fill(page, 'Location for leads that have none', 'Pune')
     await click(page, 'Check sheet', 'button')
     await waitForText(page, '4 leads ready · 4 not assigned yet')
-    await waitForText(page, 'Phone must be a 10-digit Indian mobile number.')
+    await waitForText(page, 'Phone must be a 10-digit Indian mobile number, or left empty.')
 
     const dry = api.writes.find((w) => w.path.endsWith('/leads/import'))
     assert.equal(field(dry.body, 'dryRun'), 'true')
     assert.equal(field(dry.body, 'review'), 'true')
     assert.equal(field(dry.body, 'defaultLocation'), 'Pune')
 
-    // Can't import while leads have no one.
-    assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Assign 4 more')?.disabled), true)
+    // No one is needed: leads left unassigned go in under Not assigned, to hand out later.
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Add 4 leads')?.disabled), false)
 
     // One lead by hand, the rest in bulk.
     await clickNth(page, 'Assign', 0, 'li button') // the first lead in the file
@@ -228,15 +228,17 @@ describe('bulk import', () => {
       URL.createObjectURL = (b) => (window.__blobs.push(b), make(b))
     })
     await click(page, 'Download a sample sheet', 'button')
-    const header = await page.evaluate(async () => (await window.__blobs[0].text()).split('\r\n')[0].replace('﻿', ''))
-    assert.equal(header, 'name,phone,business_name,location,notes,owner_email')
+    const sample = await page.evaluate(async () => (await window.__blobs[0].text()).replace('﻿', '').trim().split('\r\n'))
+    assert.equal(sample[0], 'business_name,phone,name,location,notes,owner_email')
+    // The phone is optional: the sample shows a lead without one.
+    assert.equal(sample.at(-1), 'Joshi Medicals,,,Kondhwa,No number yet,')
 
     await (await page.$('#import-file')).uploadFile(csvFile('leads.csv', GOOD_CSV))
     await click(page, 'Check sheet', 'button')
     await waitForText(page, 'Not added')
     await click(page, 'Download list', 'button')
     const report = await page.evaluate(async () => (await window.__blobs.at(-1).text()).replace('﻿', ''))
-    assert.match(report, /^row,kind,name,phone,reason\r\n5,invalid,Bad Phone,12345,Phone must be a 10-digit Indian mobile number\./)
+    assert.match(report, /^row,kind,lead,phone,reason\r\n5,invalid,Bad Phone,12345,"Phone must be a 10-digit Indian mobile number, or left empty\."/)
     await page.close()
   })
 

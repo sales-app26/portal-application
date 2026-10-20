@@ -196,16 +196,28 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
       </header>
 
       <div className="flex gap-3">
-        <QuickAction
-          href={telHref(lead.phone)}
-          onClick={() => lead.permissions.canLogFollowUp && rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'call' })}
-          icon={<Icon name="phone" />}
-          label="Call"
-          sub={formatPhone(lead.phone)}
-          tone="primary"
-        />
-        <QuickAction onClick={() => setChat(true)} icon={<ChatIcon size={24} />} label="WhatsApp" sub="Ready messages" tone="whatsapp" />
-        <WhatsAppSheet open={chat} onOpenChange={setChat} lead={lead} prompt={lead.permissions.canLogFollowUp} />
+        {lead.phone ? (
+          <>
+            <QuickAction
+              href={telHref(lead.phone)}
+              onClick={() => lead.permissions.canLogFollowUp && rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'call' })}
+              icon={<Icon name="phone" />}
+              label="Call"
+              sub={formatPhone(lead.phone)}
+              tone="primary"
+            />
+            <QuickAction onClick={() => setChat(true)} icon={<ChatIcon size={24} />} label="WhatsApp" sub="Ready messages" tone="whatsapp" />
+            <WhatsAppSheet open={chat} onOpenChange={setChat} lead={lead} prompt={lead.permissions.canLogFollowUp} />
+          </>
+        ) : (
+          // Uploaded from a sheet without a number.
+          <QuickAction
+            onClick={lead.permissions.canEdit ? () => onOpenForm('edit') : undefined}
+            icon={<Icon name="phone" />}
+            label="No phone yet"
+            sub={lead.permissions.canEdit ? 'Add a number' : undefined}
+          />
+        )}
         {lastGps && (
           <QuickAction
             href={`https://www.google.com/maps/dir/?api=1&destination=${lastGps.latitude},${lastGps.longitude}`}

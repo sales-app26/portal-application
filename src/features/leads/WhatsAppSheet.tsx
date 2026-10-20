@@ -9,7 +9,8 @@ export interface ContactLead {
   id: string
   /** The person at the business, when known. */
   name: string | null
-  phone: string
+  /** Null for a lead uploaded without a number: no call or WhatsApp is offered for it. */
+  phone: string | null
   businessName: string | null
   /** Picks the project's own messages, when its manager wrote some. */
   projectId?: string
@@ -48,7 +49,7 @@ export function WhatsAppSheet({ open, onOpenChange, lead, prompt = true }: { ope
     if (prompt) rememberContact({ leadId: lead.id, name: leadTitle(lead), kind: 'whatsapp' })
     onOpenChange(false)
   }
-  const href = (text?: string) => `${whatsappHref(lead.phone)}${text ? `?text=${encodeURIComponent(text)}` : ''}`
+  const href = (text?: string) => `${whatsappHref(lead.phone ?? '')}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 
   return (
     <ResponsiveOverlay

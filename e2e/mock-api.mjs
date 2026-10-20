@@ -1201,6 +1201,13 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if (p === '/projects' && method === 'POST')
       return ok(projectDto({ id: ids.other, name: 'New Drive', type: 'online', status: 'active' }, { typeLocked: false, memberCount: 0, leadCount: 0 }), 'Saved.', 201)
     if ((m = p.match(/^\/projects\/([^/]+)\/join$/))) return ok(members[0], 'Added to the campaign team.', 201)
+    if ((m = p.match(/^\/projects\/([^/]+)\/delete$/)) && method === 'POST') {
+      const target = projects.find((x) => x.id === m[1])
+      const same = (s) => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+      if (!target || same(json().confirmName) !== same(target.name))
+        return fail(400, 'VALIDATION_FAILED', 'Type the campaign’s name exactly as it is to delete it.')
+      return ok({ leads: 3, followUps: 5, files: 2 }, 'Campaign deleted, with all its leads, visits and photos.')
+    }
     if ((m = p.match(/^\/projects\/([^/]+)\/(close|reopen)$/)))
       return ok(
         projectDto(projects[0], { status: m[2] === 'close' ? 'closed' : 'active' }),
@@ -1233,7 +1240,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
           count: i === 0 ? Math.ceil(4 / picked.length) : Math.floor(4 / picked.length),
         })),
         problems: [
-          { row: 5, kind: 'invalid', name: 'Bad Phone', phone: '12345', reason: 'Phone must be a 10-digit Indian mobile number.' },
+          { row: 5, kind: 'invalid', name: 'Bad Phone', phone: '12345', reason: 'Phone must be a 10-digit Indian mobile number, or left empty.' },
           { row: 6, kind: 'duplicate', name: 'Asha Patil', phone: '9876543210', reason: 'Already a lead in this campaign, owned by Ravi Kumar.' },
         ],
         problemsTruncated: false,
