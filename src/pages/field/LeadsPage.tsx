@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { Navigate, Outlet, useParams } from 'react-router'
+import { Navigate, Outlet, useParams, useSearchParams } from 'react-router'
 import { useMe } from '@/auth/AuthProvider'
 import { Page } from '@/components/layout/Page'
 import { SearchInput } from '@/components/ui/SearchInput'
-import { ChoiceList, FilterChips } from '@/components/ui/Choice'
+import { ChoiceList, FilterChips, Segmented } from '@/components/ui/Choice'
 import { ResponsiveOverlay } from '@/components/ui/Overlay'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Display'
 import { LoadMore } from '@/components/ui/LoadMore'
 import { Button } from '@/components/ui/Button'
 import { AddLeadForm } from '@/features/leads/AddLeadForm'
 import { LeadRow } from '@/features/leads/LeadRow'
-import { useLeadList } from '@/features/leads/queries'
+import { OpenLeadsList } from '@/features/leads/OpenLeads'
+import { useLeadList, useOpenLeadCount } from '@/features/leads/queries'
 import { useProject } from '@/features/projects/ProjectContext'
 import { ProjectSwitcher } from '@/features/projects/ProjectSwitcher'
 import { useDebounced } from '@/hooks/useDebounced'
@@ -92,6 +93,12 @@ export function LeadDetailRoute() {
 function LeadList() {
   const me = useMe()
   const { project } = useProject()
+  // Reps also see the campaign's Open leads (unassigned ones they can take); managers hand those
+  // out from the campaign page instead.
+  const isRep = me.role === 'sales_person'
+  const [params, setParams] = useSearchParams()
+  const view = isRep && params.get('view') === 'open' ? 'open' : 'mine'
+  const openCount = useOpenLeadCount(isRep ? project?.id : undefined)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [adding, setAdding] = useState(false)
@@ -121,73 +128,97 @@ function LeadList() {
 
   return (
     <Page
-      title="My leads"
+      title={view === 'open' ? 'Open leads' : 'My leads'}
       leading={<ProjectSwitcher />}
       cta={closed ? undefined : { label: 'Add lead', icon: 'plus-math', onClick: () => setAdding(true) }}
       header={
         <div className="flex flex-col gap-3">
-          <SearchInput label="Search leads" placeholder="Name, business or phone" value={search} onChange={setSearch} />
-          <FilterChips
-            label="Status"
-            value={status}
-            onChange={setStatus}
-            options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]}
-          />
+          {isRep && (
+            <Segmented
+              label="Which leads"
+              value={view}
+              onChange={(v) => {
+                const next = new URLSearchParams(params)
+                if (v === 'open') next.set('view', 'open')
+                else next.delete('view')
+                setParams(next, { replace: true })
+              }}
+              options={[
+                { value: 'mine', label: 'My leads' },
+                { value: 'open', label: openCount.data ? `Open leads (${openCount.data})` : 'Open leads' },
+              ]}
+            />
+          )}
+          <SearchInput label="Search leads" placeholder={view === 'open' ? 'Business, name or area' : 'Name, business or phone'} value={search} onChange={setSearch} />
+          {view === 'mine' && (
+            <FilterChips
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={[{ value: 'all' as const, label: 'All' }, ...STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], dot: STATUS_DOT[s] }))]}
+            />
+          )}
         </div>
       }
     >
-      <div className="mb-1 flex min-h-9 items-center justify-between gap-2">
-        <p className="text-caption text-muted" aria-live="polite">
-          {total === undefined ? '' : total === 1 ? '1 lead' : `${total} leads`}
-        </p>
-        <button
-          type="button"
-          onClick={() => setSorting(true)}
-          className="pressable -mr-2 flex h-9 items-center gap-1.5 rounded-pill px-3 text-body-sm font-semibold text-ink active:bg-surface-strong"
-        >
-          <Icon name="sort" size={18} />
-          {SORTS.find((s) => s.value === sort)?.short}
-        </button>
-      </div>
-      <ResponsiveOverlay open={sorting} onOpenChange={setSorting} title="Sort leads" variant="choice">
-        <ChoiceList
-          label="Sort leads"
-          value={sort}
-          options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
-          onSelect={(v) => {
-            setSort(v)
-            setSorting(false)
-          }}
-        />
-      </ResponsiveOverlay>
-      {list.isLoading ? (
-        <ListSkeleton />
-      ) : list.isError ? (
-        <ErrorState message={list.error.message} onRetry={() => void list.refetch()} />
-      ) : leads.length === 0 ? (
-        filtered ? (
-          <EmptyState icon="search" title="No leads match" body="Try another name or number, or clear the status filter." />
-        ) : (
-          <EmptyState
-            icon="contacts"
-            title="No leads yet"
-            body={closed ? 'This campaign is closed.' : 'Add your first lead to start tracking follow-ups.'}
-            action={
-              !closed && (
-                <Button icon="plus-math" onClick={() => setAdding(true)}>
-                  Add lead
-                </Button>
-              )
-            }
-          />
-        )
+      {view === 'open' ? (
+        <OpenLeadsList project={project} search={q} />
       ) : (
-        <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0 expanded:-mx-2">
-          {leads.map((l) => (
-            <LeadRow key={l.id} lead={l} contact />
-          ))}
-          <LoadMore hasNext={!!list.hasNextPage} loading={list.isFetchingNextPage} onLoad={() => void list.fetchNextPage()} />
-        </div>
+        <>
+          <div className="mb-1 flex min-h-9 items-center justify-between gap-2">
+            <p className="text-caption text-muted" aria-live="polite">
+              {total === undefined ? '' : total === 1 ? '1 lead' : `${total} leads`}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSorting(true)}
+              className="pressable -mr-2 flex h-9 items-center gap-1.5 rounded-pill px-3 text-body-sm font-semibold text-ink active:bg-surface-strong"
+            >
+              <Icon name="sort" size={18} />
+              {SORTS.find((s) => s.value === sort)?.short}
+            </button>
+          </div>
+          <ResponsiveOverlay open={sorting} onOpenChange={setSorting} title="Sort leads" variant="choice">
+            <ChoiceList
+              label="Sort leads"
+              value={sort}
+              options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
+              onSelect={(v) => {
+                setSort(v)
+                setSorting(false)
+              }}
+            />
+          </ResponsiveOverlay>
+          {list.isLoading ? (
+            <ListSkeleton />
+          ) : list.isError ? (
+            <ErrorState message={list.error.message} onRetry={() => void list.refetch()} />
+          ) : leads.length === 0 ? (
+            filtered ? (
+              <EmptyState icon="search" title="No leads match" body="Try another name or number, or clear the status filter." />
+            ) : (
+              <EmptyState
+                icon="contacts"
+                title="No leads yet"
+                body={closed ? 'This campaign is closed.' : 'Add your first lead to start tracking follow-ups.'}
+                action={
+                  !closed && (
+                    <Button icon="plus-math" onClick={() => setAdding(true)}>
+                      Add lead
+                    </Button>
+                  )
+                }
+              />
+            )
+          ) : (
+            <div className="card card--default gap-0 overflow-hidden rounded-2xl p-0 expanded:-mx-2">
+              {leads.map((l) => (
+                <LeadRow key={l.id} lead={l} contact />
+              ))}
+              <LoadMore hasNext={!!list.hasNextPage} loading={list.isFetchingNextPage} onLoad={() => void list.fetchNextPage()} />
+            </div>
+          )}
+        </>
       )}
       {!closed && <AddLeadForm open={adding} onOpenChange={setAdding} project={project} />}
     </Page>

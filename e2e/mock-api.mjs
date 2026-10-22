@@ -451,6 +451,11 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   const offerLive = (o) => o.active && (!o.startsOn || o.startsOn <= today) && (!o.endsOn || o.endsOn >= today)
 
   const page = (items) => ({ items, meta: { page: 1, limit: 20, total: items.length, totalPages: 1, hasNextPage: false, hasPreviousPage: false } })
+  // Open leads (unassigned, for reps to take). The second one a teammate takes first.
+  const openLeads = [
+    { id: ids.lead, businessName: 'Patil Store', name: 'Asha Patil', location: { id: 'loc-w', name: 'Wanowrie' }, notes: 'Wants a demo on Saturday', hasPhone: true, source: 'import', addedBy: { id: 'u-head', name: 'Adeeb Shah' }, createdAt: new Date().toISOString() },
+    { id: '33333330-3333-4333-8333-333333333333', businessName: 'Joshi Medicals', name: null, location: { id: 'loc-k', name: 'Kondhwa' }, notes: null, hasPhone: false, source: 'import', addedBy: { id: 'u-head', name: 'Adeeb Shah' }, createdAt: new Date().toISOString() },
+  ]
   const ok = (data, message = 'Done.', status = 200) => ({ status, body: { success: true, statusCode: status, message, data } })
   const fail = (status, errorCode, message, details) => ({ status, body: { success: false, statusCode: status, errorCode, message, ...(details ? { details } : {}) } })
 
@@ -1254,6 +1259,20 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
           ? [2, 3, 4, 7].map((row, i) => ({ row, name: `Lead ${i + 1}`, phone: `912345678${i}`, businessName: null, location: 'Kondhwa', owner: null }))
           : result.sample
       return ok(result, 'Leads added.')
+    }
+    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/open$/))) {
+      const term = (query.get('search') ?? '').toLowerCase()
+      const hits = openLeads.filter((l) => !term || [l.businessName, l.name, l.location.name].some((v) => v?.toLowerCase().includes(term)))
+      return ok(page(hits))
+    }
+    if ((m = p.match(/^\/leads\/([^/]+)\/claim$/))) {
+      const at = openLeads.findIndex((l) => l.id === m[1])
+      if (m[1] === openLeads[1]?.id) {
+        openLeads.splice(at, 1)
+        return fail(409, 'CONFLICT', 'Priya Desai has just taken this lead.')
+      }
+      if (at >= 0) openLeads.splice(at, 1)
+      return ok({ leadId: m[1] }, 'The lead is yours now. It’s in My leads.')
     }
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/delete$/))) return ok({ deleted: json().leadIds.length }, 'Leads deleted.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/reassign$/))) return ok({ reassigned: json().leadIds.length, skipped: 0 }, 'Leads assigned.')

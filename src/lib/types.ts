@@ -830,3 +830,18 @@ export interface TrainingBoard {
   }[]
   recentPitches: { id: string; userId: string; userName: string; lessonTitle: string; score: number | null; startedAt: string; finishedAt: string | null }[]
 }
+
+/** An unassigned lead in a campaign's Open leads, as a rep sees it before taking it. */
+export interface OpenLead {
+  id: string
+  businessName: string | null
+  /** The owner or manager, if known. */
+  name: string | null
+  location: { id: string; name: string }
+  notes: string | null
+  /** The number itself shows once the lead is taken. */
+  hasPhone: boolean
+  source: LeadSource | null
+  addedBy: { id: string; name: string } | null
+  createdAt: string
+}

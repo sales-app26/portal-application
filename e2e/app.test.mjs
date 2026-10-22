@@ -511,3 +511,30 @@ describe('iPad', () => {
     await page.close()
   })
 })
+
+describe('open leads', () => {
+  test('a rep browses Open leads, takes one and lands on it; a lead someone took first drops out', async () => {
+    const { page, go, api, errors } = await app.open(PHONE)
+    await go('/leads')
+    await click(page, 'Open leads (2)', '[role=radio], [role=tab], button')
+    await waitForText(page, '2 leads waiting for someone')
+    // Enough to decide: business, person, area, notes, whether there's a number, who added it.
+    for (const text of ['Patil Store', 'Asha Patil', 'Wanowrie', 'Wants a demo on Saturday', 'Has a number', 'No number yet', 'by Adeeb Shah']) await waitForText(page, text)
+    assert.match(await page.evaluate(() => location.search), /view=open/)
+
+    // Someone else got there first: told who, and the card goes.
+    await click(page, 'Take Joshi Medicals', 'button[aria-label]')
+    await waitForText(page, "it can't go back to Open leads")
+    await click(page, 'Take lead', '[role=dialog] button')
+    await waitForText(page, 'Priya Desai has just taken this lead.')
+    await waitForText(page, '1 lead waiting for someone')
+
+    await click(page, 'Take Patil Store', 'button[aria-label]')
+    await click(page, 'Take lead', '[role=dialog] button')
+    await waitForText(page, 'The lead is yours now.')
+    await page.waitForFunction((id) => location.pathname === `/leads/${id}`, {}, ids.lead)
+    assert.equal(api.writes.filter((w) => w.path.endsWith('/claim')).length, 2)
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+})

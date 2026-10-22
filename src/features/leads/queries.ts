@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Agenda, Entry, LeadDetail, LeadDue, LeadSort, LeadStatus, LeadSummary, MeHome, Member, Paginated } from '@/lib/types'
+import type { Agenda, Entry, LeadDetail, LeadDue, LeadSort, LeadStatus, LeadSummary, MeHome, Member, OpenLead, Paginated } from '@/lib/types'
 
 export interface LeadListFilter {
   search?: string
@@ -25,6 +25,13 @@ export const leadKeys = {
   detail: (id: string) => ['leads', 'detail', id] as const,
   entries: (id: string) => ['leads', 'entries', id] as const,
 }
+/** Open leads: a campaign's unassigned leads, which reps take for themselves. */
+export const openLeadKeys = {
+  all: ['open-leads'] as const,
+  list: (projectId: string, search: string) => ['open-leads', 'list', projectId, search] as const,
+  count: (projectId: string) => ['open-leads', 'count', projectId] as const,
+}
+
 export const homeKeys = {
   home: (projectId?: string) => ['me', 'home', projectId ?? 'all'] as const,
   due: (projectId?: string) => ['me', 'due', projectId ?? 'all'] as const,
@@ -114,6 +121,28 @@ export function useMembers(projectId: string, enabled = true) {
 /** After any save that touches a lead: refresh lists, home counts and the detail. */
 export function invalidateLeadData(qc: QueryClient, leadId?: string) {
   void qc.invalidateQueries({ queryKey: leadKeys.all })
+  void qc.invalidateQueries({ queryKey: openLeadKeys.all })
   void qc.invalidateQueries({ queryKey: ['me'], predicate: (q) => q.queryKey[1] !== undefined })
   if (leadId) void qc.invalidateQueries({ queryKey: leadKeys.detail(leadId) })
+}
+
+export function useOpenLeads(projectId: string | undefined, search: string) {
+  return useInfiniteQuery({
+    queryKey: openLeadKeys.list(projectId ?? '-', search),
+    enabled: !!projectId,
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) =>
+      api<Paginated<OpenLead>>(`/projects/${projectId}/leads/open`, { signal, query: { page: pageParam, limit: PAGE, search: search || undefined } }),
+    getNextPageParam: (last) => (last.meta.hasNextPage ? last.meta.page + 1 : undefined),
+  })
+}
+
+/** How many leads are waiting, for the tab label. */
+export function useOpenLeadCount(projectId: string | undefined) {
+  return useQuery({
+    queryKey: openLeadKeys.count(projectId ?? '-'),
+    enabled: !!projectId,
+    queryFn: ({ signal }) => api<Paginated<OpenLead>>(`/projects/${projectId}/leads/open`, { signal, query: { limit: 1 } }),
+    select: (page) => page.meta.total,
+  })
 }
