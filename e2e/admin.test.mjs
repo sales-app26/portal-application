@@ -134,7 +134,7 @@ describe('people', () => {
     await click(page, 'Add and send invite')
     await waitForText(page, 'We’ve emailed them an invite to set a password.')
     const b = bodyOf(api, '/users')
-    assert.deepEqual(b, { name: 'Zoya Ali', email: 'zoya@example.test', role: 'moderator' })
+    assert.deepEqual(b, { name: 'Zoya Ali', email: 'zoya@example.test', role: 'moderator', workType: 'both' })
     await page.close()
   })
 
@@ -162,6 +162,21 @@ describe('people', () => {
     assert.equal(api.writes.filter((w) => w.path.endsWith('/deactivate')).length, 0, 'nothing sent yet')
     await click(page, 'Remove Priya Desai')
     await waitForText(page, 'Removed from the team.')
+    await page.close()
+  })
+
+  test('someone who never got in shows as pending and can be sent the invite again', async () => {
+    const { page, go, api } = await app.open(PHONE, { role: 'super_admin' })
+    await go('/people?view=accounts')
+    await waitForText(page, 'Invite pending')
+    await clickNth(page, 'More actions', 0) // Priya's row: she already has a password
+    await waitForText(page, 'Email reset link')
+    assert.equal(await page.evaluate(() => document.body.innerText.includes('Resend invite')), false, 'nothing to resend for Priya')
+    await page.keyboard.press('Escape')
+    await clickNth(page, 'More actions', 1) // Karan's row
+    await click(page, 'Resend invite', 'button')
+    await waitForText(page, 'Invite sent again to karan@example.test.')
+    assert.equal(api.writes.filter((w) => w.path.endsWith('/resend-invite')).length, 1)
     await page.close()
   })
 })
@@ -261,6 +276,44 @@ describe('projects', () => {
     await waitForText(page, '0 selected')
     const deleteButtons = await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => /^Delete/.test(b.textContent.trim())).length)
     assert.equal(deleteButtons, 0)
+    await page.close()
+  })
+
+  test('sales head adds one lead and assigns it, with no visit photo', async () => {
+    const { page, go, api, errors } = await app.open(PHONE, { role: 'super_admin' })
+    await go(`/projects/${ids.online}?tab=leads`)
+    await waitForText(page, 'Asha Patil')
+    await click(page, 'Add lead')
+    await waitForText(page, 'No visit photo needed')
+    await fill(page, 'Shop or business name', 'Sweet Crumbs')
+    await fill(page, 'Location', 'Kothrud')
+    await fill(page, 'Phone', '98111 11111')
+    await click(page, 'Add lead', '[role=dialog] button')
+    await waitForText(page, 'owned by Priya Desai')
+    await waitForText(page, 'Open that lead')
+
+    const phone = await page.$('[role=dialog] input[type=tel]')
+    await phone.evaluate((e) => (e.focus(), e.select()))
+    await page.keyboard.press('Backspace')
+    await click(page, 'Not assigned', '[role=dialog] button')
+    await click(page, 'PDPriya DesaiSales rep', '[role=option]')
+    await click(page, 'Add lead', '[role=dialog] button')
+    await waitForText(page, 'Lead saved. Assigned to Priya Desai.')
+    const sent = api.writes.filter((w) => w.path === `/projects/${ids.online}/leads/add`).at(-1)
+    const body = typeof sent.body === 'string' ? JSON.parse(sent.body) : sent.body
+    assert.equal(body.businessName, 'Sweet Crumbs')
+    assert.equal(body.location, 'Kothrud')
+    assert.equal(body.ownerId, ids.priya)
+    assert.equal(body.phone, undefined)
+    assert.deepEqual(errors, [])
+    await page.close()
+  })
+
+  test('a sales manager has no Add lead button on the campaign', async () => {
+    const { page, go } = await app.open(PHONE, { role: 'moderator' })
+    await go(`/projects/${ids.online}?tab=leads`)
+    await waitForText(page, 'Asha Patil')
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Add lead')), false)
     await page.close()
   })
 

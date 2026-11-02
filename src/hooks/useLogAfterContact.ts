@@ -25,7 +25,7 @@ export function useLogAfterContact(enabled: boolean) {
       if (away < MIN_AWAY_MS || away > MAX_AWAY_MS) return
       toast(`How did the ${c.kind === 'call' ? 'call' : 'chat'} with ${c.name} go?`, {
         duration: 15_000,
-        action: { label: 'Log it', onClick: () => navigate(`/leads/${c.leadId}?log=1`) },
+        action: { label: 'Log it', onClick: () => navigate(`/leads/${c.leadId}?log=${c.kind === 'call' ? 'call' : '1'}`) },
       })
     }
     document.addEventListener('visibilitychange', onVisible)

@@ -15,13 +15,15 @@ import { Icon } from '@/icons'
 import { dealSentence, PLAN_LABEL } from '@/lib/deal'
 import { Picker } from '@/components/ui/Picker'
 import { ApiError, apiWithMessage } from '@/lib/api'
-import { formatPhone, leadPerson, leadTitle, normalizePhone, relativeDay } from '@/lib/format'
+import { formatPhone, leadPerson, leadTitle, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import type { EntrySaveResult, LeadDetail, LeadSource } from '@/lib/types'
+import type { CallOutcome, EntrySaveResult, FollowUpChannel, LeadDetail, LeadSource } from '@/lib/types'
 import { checkDeal, checkNextDate, dealBody, dealDefaults, dealShape, followUpSchema, followUpShape, outcomeBody, type FollowUpValues } from './entrySchema'
 import { DealFields } from './DealFields'
 import { SourceChoice } from './SourceChoice'
+import { CallFields, ChannelChoice } from './CallFields'
+import { ATTEMPT_NOTE, channelsFor, isUnreached, nextStepBody, nextStepsFor, relativeDayTime } from './channels'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
 import { invalidateLeadData, leadKeys, useMembers } from './queries'
@@ -68,8 +70,18 @@ function useSaveHelpers(lead: LeadDetail, onOpenChange: (o: boolean) => void) {
 
 // ---------------------------------------------------------------- log follow-up
 
-export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
-  const doorToDoor = lead.project.type === 'door_to_door'
+export function LogFollowUpForm({ open, onOpenChange, lead, startWith }: FormProps & { startWith?: FollowUpChannel }) {
+  const workType = useMe().workType
+  const channels = channelsFor(lead.project.type, workType)
+  const firstChannel = startWith && channels.includes(startWith) ? startWith : channels[0]
+  const nextSteps = nextStepsFor(lead.project.type, workType)
+  const [channel, setChannel] = useState<FollowUpChannel>(firstChannel)
+  const [outcome, setOutcome] = useState<CallOutcome | null>(null)
+  const [recording, setRecording] = useState<File | null>(null)
+  const [callError, setCallError] = useState<string>()
+  const isVisit = channel === 'visit'
+  const isCall = channel === 'call'
+  const attempt = isCall && isUnreached(outcome)
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const [proof, setProof] = useState<VisitProof | null>(null)
   const [proofError, setProofError] = useState<string>()
@@ -85,12 +97,14 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
     status: lead.status === 'new' ? 'contacted' : lead.status,
     note: '',
     nextFollowUpDate: '',
+    nextFollowUpTime: '',
+    nextFollowUpChannel: nextSteps[0],
     location: lead.location.name,
     reason: null,
     // An expected deal set earlier carries into "Mark as won".
     ...dealDefaults(lead),
   })
-  const { register, control, handleSubmit, formState, reset, setError } = useForm<FollowUpValues>({
+  const { register, control, handleSubmit, formState, reset, setError, setValue, getValues } = useForm<FollowUpValues>({
     resolver: zodResolver(followUpSchema),
     mode: 'onBlur',
     defaultValues: defaults(),
@@ -103,45 +117,77 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
     setProof(null)
     setProofError(undefined)
     setPending(null)
+    setChannel(firstChannel)
+    setOutcome(null)
+    setRecording(null)
+    setCallError(undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  // An attempt writes its own note, so logging it takes two taps; it can still be reworded.
+  const pickOutcome = (o: CallOutcome) => {
+    setOutcome(o)
+    // After a call, the next step is usually another one.
+    setValue('nextFollowUpChannel', 'call')
+    if (o === 'spoke') {
+      if (Object.values(ATTEMPT_NOTE).includes(getValues('note'))) setValue('note', '')
+      return
+    }
+    setValue('note', ATTEMPT_NOTE[o], { shouldValidate: true })
+    setValue('status', defaults().status)
+  }
+
   // The photo's 10 minutes ran out while the rep was reading the summary: back to the form to retake it.
   useEffect(() => {
-    if (pending && doorToDoor && !proof && !saving) {
+    if (pending && isVisit && !proof && !saving) {
       setPending(null)
       setProofError('The photo was taken more than 10 minutes ago. Take it again.')
       haptic.error()
     }
-  }, [pending, doorToDoor, proof, saving])
+  }, [pending, isVisit, proof, saving])
 
   // Tapping Save checks the form, then asks for a last look.
   const onSubmit = handleSubmit((v) => {
-    if (doorToDoor && !proof) {
+    if (isVisit && !proof) {
       setProofError('Take a photo of the visit to save it.')
       haptic.error()
       return
     }
+    if (isCall && !outcome) {
+      setCallError('Choose how the call went.')
+      haptic.error()
+      return
+    }
+    if (isCall && outcome === 'spoke' && !recording) {
+      setCallError('Add the call recording to save a call you spoke on.')
+      haptic.error()
+      return
+    }
+    // Nothing about the lead changes, so there's nothing to look over first.
+    if (attempt) return void save(v)
     // An after-sale visit on a won lead resends the deal only if the rep changed it, so an
     // old deal (its free-text plan included) is never rewritten by a visit.
     sendDeal.current = lead.status !== 'converted' || DEAL_FORM_FIELDS.some((k) => formState.dirtyFields[k])
     setPending(v)
   })
 
-  const save = async () => {
-    const v = pending
+  const save = async (v: FollowUpValues | null) => {
     if (!v) return
     setSaving(true)
     try {
+      const hidden = nextDateRule(v.status) === 'hidden'
       const fields = {
         clientRequestId: requestId,
-        status: v.status ?? undefined,
+        channel,
+        callOutcome: isCall ? (outcome ?? undefined) : undefined,
+        status: attempt ? undefined : (v.status ?? undefined),
         note: v.note.trim(),
-        nextFollowUpDate: nextDateRule(v.status) === 'hidden' ? undefined : v.nextFollowUpDate || undefined,
+        nextFollowUpDate: hidden ? undefined : v.nextFollowUpDate || undefined,
+        ...nextStepBody(v, hidden),
         location: v.location.trim().replace(/\s+/g, ' '),
-        ...outcomeBody(v, { dealAlways: false, withDeal: sendDeal.current }),
+        ...(attempt ? {} : outcomeBody(v, { dealAlways: false, withDeal: sendDeal.current })),
       }
-      const { data, message } = await apiWithMessage<EntrySaveResult>(`/leads/${lead.id}/follow-ups`, { method: 'POST', body: entryBody(fields, doorToDoor ? proof : null) })
+      const { data, message } = await apiWithMessage<EntrySaveResult>(`/leads/${lead.id}/follow-ups`, { method: 'POST', body: entryBody(fields, isVisit ? proof : null, isCall && outcome === 'spoke' ? recording : null) })
       setPending(null)
       helpers.done(message, data)
     } catch (err) {
@@ -153,7 +199,14 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
         haptic.error()
         return
       }
-      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate', 'location', 'reason', ...DEAL_FIELDS])
+      // The recording was refused: not audio, or already on another call.
+      if (isCall && err instanceof ApiError && ['CALL_RECORDING_REQUIRED', 'UNPROCESSABLE', 'CONFLICT'].includes(err.code ?? '')) {
+        setRecording(null)
+        setCallError(err.message)
+        haptic.error()
+        return
+      }
+      handleFormError(err, setError, ['status', 'note', 'nextFollowUpDate', 'nextFollowUpTime', 'location', 'reason', ...DEAL_FIELDS])
     } finally {
       setSaving(false)
     }
@@ -166,7 +219,7 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
       title="Log follow-up"
       description={[leadTitle(lead), leadPerson(lead)].filter(Boolean).join(' · ')}
       variant="form"
-      dirty={(formState.isDirty || !!proof) && !saving}
+      dirty={(formState.isDirty || !!proof || !!outcome) && !saving}
       footer={
         <Button type="submit" form="log-follow-up" size="lg" block loading={saving}>
           Save follow-up
@@ -174,7 +227,9 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
       }
     >
       <form id="log-follow-up" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-2">
-        {doorToDoor && (
+        <ChannelChoice options={channels} value={channel} onChange={setChannel} />
+        {isCall && <CallFields outcome={outcome} onOutcome={pickOutcome} recording={recording} onRecording={setRecording} error={callError} onError={setCallError} />}
+        {isVisit && (
           <div className="flex flex-col gap-1.5">
             <VisitProofField value={proof} onChange={(p) => (setProof(p), setProofError(undefined))} error={proofError} />
             {proofError && <p className="text-caption text-down">{proofError}</p>}
@@ -183,7 +238,8 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
         {lead.status === 'converted' && (
           <p className="rounded-md bg-surface-strong px-4 py-3 text-body-sm">This lead is won. The status stays Won unless your sales manager changes it.</p>
         )}
-        <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} dealLead={lead} />
+        {(!isCall || outcome) && <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} dealLead={lead} attempt={attempt} showLocation={!isCall} nextSteps={nextSteps} />}
+        {attempt && <p className="text-caption text-muted">With no date, it comes up again tomorrow.</p>}
       </form>
       <Confirm
         open={!!pending}
@@ -192,8 +248,8 @@ export function LogFollowUpForm({ open, onOpenChange, lead }: FormProps) {
         confirmLabel="Save follow-up"
         cancelLabel="Go back"
         loading={saving}
-        onConfirm={save}
-        body={pending && <FollowUpSummary values={pending} lead={lead} proof={doorToDoor ? proof : null} />}
+        onConfirm={() => save(pending)}
+        body={pending && <FollowUpSummary values={pending} lead={lead} proof={isVisit ? proof : null} recording={isCall ? recording : null} />}
       />
     </ResponsiveOverlay>
   )
@@ -206,7 +262,7 @@ const NOTE_PREVIEW = 80
  * author edits the note and next date until midnight India time; the stage, photo and time never;
  * and once won, only a sales manager moves the lead to another stage.
  */
-function FollowUpSummary({ values, lead, proof }: { values: FollowUpValues; lead: LeadDetail; proof: VisitProof | null }) {
+function FollowUpSummary({ values, lead, proof, recording }: { values: FollowUpValues; lead: LeadDetail; proof: VisitProof | null; recording: File | null }) {
   const status = values.status
   const note = values.note.trim()
   const won = status === 'converted'
@@ -240,12 +296,19 @@ function FollowUpSummary({ values, lead, proof }: { values: FollowUpValues; lead
             <StatusChip status={status} size="sm" />
           </SummaryRow>
         )}
-        {nextDateRule(status) !== 'hidden' && <SummaryRow label="Next follow-up">{values.nextFollowUpDate ? relativeDay(values.nextFollowUpDate) : 'None'}</SummaryRow>}
+        {nextDateRule(status) !== 'hidden' && <SummaryRow label="Next follow-up">{values.nextFollowUpDate ? relativeDayTime(values.nextFollowUpDate, values.nextFollowUpTime) : 'None'}</SummaryRow>}
         <SummaryRow label="Note">“{note.length > NOTE_PREVIEW ? `${note.slice(0, NOTE_PREVIEW).trimEnd()}…` : note}”</SummaryRow>
         {proof && (
           <SummaryRow label="Photo">
             <span className="inline-flex flex-wrap items-center gap-1">
               <Icon name="checkmark" size={16} className="text-up" /> Visit photo attached · <ProofCountdown proof={proof} />
+            </span>
+          </SummaryRow>
+        )}
+        {recording && (
+          <SummaryRow label="Recording">
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <Icon name="checkmark" size={16} className="text-up" /> {recording.name}
             </span>
           </SummaryRow>
         )}
@@ -294,6 +357,8 @@ const changeSchema = z
     status: followUpShape.status,
     note: followUpShape.note,
     nextFollowUpDate: z.string(),
+    nextFollowUpTime: followUpShape.nextFollowUpTime,
+    nextFollowUpChannel: followUpShape.nextFollowUpChannel,
     reason: followUpShape.reason,
     ...dealShape,
   })
@@ -308,15 +373,16 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const helpers = useSaveHelpers(lead, onOpenChange)
   const statuses = changeStatuses(lead.status, lead.permissions.canLeaveConverted)
+  const nextSteps = nextStepsFor(lead.project.type, useMe().workType)
   const { register, control, handleSubmit, formState, reset, setError } = useForm<ChangeValues>({
     resolver: zodResolver(changeSchema),
     mode: 'onBlur',
-    defaultValues: { status: null, note: '', nextFollowUpDate: '', reason: null, ...dealDefaults(lead) },
+    defaultValues: { status: null, note: '', nextFollowUpDate: '', nextFollowUpTime: '', nextFollowUpChannel: nextSteps[0], reason: null, ...dealDefaults(lead) },
   })
 
   useEffect(() => {
     if (!open) return
-    reset({ status: null, note: '', nextFollowUpDate: '', reason: null, ...dealDefaults(lead) })
+    reset({ status: null, note: '', nextFollowUpDate: '', nextFollowUpTime: '', nextFollowUpChannel: nextSteps[0], reason: null, ...dealDefaults(lead) })
     setRequestId(crypto.randomUUID())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reset])
@@ -330,6 +396,7 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
           status: v.status,
           note: v.note.trim(),
           ...(nextDateRule(v.status) !== 'hidden' && v.nextFollowUpDate ? { nextFollowUpDate: v.nextFollowUpDate } : {}),
+          ...nextStepBody(v, nextDateRule(v.status) === 'hidden'),
           ...outcomeBody(v),
         },
       })
@@ -357,7 +424,7 @@ export function ChangeStatusForm({ open, onOpenChange, lead }: FormProps) {
         <p className="text-body-md text-body">Ask your sales manager to change this.</p>
       ) : (
         <form id="change-status" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-1">
-          <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} showLocation={false} dealLead={lead} />
+          <FollowUpFields projectId={lead.projectId} statuses={statuses} control={control} register={register} errors={formState.errors} showLocation={false} dealLead={lead} nextSteps={nextSteps} />
         </form>
       )}
     </ResponsiveOverlay>

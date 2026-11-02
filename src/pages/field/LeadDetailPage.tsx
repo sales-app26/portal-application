@@ -24,7 +24,8 @@ import { Icon } from '@/icons'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import { ago, formatDateTime, formatPhone, leadPerson, leadTitle, plural, relativeDay, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
+import { ago, formatDateTime, formatPhone, leadPerson, leadTitle, plural, rupees, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
+import { relativeDayTime } from '@/features/leads/channels'
 import { cn } from '@/lib/cn'
 import { dealOf } from '@/lib/deal'
 import { ChatIcon } from '@/features/leads/ContactActions'
@@ -48,13 +49,15 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
   const [params, setParams] = useSearchParams()
 
   // "Log it" from the after-call prompt lands here with ?log=1: open the form once the lead is in.
-  const wantsLog = params.get('log') === '1'
+  const wantsLog = params.get('log') === '1' || params.get('log') === 'call'
+  const [startWith, setStartWith] = useState<'call' | undefined>()
   const canLog = !!lead.data?.permissions.canLogFollowUp
   useEffect(() => {
     if (!wantsLog || !lead.data) return
+    if (params.get('log') === 'call') setStartWith('call')
     setParams((p) => (p.delete('log'), p), { replace: true })
     if (canLog) setForm('follow-up')
-  }, [wantsLog, lead.data, canLog, setParams])
+  }, [wantsLog, lead.data, canLog, params, setParams])
 
   const notFound = lead.error instanceof ApiError && lead.error.code === 'NOT_FOUND'
   const d = lead.data
@@ -85,7 +88,7 @@ export function LeadDetailPage({ embedded = false }: { embedded?: boolean }) {
 
   const forms = d && (
     <>
-      <LogFollowUpForm open={form === 'follow-up'} onOpenChange={(o) => setForm(o ? 'follow-up' : null)} lead={d} />
+      <LogFollowUpForm open={form === 'follow-up'} onOpenChange={(o) => (setForm(o ? 'follow-up' : null), o || setStartWith(undefined))} lead={d} startWith={startWith} />
       <ChangeStatusForm open={form === 'status'} onOpenChange={(o) => setForm(o ? 'status' : null)} lead={d} />
       <EditLeadForm open={form === 'edit'} onOpenChange={(o) => setForm(o ? 'edit' : null)} lead={d} />
       <RequestTransferForm open={form === 'transfer'} onOpenChange={(o) => setForm(o ? 'transfer' : null)} lead={d} />
@@ -272,7 +275,7 @@ function LeadBody({ lead, onOpenForm }: { lead: LeadDetail; onOpenForm: (f: Form
         {lead.nextFollowUpDate && (
           <ListRow
             icon="calendar"
-            title={relativeDay(lead.nextFollowUpDate)}
+            title={relativeDayTime(lead.nextFollowUpDate, lead.nextFollowUpTime)}
             subtitle="Next follow-up"
             onClick={lead.permissions.canLogFollowUp ? () => onOpenForm('follow-up') : undefined}
             chevron={lead.permissions.canLogFollowUp}

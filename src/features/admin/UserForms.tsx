@@ -12,10 +12,14 @@ import { Segmented } from '@/components/ui/Choice'
 import { useMembers } from '@/features/leads/queries'
 import { ApiError, apiWithMessage } from '@/lib/api'
 import { formatPhone, normalizePhone, ROLE_LABEL } from '@/lib/format'
+import { WORK_TYPE_LABEL } from '@/features/leads/channels'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
 import type { User, UserRole } from '@/lib/types'
 import { invalidateUsers } from './queries'
+
+const WORK_TYPE_OPTIONS = (['field', 'calling', 'both'] as const).map((value) => ({ value, label: WORK_TYPE_LABEL[value] }))
+const WORK_TYPE_HINT = 'People set to Calling log calls, not visits. It doesn’t change what they’re allowed to see.'
 
 const phoneRule = z
   .string()
@@ -27,6 +31,7 @@ const createSchema = z.object({
   email: z.email('Enter a valid email address.').trim(),
   phone: phoneRule,
   role: z.enum(['moderator', 'sales_person']),
+  workType: z.enum(['field', 'calling', 'both']),
 })
 type CreateValues = z.input<typeof createSchema>
 
@@ -56,12 +61,12 @@ export function AddUserForm({
   const { register, control, handleSubmit, formState, reset, setError } = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
     mode: 'onBlur',
-    defaultValues: { name: '', email: '', phone: '', role },
+    defaultValues: { name: '', email: '', phone: '', role, workType: role === 'moderator' ? 'both' : 'field' },
   })
 
   useEffect(() => {
     if (!open) return
-    reset({ name: '', email: '', phone: '', role })
+    reset({ name: '', email: '', phone: '', role, workType: role === 'moderator' ? 'both' : 'field' })
     setExisting(null)
     setProjectId(projects.length === 1 ? projects[0].id : null)
     setTargetCount('')
@@ -73,7 +78,7 @@ export function AddUserForm({
     try {
       const created = await apiWithMessage<User>('/users', {
         method: 'POST',
-        body: { name: v.name.trim(), email: v.email.toLowerCase(), role: canAddModerator ? v.role : 'sales_person', ...(v.phone ? { phone: normalizePhone(v.phone) } : {}) },
+        body: { name: v.name.trim(), email: v.email.toLowerCase(), role: canAddModerator ? v.role : 'sales_person', workType: v.workType, ...(v.phone ? { phone: normalizePhone(v.phone) } : {}) },
       })
       // One step for the manager: project, target and backup follow the account. If one of
       // them fails the account still exists, so say what's left to do instead of failing it all.
@@ -102,7 +107,7 @@ export function AddUserForm({
         setError('email', { message: err.message })
         return
       }
-      handleFormError(err, setError, ['name', 'email', 'phone', 'role'])
+      handleFormError(err, setError, ['name', 'email', 'phone', 'role', 'workType'])
     }
   })
 
@@ -150,6 +155,11 @@ export function AddUserForm({
             )}
           />
         )}
+        <Controller
+          control={control}
+          name="workType"
+          render={({ field }) => <Picker label="Works in" value={field.value} onChange={field.onChange} options={WORK_TYPE_OPTIONS} hint={WORK_TYPE_HINT} />}
+        />
         <TextField label="Name" autoCapitalize="words" autoComplete="off" enterKeyHint="next" error={formState.errors.name?.message} {...register('name')} />
         <div className="flex flex-col gap-2">
           <TextField
@@ -235,13 +245,14 @@ const editSchema = z.object({
   phone: phoneRule,
   email: z.email('Enter a valid email address.').trim(),
   role: z.enum(['super_admin', 'moderator', 'sales_person']),
+  workType: z.enum(['field', 'calling', 'both']),
 })
 type EditValues = z.input<typeof editSchema>
 
 /** Name and phone for admins; email and role only for the Super Admin (PRD §5.2). */
 export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: User; open: boolean; onOpenChange: (o: boolean) => void; superAdmin: boolean }) {
   const qc = useQueryClient()
-  const defaults = (): EditValues => ({ name: user.name, phone: user.phone ? formatPhone(user.phone) : '', email: user.email, role: user.role })
+  const defaults = (): EditValues => ({ name: user.name, phone: user.phone ? formatPhone(user.phone) : '', email: user.email, role: user.role, workType: user.workType ?? 'field' })
   const { register, control, handleSubmit, formState, reset, setError } = useForm<EditValues>({ resolver: zodResolver(editSchema), mode: 'onBlur', defaultValues: defaults() })
 
   useEffect(() => {
@@ -253,8 +264,9 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
     const d = formState.dirtyFields
     try {
       // Separate endpoints, one request each; stop at the first refusal so nothing half-applies silently.
-      if (d.name || d.phone) {
+      if (d.name || d.phone || d.workType) {
         const body: Record<string, string | null> = {}
+        if (d.workType) body.workType = v.workType
         if (d.name) body.name = v.name.trim()
         if (d.phone) body.phone = v.phone ? normalizePhone(v.phone) : null
         await apiWithMessage(`/users/${user.id}`, { method: 'PATCH', body })
@@ -267,7 +279,7 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
       onOpenChange(false)
     } catch (err) {
       invalidateUsers(qc)
-      handleFormError(err, setError, ['name', 'phone', 'email', 'role'])
+      handleFormError(err, setError, ['name', 'phone', 'email', 'role', 'workType'])
     }
   })
 
@@ -288,6 +300,11 @@ export function EditUserForm({ user, open, onOpenChange, superAdmin }: { user: U
       <form id="edit-user" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-2">
         <TextField label="Name" autoCapitalize="words" error={formState.errors.name?.message} {...register('name')} />
         <TextField label="Phone" optional type="tel" inputMode="tel" prefix="+91" error={formState.errors.phone?.message} {...register('phone')} />
+        <Controller
+          control={control}
+          name="workType"
+          render={({ field }) => <Picker label="Works in" value={field.value} onChange={field.onChange} options={WORK_TYPE_OPTIONS} hint={WORK_TYPE_HINT} />}
+        />
         {superAdmin && (
           <>
             <TextField

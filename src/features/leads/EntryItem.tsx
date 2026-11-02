@@ -1,11 +1,13 @@
 import { Link } from 'react-router'
+import { RecordingPlayer } from './CallFields'
 import { StatusChip } from '@/components/ui/Choice'
 import { FeedbackButton, FeedbackList } from '@/features/team/EntryFeedback'
 import { VisitPlace } from '@/features/visits/VisitPlace'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
-import { formatDateTime, formatTime, REASON_LABEL, relativeDay } from '@/lib/format'
+import { formatDateTime, formatTime, REASON_LABEL } from '@/lib/format'
+import { relativeDayTime, CALL_OUTCOME_LABEL } from './channels'
 import type { Entry } from '@/lib/types'
 
 /** One row in a lead's history (PRD §5.11). A visit's photo opens the entry: full photo and map pin. */
@@ -38,9 +40,10 @@ export function EntryItem({
           <StatusChip status={entry.status} />
           {entry.nextFollowUpDate && (
             <span className="inline-flex items-center gap-1 text-caption text-body">
-              <Icon name="calendar" size={16} /> Next: {relativeDay(entry.nextFollowUpDate)}
+              <Icon name="calendar" size={16} /> Next: {relativeDayTime(entry.nextFollowUpDate, entry.nextFollowUpTime)}
             </span>
           )}
+          {entry.callOutcome && <Tag>Call · {CALL_OUTCOME_LABEL[entry.callOutcome]}</Tag>}
           {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
           {entry.lowAccuracy && !isVisit && <Tag>Location is approximate</Tag>}
           {entry.entryType === 'status_change' && <Tag>Changed by hand</Tag>}
@@ -62,6 +65,7 @@ export function EntryItem({
             Logged by {entry.user.name}, covering for {entry.coveringFor.name}
           </p>
         )}
+        {entry.hasRecording && <RecordingPlayer entryId={entry.id} className="mt-2" />}
         <FeedbackList entry={entry} />
         {canFeedback && !mine && <FeedbackButton entry={entry} leadId={entry.leadId} />}
         {onDelete && (

@@ -65,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
+    // While still signed in, so the API can forget this device for this person.
+    await import('@/lib/reminders').then((m) => m.turnOffReminders()).catch(() => undefined)
     try {
       await apiRaw('/auth/logout', { method: 'POST' })
     } catch {

@@ -2,6 +2,10 @@
 
 export type UserRole = 'super_admin' | 'moderator' | 'sales_person'
 export type ProjectType = 'online' | 'door_to_door'
+export type WorkType = 'field' | 'calling' | 'both'
+export type FollowUpChannel = 'visit' | 'call' | 'other'
+export type NextStepChannel = 'visit' | 'call'
+export type CallOutcome = 'spoke' | 'no_answer' | 'busy' | 'switched_off' | 'wrong_number'
 export type ProjectStatus = 'active' | 'closed'
 export type TargetPeriod = 'weekly' | 'monthly'
 export type LeadStatus = 'new' | 'contacted' | 'interested' | 'follow_up_scheduled' | 'not_interested' | 'converted' | 'lost'
@@ -52,6 +56,8 @@ export interface Me {
   email: string
   phone: string | null
   role: UserRole
+  /** Field, Calling or Both: which work they do, not what they may do. */
+  workType: WorkType
   projects: MeProject[]
   notice: string | null
   /** On leave today. */
@@ -81,6 +87,7 @@ export interface User {
   email: string
   phone: string | null
   role: UserRole
+  workType: WorkType
   isActive: boolean
   createdBy: string | null
   createdAt: string
@@ -88,6 +95,8 @@ export interface User {
   onLeave?: LeaveSpan | null
   /** Reset link, deactivate, reactivate: false when the person also works in projects the caller doesn't run. */
   canManageAccount: boolean
+  /** Invited but no password yet: the invite can be sent again. */
+  invitePending: boolean
 }
 
 export interface Project {
@@ -141,9 +150,16 @@ export interface Entry {
   status: LeadStatus
   note: string | null
   nextFollowUpDate: string | null
+  /** India time, HH:MM. */
+  nextFollowUpTime?: string | null
+  nextFollowUpChannel?: NextStepChannel | null
   location: PersonRef | null
   hasPhoto: boolean
   photoUrl: string | null
+  /** Null on entries older than the column. */
+  channel?: FollowUpChannel | null
+  callOutcome?: CallOutcome | null
+  hasRecording?: boolean
   latitude: number | null
   longitude: number | null
   gpsAccuracyM: number | null
@@ -184,6 +200,9 @@ export interface LeadSummary {
   phone: string | null
   status: LeadStatus
   nextFollowUpDate: string | null
+  /** India time, HH:MM. */
+  nextFollowUpTime?: string | null
+  nextFollowUpChannel?: NextStepChannel | null
   overdueDays: number | null
   location: PersonRef
   /** Null: not assigned yet (a bulk upload left it for an admin to hand out). */
@@ -273,7 +292,7 @@ export interface LeadComment {
 }
 
 export type NotificationKind =
-  'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover' | 'training'
+  'follow_up_reminder' | 'transfer_requested' | 'transfer_decided' | 'lead_assigned' | 'mention' | 'help_requested' | 'help_resolved' | 'comment' | 'feedback' | 'leave_cover' | 'training'
 
 export interface AppNotification {
   id: string

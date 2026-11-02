@@ -2,7 +2,7 @@
 // feedback, shared messages, asking for a teammate's lead, and adding a rep in one step.
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { click, clickNth, fill, PHONE, sleep, startApp, waitForText } from './harness.mjs'
+import { click, clickNth, fill, PHONE, sleep, startApp, waitForText, chooseNoteIfOffered } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -220,6 +220,7 @@ describe('a number a teammate already has', () => {
     const { page, go, api } = await app.open(PHONE)
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await fill(page, 'Contact person', 'Sunil Bakery')
     await fill(page, 'Phone', '98111 00000')
     await fill(page, 'Location', 'Wanowrie')

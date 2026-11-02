@@ -6,7 +6,9 @@ import { StatusChip } from '@/components/ui/Choice'
 import { Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
-import { formatTime, leadPerson, leadTitle, REASON_LABEL, relativeDay } from '@/lib/format'
+import { RecordingPlayer } from '@/features/leads/CallFields'
+import { formatTime, leadPerson, leadTitle, REASON_LABEL } from '@/lib/format'
+import { relativeDayTime, CALL_OUTCOME_LABEL } from '@/features/leads/channels'
 import type { TimelineEntry } from '@/lib/types'
 
 interface Props {
@@ -50,10 +52,11 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusChip status={entry.status} />
           {entry.entryType === 'status_change' && <Tag>Changed by hand</Tag>}
+          {entry.callOutcome && <Tag>Call · {CALL_OUTCOME_LABEL[entry.callOutcome]}</Tag>}
           {entry.reason && <Tag tone="down">{REASON_LABEL[entry.reason]}</Tag>}
           {entry.nextFollowUpDate && (
             <span className="inline-flex items-center gap-1 text-caption text-body">
-              <Icon name="calendar" size={16} /> {relativeDay(entry.nextFollowUpDate)}
+              <Icon name="calendar" size={16} /> {relativeDayTime(entry.nextFollowUpDate, entry.nextFollowUpTime)}
             </span>
           )}
         </div>
@@ -88,6 +91,7 @@ export function TimelineEntryCard({ entry, number, selected, showProject, onSele
         )}
 
         {entry.coveringFor && <p className="mt-1 text-caption text-muted">Covering for {entry.coveringFor.name}</p>}
+        {entry.hasRecording && <RecordingPlayer entryId={entry.id} className="mt-2" />}
         <FeedbackList entry={entry} />
         {canFeedback && <FeedbackButton entry={entry} leadId={entry.lead.id} />}
         {entry.editable && (

@@ -110,6 +110,9 @@ export const followUpShape = {
   status: STATUS.nullable().refine((s) => s !== null, 'Choose a status.'),
   note: z.string().trim().min(NOTE_MIN, `Write at least ${NOTE_MIN} characters.`).max(2000),
   nextFollowUpDate: z.string(),
+  /** India time, HH:MM. A reminder goes out at this time. */
+  nextFollowUpTime: z.string().optional(),
+  nextFollowUpChannel: z.string().optional(),
   /** Why it was lost (Not interested / Lost only). */
   reason: z.string().nullable().optional(),
   ...dealShape,

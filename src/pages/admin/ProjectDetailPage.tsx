@@ -18,6 +18,7 @@ import { ListGroup, ListRow } from '@/components/ui/ListRow'
 import { LoadMore } from '@/components/ui/LoadMore'
 import { Confirm, ResponsiveOverlay } from '@/components/ui/Overlay'
 import { TextField } from '@/components/ui/Field'
+import { AddTeamLeadForm } from '@/features/admin/AddTeamLeadForm'
 import { AddMemberForm, ReassignForm, SetTargetForm } from '@/features/admin/MemberForms'
 import { ProjectForm } from '@/features/admin/ProjectForm'
 import { invalidateProjects, projectMembersKey, useProjectDetail, useProjectMembers } from '@/features/admin/queries'
@@ -218,8 +219,10 @@ function MembersTab({ project }: { project: Project }) {
 
 function LeadsTab({ project }: { project: Project }) {
   const qc = useQueryClient()
-  // Only the sales head deletes leads; managers can still select to assign.
+  // Only the sales head deletes leads or adds one by hand; managers can still select to assign.
   const canDelete = useMe().role === 'super_admin'
+  const canAddOne = canDelete
+  const [addingOne, setAddingOne] = useState(false)
   const members = useProjectMembers(project.id)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<LeadStatus | 'all'>('all')
@@ -271,6 +274,11 @@ function LeadsTab({ project }: { project: Project }) {
       </Link>
     </Button>
   )
+  const addOneButton = canAddOne && (
+    <Button icon="plus-math" onClick={() => setAddingOne(true)}>
+      Add lead
+    </Button>
+  )
 
   return (
     <section className="flex flex-col gap-4 expanded:max-w-[900px]">
@@ -279,12 +287,13 @@ function LeadsTab({ project }: { project: Project }) {
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput label="Search leads" placeholder="Name, business or phone" value={search} onChange={setSearch} className="flex-1 basis-64 medium:max-w-md" />
           {!closed && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {leads.length > 0 && (
                 <Button variant="secondary" icon={selecting ? 'multiply' : 'checkmark'} onClick={() => (selecting ? exit() : setSelecting(true))}>
                   {selecting ? 'Cancel' : 'Select'}
                 </Button>
               )}
+              {!selecting && addOneButton}
               {!selecting && importButton}
             </div>
           )}
@@ -322,7 +331,14 @@ function LeadsTab({ project }: { project: Project }) {
           icon="contacts"
           title="No leads yet"
           body={closed ? 'This campaign is closed.' : 'Add leads from a sheet to hand them out to your team, or wait for sales reps to add them in the field.'}
-          action={!closed && importButton}
+          action={
+            !closed && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {addOneButton}
+                {importButton}
+              </div>
+            )
+          }
         />
       ) : leads.length === 0 ? (
         <EmptyState
@@ -369,6 +385,7 @@ function LeadsTab({ project }: { project: Project }) {
         loading={busy}
         danger
       />
+      {canAddOne && <AddTeamLeadForm open={addingOne} onOpenChange={setAddingOne} project={project} />}
       <ReassignForm projectId={project.id} leadIds={[...picked]} members={members.data ?? []} open={reassigning} onOpenChange={setReassigning} onDone={exit} />
     </section>
   )

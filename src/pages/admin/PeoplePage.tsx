@@ -1,3 +1,4 @@
+import { WORK_TYPE_LABEL } from '@/features/leads/channels'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -146,6 +147,8 @@ export function PeoplePage() {
                   <span className="flex items-center gap-2">
                     <span className="truncate text-title-sm">{u.name}</span>
                     {!u.isActive && <Tag>Left the team</Tag>}
+                    {u.isActive && u.invitePending && <Tag>Invite pending</Tag>}
+                    {u.role === 'sales_person' && u.workType && u.workType !== 'field' && <Tag>{WORK_TYPE_LABEL[u.workType]}</Tag>}
                     {isSuper && u.role === 'moderator' && tab === 'sales_person' && <Tag>Manager</Tag>}
                   </span>
                   <span className="truncate text-body-sm text-body">{u.email}</span>
@@ -158,6 +161,7 @@ export function PeoplePage() {
                       { label: 'View their day', icon: 'timeline', onSelect: () => navigate(`/people/${u.id}/day`) },
                       { label: 'Performance review', icon: 'goal', onSelect: () => navigate(`/people/${u.id}/review`), hidden: u.role !== 'sales_person' },
                       { label: 'Edit', icon: 'edit', onSelect: () => setEditing(u), hidden: !u.isActive && u.id === me.id },
+                      { label: 'Resend invite', icon: 'refresh', onSelect: () => void resendInvite(u), hidden: !u.isActive || !u.invitePending || u.id === me.id },
                       { label: 'Email reset link', icon: 'lock', onSelect: () => void emailResetLink(u), hidden: !u.isActive || u.id === me.id },
                       { label: 'Copy reset link (to share yourself)', icon: 'lock', onSelect: () => setSharing(u), hidden: !u.isActive || u.id === me.id || !u.canManageAccount },
                       { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(u), hidden: !isSuper || u.id === me.id || u.role === 'super_admin' },
@@ -333,6 +337,16 @@ async function emailResetLink(user: User) {
   try {
     const { data } = await apiWithMessage<{ email: string }>(`/users/${user.id}/reset-email`, { method: 'POST' })
     toast.success(`Reset email sent to ${data.email}.`)
+  } catch (err) {
+    handleFormError(err)
+  }
+}
+
+/** Emails someone who hasn't set a password yet a new invite link, which doesn't expire. */
+async function resendInvite(user: User) {
+  try {
+    const { data } = await apiWithMessage<{ email: string }>(`/users/${user.id}/resend-invite`, { method: 'POST' })
+    toast.success(`Invite sent again to ${data.email}.`)
   } catch (err) {
     handleFormError(err)
   }

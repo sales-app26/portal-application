@@ -13,9 +13,12 @@ import { api } from '@/lib/api'
 import { formatPhone, normalizePhone } from '@/lib/format'
 import { handleFormError } from '@/lib/forms'
 import { haptic } from '@/lib/haptics'
-import type { LeadDetail, LeadSource, LeadSummary, MeProject, Paginated } from '@/lib/types'
+import type { CallOutcome, FollowUpChannel, LeadDetail, LeadSource, LeadSummary, MeProject, Paginated } from '@/lib/types'
 import { dealDefaults, leadSchema, outcomeBody, type LeadValues } from './entrySchema'
 import { SourceChoice } from './SourceChoice'
+import { useMe } from '@/auth/AuthProvider'
+import { CallFields, ChannelChoice } from './CallFields'
+import { ATTEMPT_NOTE, channelsFor, isUnreached, nextStepBody, nextStepsFor } from './channels'
 import { FollowUpFields } from './FollowUpFields'
 import { LocationField } from './LocationField'
 import { invalidateLeadData } from './queries'
@@ -30,6 +33,8 @@ const EMPTY: LeadValues = {
   status: 'new',
   note: '',
   nextFollowUpDate: '',
+  nextFollowUpTime: '',
+  nextFollowUpChannel: undefined,
   location: '',
   source: null,
   reason: null,
@@ -40,7 +45,16 @@ const EMPTY: LeadValues = {
 export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; onOpenChange: (o: boolean) => void; project: MeProject }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const doorToDoor = project.type === 'door_to_door'
+  const workType = useMe().workType
+  const channels = channelsFor(project.type, workType)
+  const nextSteps = nextStepsFor(project.type, workType)
+  const [channel, setChannel] = useState<FollowUpChannel>(channels[0])
+  const [outcome, setOutcome] = useState<CallOutcome | null>(null)
+  const [recording, setRecording] = useState<File | null>(null)
+  const [callError, setCallError] = useState<string>()
+  const isVisit = channel === 'visit'
+  const isCall = channel === 'call'
+  const attempt = isCall && isUnreached(outcome)
   // One id per submission, kept across retries so a double tap saves once (PRD §5.6).
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const [proof, setProof] = useState<VisitProof | null>(null)
@@ -51,7 +65,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
   const [asking, setAsking] = useState(false)
 
   const form = useForm<LeadValues>({ resolver: zodResolver(leadSchema), mode: 'onBlur', defaultValues: EMPTY })
-  const { register, control, handleSubmit, formState, reset, setError, setValue } = form
+  const { register, control, handleSubmit, formState, reset, setError, setValue, getValues } = form
   // Found while typing: the rep's own lead with this number, so they can open it instead of retyping.
   const [existing, setExisting] = useState<LeadSummary | null>(null)
   const phoneField = register('phone')
@@ -97,11 +111,32 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
     setDuplicateOf(null)
     setExisting(null)
     setTakenPhone(null)
+    setChannel(channels[0])
+    setOutcome(null)
+    setRecording(null)
+    setCallError(undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reset])
 
+  const pickOutcome = (o: CallOutcome) => {
+    setOutcome(o)
+    if (o !== 'spoke') setValue('note', ATTEMPT_NOTE[o], { shouldValidate: true })
+    else if (Object.values(ATTEMPT_NOTE).includes(getValues('note'))) setValue('note', '')
+  }
+
   const onSubmit = handleSubmit(async (v) => {
-    if (doorToDoor && !proof) {
+    if (isVisit && !proof) {
       setProofError('Take a photo of the visit to save it.')
+      haptic.error()
+      return
+    }
+    if (isCall && !outcome) {
+      setCallError('Choose how the call went.')
+      haptic.error()
+      return
+    }
+    if (isCall && outcome === 'spoke' && !recording) {
+      setCallError('Add the call recording to save a call you spoke on.')
       haptic.error()
       return
     }
@@ -113,14 +148,17 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
         name: v.name.trim() || undefined,
         phone: normalizePhone(v.phone) ?? v.phone,
         notes: v.notes.trim() || undefined,
-        status: v.status ?? undefined,
+        channel,
+        callOutcome: isCall ? (outcome ?? undefined) : undefined,
+        status: attempt ? undefined : (v.status ?? undefined),
         note: v.note.trim(),
         nextFollowUpDate: nextDateRule(v.status) === 'hidden' ? undefined : v.nextFollowUpDate || undefined,
+        ...nextStepBody({ ...v, nextFollowUpChannel: v.nextFollowUpChannel || nextSteps[0] }, nextDateRule(v.status) === 'hidden'),
         location: v.location.trim().replace(/\s+/g, ' '),
         source: v.source ?? undefined,
         ...outcomeBody(v, { dealAlways: true }),
       }
-      const { data, message } = await apiWithMessage<LeadDetail>(`/projects/${project.id}/leads`, { method: 'POST', body: entryBody(fields, doorToDoor ? proof : null) })
+      const { data, message } = await apiWithMessage<LeadDetail>(`/projects/${project.id}/leads`, { method: 'POST', body: entryBody(fields, isVisit ? proof : null, isCall && outcome === 'spoke' ? recording : null) })
       haptic.success()
       toast.success(message)
       invalidateLeadData(qc)
@@ -138,6 +176,12 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
       if (err instanceof ApiError && err.code === 'DUPLICATE_LEAD_OTHER') {
         setError('phone', { message: err.message })
         if (err.details?.canRequest) setTakenPhone(normalizePhone(v.phone) ?? v.phone)
+        haptic.error()
+        return
+      }
+      if (isCall && err instanceof ApiError && ['CALL_RECORDING_REQUIRED', 'UNPROCESSABLE'].includes(err.code ?? '')) {
+        setRecording(null)
+        setCallError(err.message)
         haptic.error()
         return
       }
@@ -247,7 +291,9 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
           <Controller control={control} name="source" render={({ field }) => <SourceChoice value={(field.value as LeadSource | null) ?? null} onChange={field.onChange} />} />
         </fieldset>
 
-        {doorToDoor && (
+        {channels.length > 1 && <ChannelChoice options={channels} value={channel} onChange={setChannel} />}
+        {isCall && <CallFields outcome={outcome} onOutcome={pickOutcome} recording={recording} onRecording={setRecording} error={callError} onError={setCallError} />}
+        {isVisit && (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-4 text-caption-strong text-muted uppercase">Visit proof</legend>
             <VisitProofField value={proof} onChange={(p) => (setProof(p), setProofError(undefined))} error={proofError} />
@@ -257,7 +303,7 @@ export function AddLeadForm({ open, onOpenChange, project }: { open: boolean; on
 
         <fieldset className="flex flex-col gap-5">
           <legend className="mb-4 text-caption-strong text-muted uppercase">First follow-up</legend>
-          <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} dealAlways />
+          <FollowUpFields projectId={project.id} statuses={createStatuses()} control={control} register={register} errors={formState.errors} showLocation={false} dealAlways  attempt={attempt} nextSteps={nextSteps} />
         </fieldset>
       </form>
       {takenPhone && (

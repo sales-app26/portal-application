@@ -42,6 +42,8 @@ export function EditEntryForm({ entry, open, onOpenChange }: { entry: Entry; ope
     if (isFollowUp && formState.dirtyFields.nextFollowUpDate) {
       if (v.nextFollowUpDate && v.nextFollowUpDate < NEXT_DATE_MIN()) return setError('nextFollowUpDate', { message: 'The next follow-up date cannot be in the past.' })
       body.nextFollowUpDate = v.nextFollowUpDate || null
+      // A new day keeps the time it was set for.
+      if (v.nextFollowUpDate && entry.nextFollowUpTime) body.nextFollowUpTime = entry.nextFollowUpTime
     }
     if (Object.keys(body).length === 0) return onOpenChange(false)
     try {

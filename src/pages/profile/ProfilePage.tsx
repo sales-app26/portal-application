@@ -1,3 +1,4 @@
+import { useReminders } from '@/lib/reminders'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
@@ -64,6 +65,7 @@ export function ProfilePage() {
           </ListGroup>
         )}
 
+        {me.role !== 'super_admin' && <ReminderSettings />}
         {me.role !== 'super_admin' && <MyLeave />}
         {me.role === 'sales_person' && (
           <ListGroup title="Requests">
@@ -347,6 +349,37 @@ function MyLeave() {
       ))}
       <ListRow icon="plus-math" title="Mark leave" subtitle="Your backup covers your follow-ups while you're away" chevron onClick={() => setMarking(true)} />
       <LeaveForm open={marking} onOpenChange={setMarking} />
+    </ListGroup>
+  )
+}
+
+/** Reminders at each follow-up's time, on this phone. Hidden where push isn't set up. */
+function ReminderSettings() {
+  const reminders = useReminders()
+  const [busy, setBusy] = useState(false)
+  if (reminders.state === 'unavailable') return null
+  const on = reminders.state === 'on'
+  const subtitle = {
+    on: 'On for this phone. Tap to turn off',
+    off: 'Off. Tap to get one at each follow-up’s time',
+    blocked: 'Blocked. Allow notifications in your browser’s settings',
+    'needs-install': 'Add the app to your home screen first',
+  }[reminders.state]
+  const toggle = async () => {
+    if (busy || reminders.state === 'blocked' || reminders.state === 'needs-install') return
+    setBusy(true)
+    try {
+      await (on ? reminders.turnOff() : reminders.turnOn())
+      toast.success(on ? 'Reminders are off for this phone.' : 'Reminders are on for this phone.')
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <ListGroup title="Reminders">
+      <ListRow icon="bell" title="Follow-up reminders" subtitle={subtitle} onClick={() => void toggle()} />
     </ListGroup>
   )
 }

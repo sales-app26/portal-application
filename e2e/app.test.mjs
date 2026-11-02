@@ -1,7 +1,7 @@
 // Browser tests against a fake API: node --test e2e/   (or npm run test:e2e)
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { tap, click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining } from './harness.mjs'
+import { tap, click, fill, LAPTOP, PHONE, sleep, startApp, waitForText, clickContaining, chooseNoteIfOffered } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 /** Save follow-up asks for a last look first; the confirmation's own button saves. */
@@ -64,6 +64,7 @@ describe('field work', () => {
     const { page, go, api, errors } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Interested', '[role=radio]') // status chips: one tap
     await fill(page, 'Note', 'Called back, wants a demo next week.')
     await click(page, 'Save follow-up')
@@ -87,6 +88,7 @@ describe('field work', () => {
     const { page, go, api } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Contacted', '[role=radio]')
     await fill(page, 'Note', 'ok')
     await click(page, 'Save follow-up')
@@ -102,6 +104,7 @@ describe('deals, reasons and the agenda', () => {
     const { page, go, api, errors } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Won', '[role=radio]')
     await waitForText(page, 'Mark as won')
     const value = await page.$('input[inputmode=numeric]')
@@ -125,6 +128,7 @@ describe('deals, reasons and the agenda', () => {
     const { page, go, api } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Lost', '[role=radio]')
     await click(page, 'Price too high', '[role=radio]')
     await fill(page, 'Note', 'Went with a cheaper option.')
@@ -159,6 +163,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.d2d })
     await go(`/leads/${ids.d2dLead}`)
     await tap(page, 'button', 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save follow-up')
     await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     await tap(page, 'button[aria-label="Take photo"]')
@@ -182,6 +187,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go } = await app.open(PHONE, { projectId: ids.d2d })
     await go(`/leads/${ids.d2dLead}`)
     await tap(page, 'button', 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     await tap(page, 'button[aria-label="Close camera"]')
     await page.waitForFunction(() => !document.querySelector('[aria-label="Visit photo"]'), { timeout: 3000 })
@@ -196,6 +202,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     // Real taps: the camera sits outside the sheet, and must still take a finger.
     await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     // Shutter enables once the fake camera and the fixed GPS position are ready.
@@ -229,6 +236,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await click(page, 'Interested', '[role=radio]') // Add lead starts as New; a chip changes it in place
     await sleep(400)
     assert.ok(await page.evaluate(() => document.body.innerText.includes('Save lead')), 'form still open')
@@ -248,6 +256,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save follow-up')
     await page.evaluate(() => history.back()) // what the Android back button does
     await page.waitForFunction(() => !document.body.innerText.includes('Save follow-up'), { timeout: 3000 })
@@ -259,6 +268,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go } = await app.open(PHONE, { projectId: ids.d2d, gps: { latitude: 18.49, longitude: 73.89, accuracy: 180 } })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await click(page, 'Take photo', 'button > span > span.text-title-sm')
     await waitForText(page, 'Approximate', 10000) // the camera's location pill
     await page.close()
@@ -268,6 +278,7 @@ describe('visit proof (door-to-door)', () => {
     const { page, go, api } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await fill(page, 'Shop or business name', 'No Photo')
     await fill(page, 'Phone', '9876543211')
     await fill(page, 'Location', 'Kondhwa')
@@ -315,6 +326,7 @@ describe('pull to refresh', () => {
     const { page, go, api } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save follow-up')
     await sleep(400)
     const before = api.calls.length
@@ -330,6 +342,7 @@ describe('navigating right after a sheet closes', () => {
     const { page, go, errors } = await app.open(PHONE)
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await fill(page, 'Shop or business name', 'New Client')
     await fill(page, 'Phone', '98765 43210')
     await fill(page, 'Location', 'Kondhwa')
@@ -439,6 +452,7 @@ describe('speaking a note', () => {
     await page.evaluateOnNewDocument(fakeIphoneMic)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Speak')
     await waitForText(page, '“owner wants a demo on friday”')
     await click(page, 'Listening… tap to stop')
@@ -460,6 +474,7 @@ describe('speaking a note', () => {
     })
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Speak')
     await waitForText(page, 'Allow the microphone for Pronttera')
     await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Speak'), { timeout: 2000 })
@@ -481,6 +496,7 @@ describe('iPad', () => {
     await page.setUserAgent(IPAD_UA)
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save lead')
     await sleep(600)
     const title = await page.$$eval('[role=dialog] h2', (h) =>
@@ -504,6 +520,7 @@ describe('iPad', () => {
     await page.evaluateOnNewDocument(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }))
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save follow-up')
     await tap(page, 'button', 'Speak')
     await waitForText(page, 'Tap the 🎤 on your keyboard and speak.')

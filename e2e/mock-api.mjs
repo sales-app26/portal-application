@@ -21,7 +21,7 @@ const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS
 
 /** role: 'sales_person' | 'moderator' | 'super_admin' */
 /** `unreadRelease` leaves the live release note unread, so the What's new dialog shows. Off by default: it would sit over every other screen's tests. */
-export function createMockApi({ role = 'sales_person', unreadRelease = false } = {}) {
+export function createMockApi({ role = 'sales_person', unreadRelease = false, pushKey = null, workType = 'field' } = {}) {
   const projects = [
     { id: ids.online, name: 'Pune Retail Drive', type: 'online', status: 'active', targetCount: 20, targetPeriod: 'weekly' },
     { id: ids.d2d, name: 'Kondhwa Door-to-door', type: 'door_to_door', status: 'active', targetCount: null, targetPeriod: null },
@@ -32,6 +32,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     email: 'user@example.test',
     phone: '9876543210',
     role,
+    workType,
     projects: role === 'super_admin' ? [] : projects,
     notice: null,
   }
@@ -91,7 +92,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
   })
   const projectRef = (i) => ({ id: projects[i].id, name: projects[i].name, type: projects[i].type, status: 'active' })
   const day = () => [
-    { ...entry(1, { note: 'Phone call, asked for a quote.' }), lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' }, project: projectRef(0) },
+    { ...entry(1, { note: 'Phone call, asked for a quote.', channel: 'call', callOutcome: 'spoke', hasRecording: true }), lead: { id: ids.lead, name: 'Asha Patil', businessName: 'Patil General Store' }, project: projectRef(0) },
     {
       ...entry(2, {
         note: 'Visited the shop, owner present.',
@@ -181,6 +182,7 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
       createdAt: iso(),
       canManage: true,
       canManageAccount: true,
+      invitePending: true,
     },
     {
       id: ids.modOther,
@@ -1195,6 +1197,14 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if ((m = p.match(/^\/projects\/([^/]+)\/members\/([^/]+)\/backup$/))) return ok(null, 'Backup updated.')
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/request-by-phone$/))) return ok(transfers[0], 'Request sent. The lead moves to you once a manager approves it.', 201)
 
+    if (p === '/notifications/push/key') return ok({ publicKey: pushKey })
+    if ((m = p.match(/^\/entries\/([^/]+)\/recording$/))) return ok({ url: 'data:audio/mp4;base64,AAAA', expiresInSeconds: 600 })
+
+    if ((m = p.match(/^\/users\/([^/]+)\/resend-invite$/))) {
+      const u = users.find((x) => x.id === m[1]) ?? users[0]
+      return ok({ email: u.email }, 'Invite sent again.')
+    }
+
     if ((m = p.match(/^\/users\/([^/]+)\/(deactivate|reactivate)$/))) {
       const u = users.find((x) => x.id === m[1]) ?? users[0]
       u.isActive = m[2] === 'reactivate'
@@ -1224,6 +1234,10 @@ export function createMockApi({ role = 'sales_person', unreadRelease = false } =
     if ((m = p.match(/^\/projects\/([^/]+)\/members$/))) {
       if (method === 'POST') return ok(members[0], 'Added to the campaign team.', 201)
       return ok(members)
+    }
+    if ((m = p.match(/^\/projects\/([^/]+)\/leads\/add$/))) {
+      if (json().phone === '9811111111') return fail(409, 'DUPLICATE_LEAD_OTHER', 'This number is already a lead in this campaign, owned by Priya Desai.', { leadId: ids.lead, ownerName: 'Priya Desai' })
+      return ok({ id: ids.lead, businessName: json().businessName }, 'Lead saved.', 201)
     }
     if ((m = p.match(/^\/projects\/([^/]+)\/leads\/import$/))) {
       const field = (name) => new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)`).exec(body ?? '')?.[1]

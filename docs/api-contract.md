@@ -242,7 +242,7 @@ All paths below are relative to `/api/v1`.
   {
     "id": "...", "name": "...", "email": "...", "phone": "string|null",
     "role": "...", "isActive": true, "createdBy": "uuid|null",
-    "createdAt": "ISO", "canManage": true, "canManageAccount": true,
+    "createdAt": "ISO", "canManage": true, "canManageAccount": true, "invitePending": false, "workType": "field|calling|both",
     "onLeave": "LeaveSpanDto|null"
   }
   ```
@@ -441,6 +441,7 @@ Controller-level roles: **super_admin, moderator**.
 | PATCH | `/users/:id` | SA, MOD | `name?` (trimmed, non-empty, max 120); `phone?` (string, null or "" clears, max 20) | `UserDto` |
 | POST | `/users/:id/deactivate` | SA, MOD | none | `UserDto`. 200, "User deactivated." Refusals: the last active super admin gives 409 CONFLICT; an already inactive user gives 409 CONFLICT. |
 | POST | `/users/:id/reactivate` | SA, MOD | none | `UserDto`. 200, "User reactivated." |
+| POST | `/users/:id/resend-invite` | SA, MOD | none | `{ email: string }`. 200, "Invite sent again." Emails a new invite link that does not expire; any earlier invite link stops working. For people the caller manages with `invitePending` true. Refusals: left the team or already has a password gives 409 CONFLICT; a failed send gives 503. |
 | PATCH | `/users/:id/role` | **SA only** | `role` (UserRole) | `UserDto` |
 | PATCH | `/users/:id/email` | **SA only** | `email` (email) | `UserDto` |
 
@@ -489,11 +490,13 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | Method | Path | Roles | Params / Body | data |
 |---|---|---|---|---|
 | POST | `/projects/:id/leads` | **SP, MOD** (must be an active member) | JSON or multipart. **CreateLeadDto**, see the field table below. | `LeadDetailDto`. **201**, "Lead saved." |
+| POST | `/projects/:id/leads/add` | **SA only** | JSON: `businessName` (required, max 160); `location` (required, 2–100 after collapsing whitespace); `name?`; `phone?` (Indian mobile); `notes?`; `source?` (LeadSource except `import`); `ownerId?` (uuid v4, an active member who is not a super admin, else 400). Works in any campaign type, with no visit photo: the lead starts as New with no follow-up. With `ownerId` the person gets a `lead_assigned` notification; without it the lead is unassigned. A number already a lead in the campaign, or with no number a business already listed at that location, gives 409 `DUPLICATE_LEAD_OTHER` with `details: { leadId, ownerName }`. Closed project: 409 PROJECT_CLOSED. | `LeadDetailDto`. **201**, "Lead saved." |
 | GET | `/projects/:id/leads` | any member | Query: pagination plus `status?` (LeadStatus), `ownerId?` (uuid v4; admins), `coveringFor?` (uuid v4; the owner the caller is covering for today — that owner's leads, any other value is 403 "You are not covering for this person in this project today."; overrides `mine`/`ownerId`, every other filter still applies), `mine?` ("true"/"false"), `ownerUnavailable?` ("true"/"false"; admins), `due?` (LeadDue, see below), `cold?` ("true"/"false"), `source?` (LeadSource), `sort?` (`updated`, `created`, `name`, `next_follow_up`, `value` or `activity`). `search` matches name or business name, plus phone when the search term is 3–10 digits. Sales persons only ever get their own leads. Filters combine with AND. | Paginated `LeadSummaryDto` |
 | GET | `/leads/:id` | any (admin of the project, owner and active member, or the backup covering for the owner today; else 404) | | `LeadDetailDto` |
 | GET | `/leads/:id/entries` | same | Query: pagination | Paginated `EntryDto`, newest first |
 | PATCH | `/leads/:id` | **SP, MOD** (owner and active member, else 403 "Only the lead's owner can edit it.") | `name?` (trimmed, non-empty, max 120); `businessName?` (string or null, max 160, "" becomes null); `phone?` (string, non-empty, max 20; normalized and re-checked for duplicates); `notes?` (string or null, max 2000); `location?` (trimmed, non-empty, max 200, then 2–100 chars after collapsing whitespace); the deal fields (§3b), each also nullable — **sending any of them replaces the whole deal** (fields left out are cleared; all null clears it); `source?` (LeadSource, or null to clear). `plan` is no longer accepted (400 "isn't used here"). | `LeadDetailDto` |
 | DELETE | `/leads/:id` | **SA** | | `null`, "Deleted successfully." This is a soft delete. |
+| GET | `/entries/:id/recording` | whoever may see the entry | | `{ url: string, expiresInSeconds: number }`: a short-lived link to the call's recording. No recording: 404. |
 | POST | `/leads/:id/follow-ups` | **SP, MOD** (owner, or the backup covering for him) | JSON or multipart. **LogFollowUpDto**, see below. | `EntrySaveResultDto`. **201**, "Follow-up saved." |
 | POST | `/leads/:id/status` | any (owner, an admin of the project, or the backup covering for the owner) | **ChangeStatusDto**, JSON: `clientRequestId` (uuid v4); `status` (LeadStatus); `note` (trimmed, 5–2000; why it changed); `nextFollowUpDate?` (YYYY-MM-DD; "" is ignored); `reason?` (LostReason; only with `not_interested`/`lost`); the deal fields (§3b; only with `converted`) | `EntrySaveResultDto`. **200**, "Stage updated." |
 
@@ -518,6 +521,20 @@ The API never takes a location id. Leads and follow-ups send the location as **f
 | `gpsAccuracyM` | number | door-to-door | 0 to 100000, in metres |
 | `captureToken` | string | door-to-door | max 512; "" is treated as missing |
 | `photo` (file part) | binary | door-to-door | multipart file field `photo` |
+
+Calls, on both `POST /projects/:id/leads` and `POST /leads/:id/follow-ups`:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `channel` | `visit`, `call`, `other` | no | Left out: `visit` door to door, otherwise `other`. `visit` is door-to-door only and refused for someone set up for calling. `other` is online only. All refused with 400. |
+| `callOutcome` | `spoke`, `no_answer`, `busy`, `switched_off`, `wrong_number` | on a call | Anything but `spoke` is an attempt: no recording, `status` ignored, the lead keeps its status, and with no `nextFollowUpDate` it comes up again tomorrow. |
+| `recording` (file part) | binary | with `spoke` | Multipart. Up to 25 MB. M4A, MP3, AAC, AMR, 3GP, OGG, WAV, FLAC or WebM, judged from the file's bytes. Missing: 422 `CALL_RECORDING_REQUIRED`. Not audio: 422 `UNPROCESSABLE`. Already on another call: 409 `CONFLICT`. |
+| `nextFollowUpTime` | `HH:MM` | no | India time, with a next date only. A reminder goes out at this time. Also on `POST /leads/:id/status` and `PATCH /entries/:id`. |
+| `nextFollowUpChannel` | `visit`, `call` | no | With a next date only. Also on `POST /leads/:id/status`. |
+
+`EntryDto` adds `channel`, `callOutcome`, `hasRecording`, `nextFollowUpTime`, `nextFollowUpChannel`. `LeadSummaryDto` adds `nextFollowUpTime`, `nextFollowUpChannel`. `UserDto` and `MeDto` add `workType`, which `POST /users` and `PATCH /users/:id` accept.
+
+Reminders: `GET /notifications/push/key` gives `{ publicKey }` (null when push isn't set up). `POST /notifications/push` with `{ endpoint, keys: { p256dh, auth } }` sends this person's reminders to the device; only known push services are accepted, else 400. `POST /notifications/push/remove` with `{ endpoint }` stops it. Each reminder is also a `follow_up_reminder` notification.
 
 Duplicate phone on create:
 - The phone is already your lead: 409 `DUPLICATE_LEAD_OWN`, "You already have this lead.", `details: { leadId }`.

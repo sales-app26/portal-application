@@ -2,7 +2,7 @@
 // "Use my location" on the Location field. Place names come from the API (OpenStreetMap).
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { click, LAPTOP, PHONE, sleep, startApp, tap, waitForText } from './harness.mjs'
+import { click, LAPTOP, PHONE, sleep, startApp, tap, waitForText, chooseNoteIfOffered } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -65,6 +65,7 @@ describe('Use my location', () => {
     const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.online })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await tap(page, 'button', 'Use my location')
     await waitForText(page, 'Filled in from your location')
     assert.equal(await valueOf(page, 'Location'), 'Wanowrie')
@@ -81,6 +82,7 @@ describe('Use my location', () => {
     const { page, go, errors } = await app.open(PHONE, { projectId: ids.online, gps: { latitude: 0.1, longitude: 0.1, accuracy: 20 } })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await tap(page, 'button', 'Use my location')
     await waitForText(page, 'We couldn’t find the area name here. Type it instead.')
     assert.equal(await valueOf(page, 'Location'), '', 'field left for typing')
@@ -94,6 +96,7 @@ describe('visit camera', () => {
     const { page, go, api, errors } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     await waitForText(page, 'Near Wanowrie', 8000)
     // A few metres of drift is not worth asking again.

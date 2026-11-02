@@ -141,11 +141,13 @@ function useRemaining(deadline: number | null) {
 }
 
 /** JSON for online projects; multipart with the photo for door-to-door (api-contract §4). */
-export function entryBody(fields: Record<string, string | number | null | undefined>, proof: VisitProof | null): Record<string, string | number> | FormData {
+export function entryBody(fields: Record<string, string | number | null | undefined>, proof: VisitProof | null, recording?: File | null): Record<string, string | number> | FormData {
   const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== null && v !== '')) as Record<string, string | number>
-  if (!proof) return clean
+  if (!proof && !recording) return clean
   const fd = new FormData()
   for (const [k, v] of Object.entries(clean)) fd.append(k, String(v))
+  if (recording) fd.append('recording', recording, recording.name)
+  if (!proof) return fd
   fd.append('latitude', String(proof.latitude))
   fd.append('longitude', String(proof.longitude))
   fd.append('gpsAccuracyM', String(proof.gpsAccuracyM))

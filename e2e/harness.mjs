@@ -25,13 +25,13 @@ export async function startApp() {
     // A fake camera that auto-grants: the visit photo flow runs without a person.
     args: ['--no-first-run', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   })
-  await browser.defaultBrowserContext().overridePermissions(base, ['geolocation', 'camera'])
+  await browser.defaultBrowserContext().overridePermissions(base, ['geolocation', 'camera', 'notifications'])
 
   async function open(
     viewport = PHONE,
-    { signedIn = true, projectId, role = 'sales_person', unreadRelease = false, gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {},
+    { signedIn = true, projectId, role = 'sales_person', unreadRelease = false, pushKey = null, workType = 'field', gps = { latitude: 18.4966, longitude: 73.8993, accuracy: 12 } } = {},
   ) {
-    const api = createMockApi({ role, unreadRelease })
+    const api = createMockApi({ role, unreadRelease, pushKey, workType })
     const page = await browser.newPage()
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
@@ -125,6 +125,15 @@ export async function clickContaining(page, text, selector) {
     text,
     selector,
   )
+}
+
+/** Online campaigns open on Call. Tests about the note form switch to it; door to door there's no such choice. */
+export async function chooseNoteIfOffered(page) {
+  const offered = await page
+    .waitForFunction(() => [...document.querySelectorAll('button[role=radio]')].some((b) => b.textContent.trim() === 'WhatsApp or note'), { timeout: 1500 })
+    .then(() => true)
+    .catch(() => false)
+  if (offered) await click(page, 'WhatsApp or note', 'button[role=radio]')
 }
 
 export const waitForText = (page, text, timeout = 5000) => page.waitForFunction((t) => document.body.innerText.includes(t), { timeout }, text)

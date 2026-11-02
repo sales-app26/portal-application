@@ -2,7 +2,7 @@
 // and the sales head's Plans & offers page, against the fake API.
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { click, clickContaining, fill, PHONE, startApp, tap, waitForText } from './harness.mjs'
+import { click, clickContaining, fill, PHONE, startApp, tap, waitForText, chooseNoteIfOffered } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 const DIWALI = 'eeeeeee1-eeee-4eee-8eee-eeeeeeeeeeee'
@@ -25,6 +25,7 @@ describe('confirm before saving a follow-up', () => {
     const { page, go, api, errors } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Interested', '[role=radio]')
     const note = 'Spoke to the owner and his son about billing, stock and the delivery app; they want a demo next Tuesday.'
     await fill(page, 'Note', note)
@@ -59,6 +60,7 @@ describe('confirm before saving a follow-up', () => {
     const { page, go, api } = await app.open(PHONE, { projectId: ids.d2d })
     await go(`/leads/${ids.d2dLead}`)
     await tap(page, 'button', 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await tap(page, 'button > span > span.text-title-sm', 'Take photo')
     await tap(page, 'button[aria-label="Take photo"]')
     await tap(page, 'button', 'Use photo')
@@ -83,6 +85,7 @@ describe('confirm before saving a follow-up', () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Won', '[role=radio]')
     await fill(page, 'Note', 'Signed up at the counter.')
     await click(page, 'Save follow-up')
@@ -99,6 +102,7 @@ describe('the Won deal', () => {
     const { page, go, api, errors } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Won', '[role=radio]')
     await waitForText(page, 'Mark as won')
     await click(page, 'Growth Plus', '[role=radio]')
@@ -128,6 +132,7 @@ describe('the Won deal', () => {
     const { page, go, api } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Won', '[role=radio]')
     await click(page, '3 months', '[role=radio]')
     await click(page, 'Other discount', '[role=radio]')
@@ -162,6 +167,7 @@ describe('the Won deal', () => {
     const { page, go, api } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Won', '[role=radio]')
     await click(page, 'Free', '[role=radio]')
     await waitForText(page, 'Free plan: the client pays nothing.')
@@ -182,6 +188,7 @@ describe('the Won deal', () => {
     const { page, go, api } = await app.open(PHONE)
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await fill(page, 'Shop or business name', 'New Client')
     await fill(page, 'Phone', '98765 43210')
     await fill(page, 'Location', 'Kondhwa')

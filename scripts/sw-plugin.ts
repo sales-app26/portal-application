@@ -42,6 +42,37 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting()
 })
 
+// A reminder from the API. Shown even with the app closed.
+self.addEventListener('push', (event) => {
+  let message = {}
+  try {
+    message = event.data ? event.data.json() : {}
+  } catch {
+    // Not ours to read: still show something, because browsers require it.
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title || 'Pronttera Sales', {
+      body: message.body || undefined,
+      icon: '/app-icon-192.png',
+      badge: '/app-icon-192.png',
+      data: { link: message.link || '/' },
+    }),
+  )
+})
+
+// Tapping a reminder opens its lead, in the app if it's already open.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const link = (event.notification.data && event.notification.data.link) || '/'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => 'focus' in w)
+      if (open) return open.focus().then((w) => (w.navigate ? w.navigate(link) : w))
+      return self.clients.openWindow(link)
+    }),
+  )
+})
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('st-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),

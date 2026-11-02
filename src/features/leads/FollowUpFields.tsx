@@ -6,7 +6,9 @@ import { TextAreaField } from '@/components/ui/Field'
 import { cn } from '@/lib/cn'
 import { addDays, todayIST } from '@/lib/format'
 import { REASON_LABEL, REASONS } from '@/lib/format'
-import type { LeadStatus, LeadSummary, LostReason } from '@/lib/types'
+import { Segmented } from '@/components/ui/Choice'
+import { TextField } from '@/components/ui/Field'
+import type { LeadStatus, LeadSummary, LostReason, NextStepChannel } from '@/lib/types'
 import { DealFields } from './DealFields'
 import { REASON_STATUSES, type FollowUpValues } from './entrySchema'
 import { LocationField } from './LocationField'
@@ -25,6 +27,10 @@ interface Props<T extends FieldValues> {
   dealAlways?: boolean
   /** The lead's saved deal, so an offer that has since ended still shows as picked. */
   dealLead?: LeadSummary
+  /** An unanswered call: it keeps the lead's status, so only the note and next step show. */
+  attempt?: boolean
+  /** What the next follow-up can be. */
+  nextSteps?: NextStepChannel[]
 }
 
 const n = <T extends FieldValues>(name: keyof FollowUpValues) => name as Path<T>
@@ -50,23 +56,24 @@ const QUICK_DATES = [
 const chip = 'pressable h-9 flex-none rounded-pill px-3.5 text-body-sm whitespace-nowrap'
 
 /** Status, note, next date, location: the body of every follow-up (PRD §5.6). */
-export function FollowUpFields<T extends FieldValues>({ projectId, statuses, control, errors: allErrors, showLocation = true, dealAlways = false, dealLead }: Props<T>) {
+export function FollowUpFields<T extends FieldValues>({ projectId, statuses, control, errors: allErrors, showLocation = true, dealAlways = false, dealLead, attempt = false, nextSteps = ['visit', 'call'] }: Props<T>) {
   const errors = allErrors as FieldErrors<FollowUpValues>
   const status = useWatch({ control, name: n<T>('status') }) as LeadStatus | null
   const note = (useWatch({ control, name: n<T>('note') }) as string | undefined) ?? ''
   const rule = nextDateRule(status)
+  const nextDate = useWatch({ control, name: n<T>('nextFollowUpDate') }) as string | undefined
 
   return (
     <>
-      <Controller
+      {!attempt && <Controller
         control={control}
         name={n<T>('status')}
         render={({ field }) => <StatusChoice statuses={statuses} value={field.value as LeadStatus | null} onChange={field.onChange} error={errors.status?.message} />}
-      />
-      {status && REASON_STATUSES.includes(status) && (
+      />}
+      {!attempt && status && REASON_STATUSES.includes(status) && (
         <Controller control={control} name={n<T>('reason')} render={({ field }) => <ReasonChoice value={(field.value as LostReason | null) ?? null} onChange={field.onChange} />} />
       )}
-      {(status === 'converted' || dealAlways) && <DealFields control={control} errors={allErrors} tone={status === 'converted' ? 'won' : 'expected'} lead={dealLead} />}
+      {!attempt && (status === 'converted' || dealAlways) && <DealFields control={control} errors={allErrors} tone={status === 'converted' ? 'won' : 'expected'} lead={dealLead} />}
       <Controller
         control={control}
         name={n<T>('note')}
@@ -117,6 +124,39 @@ export function FollowUpFields<T extends FieldValues>({ projectId, statuses, con
             </div>
           )}
         />
+      )}
+      {rule !== 'hidden' && !!nextDate && (
+        <div className="flex flex-col gap-4">
+          {nextSteps.length > 1 && (
+            <Controller
+              control={control}
+              name={n<T>('nextFollowUpChannel')}
+              render={({ field }) => (
+                <Segmented
+                  label="Next step"
+                  value={(field.value as NextStepChannel | undefined) ?? nextSteps[0]}
+                  onChange={field.onChange}
+                  options={nextSteps.map((c) => ({ value: c, label: c === 'call' ? 'Call' : 'Visit' }))}
+                />
+              )}
+            />
+          )}
+          <Controller
+            control={control}
+            name={n<T>('nextFollowUpTime')}
+            render={({ field }) => (
+              <TextField
+                label="Time"
+                optional
+                type="time"
+                hint="You get a reminder at this time."
+                value={(field.value as string | undefined) ?? ''}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
+        </div>
       )}
       {showLocation && (
         <Controller

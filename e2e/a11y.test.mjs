@@ -1,7 +1,7 @@
 // Automated accessibility checks (axe-core, WCAG 2.1 A/AA) on the main screens and open overlays.
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
-import { axeViolations, click, clickNth, LAPTOP, PHONE, sleep, startApp, waitForText } from './harness.mjs'
+import { axeViolations, click, clickNth, LAPTOP, PHONE, sleep, startApp, waitForText, chooseNoteIfOffered } from './harness.mjs'
 import { ids } from './mock-api.mjs'
 
 let app
@@ -43,6 +43,7 @@ describe('axe: open overlays', () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save follow-up')
     await sleep(500)
     assert.deepEqual(await axeViolations(page), [])
@@ -53,6 +54,7 @@ describe('axe: open overlays', () => {
     const { page, go } = await app.open(PHONE)
     await go(`/leads/${ids.lead}`)
     await click(page, 'Log follow-up')
+    await chooseNoteIfOffered(page)
     await click(page, 'Follow-up scheduled', '[role=radio]')
     await waitForText(page, 'Tomorrow')
     await sleep(500)
@@ -84,6 +86,7 @@ describe('axe: open overlays', () => {
     const { page, go } = await app.open(PHONE, { projectId: ids.d2d })
     await go('/home')
     await click(page, 'Add lead')
+    await chooseNoteIfOffered(page)
     await waitForText(page, 'Save lead')
     await sleep(500)
     assert.deepEqual(await axeViolations(page), [])

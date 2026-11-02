@@ -4,7 +4,8 @@ import { Avatar, Tag } from '@/components/ui/Display'
 import { Icon } from '@/icons'
 import { cn } from '@/lib/cn'
 import { dealOf } from '@/lib/deal'
-import { leadPerson, leadTitle, plural, relativeDay } from '@/lib/format'
+import { leadPerson, leadTitle, plural } from '@/lib/format'
+import { relativeDayTime } from './channels'
 import type { LeadSummary } from '@/lib/types'
 import { ContactButtons } from './ContactActions'
 
@@ -14,7 +15,7 @@ export function LeadWhen({ lead }: { lead: LeadSummary }) {
   if (!lead.owner) return <Tag>Not assigned</Tag>
   if (lead.ownerTag) return <Tag>{lead.ownerTag === 'owner_inactive' ? 'Owner left the team' : 'Owner removed'}</Tag>
   if (lead.overdueDays) return <Tag tone="down">Overdue {plural(lead.overdueDays, 'day')}</Tag>
-  if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDay(lead.nextFollowUpDate)}</span>
+  if (lead.nextFollowUpDate) return <span className="text-caption whitespace-nowrap text-body">Next: {relativeDayTime(lead.nextFollowUpDate, lead.nextFollowUpTime)}</span>
   if (lead.hasPendingTransfer) return <span className="text-caption whitespace-nowrap text-muted">Handover pending</span>
   return null
 }
